@@ -71,6 +71,7 @@ export class Avatar {
       nod: null, shake: null, tap: null,
     };
     this.frameHooks = []; // (vrm, dt) => void, run after each rendered frame (self-sense reads the drawn pose here)
+    this.poseHooks = []; // (vrm, dt) => void, run after her idle pose is set and before the leg IK (learned moves blend in here)
     this.N = Object.fromEntries(['hx', 'hy', 'hz', 'nx', 'ny', 'sx', 'sy', 'sz', 'cy', 'px', 'py', 'br', 'al', 'ar', 'el', 'er', 'fl', 'fr', 'sw'].map((k) => [k, noise()]));
     this.breath = 0;
     this.feet = null; // planted foot anchors (world), set once she's on the floor
@@ -444,6 +445,7 @@ export class Avatar {
       add('rightLowerArm', 0, (0.5 + 0.5 * N.er(t * 0.15)) * 0.2 * restR, 0);
       // legs: start straight-ish (knees a hair forward of locked), then IK plants each foot
       for (const s of ['left', 'right']) { set(s + 'UpperLeg', 0, 0, 0); set(s + 'LowerLeg', 0.03, 0, 0); set(s + 'Foot', 0, 0, 0); }
+      for (const f of this.poseHooks) { try { f(vrm, dt); } catch (e) { console.warn('pose hook', e); } }
       H.normalizedHumanBonesRoot.updateMatrixWorld(true);
       // the free leg (weight on the other one) rests on the ball of its foot: heel up, knee bent
       this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));

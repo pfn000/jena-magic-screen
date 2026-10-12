@@ -1,0 +1,153 @@
+[
+ {
+  "id": "DRyaRp3COvE",
+  "ok": true,
+  "reasons": [],
+  "frames": 251,
+  "detected": 1.0,
+  "vis_legs": 0.962,
+  "vis_arms": 0.923,
+  "jitter": 0.0018,
+  "bone_cv": 0.052,
+  "feet_in_frame": 1.0,
+  "leglen": 0.824,
+  "energy_arms": 0.321,
+  "energy_body": 0.077,
+  "root_range": [
+   0.154,
+   0.054,
+   0.12
+  ],
+  "title": "3D people animation : Casual Jessica standing and waiting \u00a9cg-people.com"
+ },
+ {
+  "id": "EYDDtTJ6TtQ_18",
+  "ok": true,
+  "reasons": [],
+  "frames": 318,
+  "detected": 1.0,
+  "vis_legs": 0.977,
+  "vis_arms": 0.887,
+  "jitter": 0.0122,
+  "bone_cv": 0.166,
+  "feet_in_frame": 1.0,
+  "leglen": 0.781,
+  "energy_arms": 3.057,
+  "energy_body": 0.374,
+  "root_range": [
+   0.11,
+   0.098,
+   0.144
+  ],
+  "title": "Five-Minute Full Body Stretch | Dance Warm Up"
+ },
+ {
+  "id": "Eu_jgIfi7SQ",
+  "ok": true,
+  "reasons": [],
+  "frames": 334,
+  "detected": 1.0,
+  "vis_legs": 0.987,
+  "vis_arms": 0.993,
+  "jitter": 0.0032,
+  "bone_cv": 0.061,
+  "feet_in_frame": 1.0,
+  "leglen": 0.811,
+  "energy_arms": 0.269,
+  "energy_body": 0.053,
+  "root_range": [
+   0.24,
+   0.104,
+   0.16
+  ],
+  "title": "Weight Shift Reference"
+ },
+ {
+  "id": "G74_o_43_RQ_30",
+  "ok": false,
+  "reasons": [
+   "jittery tracking",
+   "limb lengths jumping (bad depth)",
+   "feet out of frame"
+  ],
+  "frames": 288,
+  "detected": 1.0,
+  "vis_legs": 0.907,
+  "vis_arms": 0.796,
+  "jitter": 0.0384,
+  "bone_cv": 0.254,
+  "feet_in_frame": 0.925,
+  "leglen": 0.795,
+  "energy_arms": 3.053,
+  "energy_body": 0.407,
+  "root_range": [
+   0.24,
+   0.23,
+   0.16
+  ],
+  "title": "Just Dance 2015 - Happy Pharrell Williams Gameplay - 5 Stars Rating [ HD ]"
+ },
+ {
+  "id": "clp3Ysai6w0",
+  "ok": true,
+  "reasons": [],
+  "frames": 235,
+  "detected": 1.0,
+  "vis_legs": 0.985,
+  "vis_arms": 0.979,
+  "jitter": 0.0014,
+  "bone_cv": 0.15,
+  "feet_in_frame": 1.0,
+  "leglen": 0.801,
+  "energy_arms": 0.294,
+  "energy_body": 0.037,
+  "root_range": [
+   0.103,
+   0.039,
+   0.038
+  ],
+  "title": "3D people animation : Casual Melissa Standing and speaking \u00a9cg-people.com"
+ },
+ {
+  "id": "ohASxT9tTbg",
+  "ok": true,
+  "reasons": [],
+  "frames": 233,
+  "detected": 1.0,
+  "vis_legs": 0.985,
+  "vis_arms": 0.986,
+  "jitter": 0.0017,
+  "bone_cv": 0.106,
+  "feet_in_frame": 1.0,
+  "leglen": 0.81,
+  "energy_arms": 0.306,
+  "energy_body": 0.052,
+  "root_range": [
+   0.098,
+   0.037,
+   0.084
+  ],
+  "title": "3D people animation : Casual Jessica Standing and speaking \u00a9cg-people.com"
+ },
+ {
+  "id": "vetLPqfhXCc",
+  "ok": true,
+  "reasons": [],
+  "frames": 280,
+  "detected": 1.0,
+  "vis_legs": 0.95,
+  "vis_arms": 0.903,
+  "jitter": 0.0038,
+  "bone_cv": 0.143,
+  "feet_in_frame": 1.0,
+  "leglen": 0.807,
+  "energy_arms": 0.617,
+  "energy_body": 0.119,
+  "root_range": [
+   0.172,
+   0.084,
+   0.129
+  ],
+  "title": "Reference Video"
+ }
+]

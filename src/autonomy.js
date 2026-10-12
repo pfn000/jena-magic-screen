@@ -112,6 +112,7 @@ export class Autonomy {
     if (!this.ready) return;
     this.wave('right', `${user} said my name`);
     this.face('happy', 4000, '', true);
+    if (this.moves && !this.moves.busy && Math.random() < 0.35) setTimeout(() => this.moves.play('happy', 'happy', `${user} hyped me up`), 2600);
   }
   onMessage(user, text = '') {
     if (!this.ready) return;
@@ -131,6 +132,8 @@ export class Autonomy {
     else if (/^(yes|yeah|yep|ok|okay|sure|bet)\b/.test(t)) this.nod('', true);
     else if (/\?\s*$/.test(t)) this.avatar.tiltHead(Math.random() < 0.5 ? 'left' : 'right', 2200, 0.15);
     if (/!{1,}|\b(lets go|let's go|yay|hype)\b/.test(t) && Math.random() < 0.5) this.avatar.curlHand('right', 1, 1400);
+    // a longer thing to say: she talks with her hands the way she learned from people on video
+    else if (t.length > 50 && this.moves && !this.moves.busy && Math.random() < 0.6) this.moves.play('talk', this.mood);
   }
   onPrivateMessage() {
     if (!this.ready) return;
@@ -164,10 +167,16 @@ export class Autonomy {
   tick() {
     if (!this.ready || document.hidden) return;
     const now = Date.now();
-    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000) return;
+    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000 || this.moves?.busy) return;
     this.lastIdle = now;
     this.nextIdleIn = 12000 + Math.random() * 18000;
     const quietFor = now - Math.max(...this.chatTimes, 0);
+    // moves she learned herself from watching videos of real people (src/moves.js): often her first pick
+    if (this.moves?.library.length && Math.random() < 0.55) {
+      this.lastMove = now;
+      this.moves.play(quietFor > 90000 ? 'bored' : 'idle', this.mood);
+      return;
+    }
     const options = [
       () => this.raise('both', 2200, 'stretching, been standing here a while'),
       () => this.tilt(pick(['left', 'right']), 2800, 'thinking about something'),

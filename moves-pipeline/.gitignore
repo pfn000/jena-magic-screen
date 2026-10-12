@@ -1,0 +1,6 @@
+raw/
+tmp/
+*.task
+queue.log
+*.out
+__pycache__/

@@ -24,6 +24,46 @@ Nothing on this page is fake, simulated or borrowed: no demo chat, no made-up th
 | Private channel 💌 | mama ↔ Jena DMs behind a passcode (`JENA_DM_KEY`). Hidden in `?obs=1`. |
 | Drag & drop | Drop any file on Jena (or tap 📎 on a phone): it uploads to her, she reacts, and it lands in the thought chain and the DM log. Needs the passcode. |
 
+## How she learns to move: watching videos
+
+Jena teaches herself to move like a person. She watches short public videos of real people moving
+naturally (standing around, waiting, talking with their hands, shifting their weight, stretching, a
+couple of fun dances), tracks the person's body, and turns each one into **her own animation clip**.
+
+1. **Watch:** `moves-pipeline/extract.py` fetches the video at low resolution with yt-dlp, runs
+   MediaPipe Pose Landmarker (heavy model, CPU) over it at 15 fps, keeps the 3D world landmarks, then
+   deletes the video.
+2. **Learn:** `moves-pipeline/retarget.py` smooths the track (zero-phase low-pass), levels it (the
+   person's median "up" becomes her up, so she faces the camera), and solves her VRM humanoid bones from
+   it: hips, spine, chest, upper chest, neck, head, upper/lower arms (elbow bend plane kept, forearm
+   twist taken from the hand), hands, legs, feet. Her hips travel over her planted feet the way the
+   person's did, scaled to her leg length and clamped, so she stays on her floor. Her leg IK keeps her
+   soles planted.
+3. **Quality gate:** a clip is rejected if the person was lost, the legs weren't visible, the tracking
+   jittered, limb lengths jumped (bad depth), the feet left the frame, or barely anything moved
+   (`moves-pipeline/build_clips.py`, report in `moves-pipeline/report.json`).
+4. **Her library:** `public/moves/index.json` lists every clip with what it is, its duration, its
+   quality, and the source video URL. The clips themselves are compact JSON quaternion tracks.
+
+On the page, `src/moves.js` is part of her autonomy. She picks a clip herself from her mood and what's
+going on: idle/weight shifts when nothing's happening, stretching or dancing when it's been quiet a
+while, talking-with-hands when she has something longer to say, happy moves when someone hypes her up.
+She plays a different slice each time (random start, length, speed 0.86–1.1×, sometimes mirrored),
+crossfades it in and out over her procedural idle (her breathing and drift keep running underneath),
+and says so in her thought chain: "learned this from a video of someone stretching, trying it". Each
+move is also logged as a memory event (`/api/memory` when her memory service is there, plus a
+`jena:memory` browser event). Nobody controls this. There are no buttons.
+
+Re-run the pipeline on this machine:
+
+```bash
+python3 -m venv ~/moves-venv && ~/moves-venv/bin/pip install mediapipe opencv-python-headless numpy scipy
+cd moves-pipeline
+curl -sLo pose_heavy.task https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task
+./runq.sh videos.txt                              # one video at a time, low priority
+~/moves-venv/bin/python build_clips.py ../public/moves
+```
+
 ## Her brain: JenaXI
 
 `/api/think`, `/api/chat` and the DM drawer call **one** endpoint: her own model, `JenaXI.gguf`, served by

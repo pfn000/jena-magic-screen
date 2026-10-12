@@ -1,0 +1,158 @@
+{
+ "version": 1,
+ "note": "Jena's own animation clips. Each one she built herself by watching a short public video of a real person moving, tracking their body (MediaPipe Pose, world landmarks), smoothing it and retargeting it onto her VRM bones. Bones are quaternions (x,y,z,w)*scale per frame in VRM 1.0 normalized space; hips_offset is her hips' travel over her planted feet, in leg lengths.",
+ "clips": [
+  {
+   "id": "DRyaRp3COvE",
+   "file": "DRyaRp3COvE.json",
+   "label": "waiting",
+   "what": "a woman standing and waiting",
+   "kind": "idle",
+   "moods": [
+    "neutral",
+    "relaxed",
+    "sad"
+   ],
+   "duration": 16.73,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=DRyaRp3COvE",
+    "title": "3D people animation : Casual Jessica standing and waiting \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0018,
+    "legs_visible": 0.962,
+    "limb_stability": 0.948
+   }
+  },
+  {
+   "id": "EYDDtTJ6TtQ_18",
+   "file": "EYDDtTJ6TtQ_18.json",
+   "label": "warm-up stretch",
+   "what": "a dancer warming up and stretching",
+   "kind": "stretch",
+   "moods": [
+    "neutral",
+    "relaxed"
+   ],
+   "duration": 21.2,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=EYDDtTJ6TtQ",
+    "title": "Five-Minute Full Body Stretch | Dance Warm Up",
+    "channel": "DJ Raphi",
+    "start": 18.0,
+    "end": 40.0
+   },
+   "quality": {
+    "jitter": 0.0122,
+    "legs_visible": 0.977,
+    "limb_stability": 0.834
+   }
+  },
+  {
+   "id": "Eu_jgIfi7SQ",
+   "file": "Eu_jgIfi7SQ.json",
+   "label": "weight shift",
+   "what": "someone shifting their weight from foot to foot",
+   "kind": "weight",
+   "moods": [
+    "neutral",
+    "relaxed"
+   ],
+   "duration": 22.27,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=Eu_jgIfi7SQ",
+    "title": "Weight Shift Reference",
+    "channel": "Tricia McIntosh",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0032,
+    "legs_visible": 0.987,
+    "limb_stability": 0.939
+   }
+  },
+  {
+   "id": "clp3Ysai6w0",
+   "file": "clp3Ysai6w0.json",
+   "label": "explaining",
+   "what": "a woman explaining something with her hands",
+   "kind": "talk",
+   "moods": [
+    "neutral",
+    "happy",
+    "surprised"
+   ],
+   "duration": 15.67,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=clp3Ysai6w0",
+    "title": "3D people animation : Casual Melissa Standing and speaking \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0014,
+    "legs_visible": 0.985,
+    "limb_stability": 0.85
+   }
+  },
+  {
+   "id": "ohASxT9tTbg",
+   "file": "ohASxT9tTbg.json",
+   "label": "talking gestures",
+   "what": "someone talking with their hands",
+   "kind": "talk",
+   "moods": [
+    "neutral",
+    "happy"
+   ],
+   "duration": 15.53,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=ohASxT9tTbg",
+    "title": "3D people animation : Casual Jessica Standing and speaking \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0017,
+    "legs_visible": 0.985,
+    "limb_stability": 0.894
+   }
+  },
+  {
+   "id": "vetLPqfhXCc",
+   "file": "vetLPqfhXCc.json",
+   "label": "standing fidget",
+   "what": "someone just standing around, shifting and fidgeting",
+   "kind": "idle",
+   "moods": [
+    "neutral",
+    "relaxed"
+   ],
+   "duration": 18.67,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=vetLPqfhXCc",
+    "title": "Reference Video",
+    "channel": "jelly233",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0038,
+    "legs_visible": 0.95,
+    "limb_stability": 0.857
+   }
+  }
+ ]
+}

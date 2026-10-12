@@ -6,6 +6,7 @@ import { TwitchChat, clean } from './chat.js';
 import { ThoughtChain } from './thoughts.js';
 import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
+import { Moves, rememberMove } from './moves.js';
 import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
@@ -67,6 +68,8 @@ setInterval(pollHealth, 15000);
 
 // ---------------- her own body: autonomy + self-vision ----------------
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
+// moves she learned by watching videos of real people move (pose-tracked into her own clips, /moves/)
+autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), remember: rememberMove });
 const params = new URLSearchParams(location.search);
 // her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
 const selfSense = new SelfSense(avatar, {
