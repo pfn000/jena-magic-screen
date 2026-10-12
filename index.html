@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Jena · magic screen</title>
+  <meta name="description" content="Jena's live stage: her avatar, her desktop, stream chat and her thought process chain.">
+  <meta property="og:title" content="Jena · magic screen">
+  <meta property="og:description" content="Jena's live stage: avatar, desktop, chat and thought chain.">
+  <meta name="theme-color" content="#f6d7ec">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎀</text></svg>">
+</head>
+<body>
+  <div id="bg" aria-hidden="true"></div>
+  <main id="stage">
+    <section id="avatar-panel" aria-label="Jena">
+      <canvas id="avatar-canvas" aria-label="Jena's avatar, live"></canvas>
+      <p id="avatar-status" role="status">waking Jena up…</p>
+      <div id="speech" aria-live="polite"></div>
+      <div class="nametag"><span class="name">Jena</span><span class="model">JenaXI</span></div>
+      <div class="drop-hint" aria-hidden="true">drop it on me 👀</div>
+      <canvas id="self-view" aria-label="what Jena sees of herself"></canvas>
+      <span id="self-view-label">what I see</span>
+      <div class="controls" aria-label="give Jena a file">
+        <button type="button" id="gift" title="give Jena a file">📎</button>
+        <input type="file" id="file-input" hidden>
+      </div>
+    </section>
+
+    <section id="desktop" class="panel is-asleep" aria-label="Jena's virtual desktop">
+      <header class="panel-head"><h2>Virtual desktop</h2><span class="desk-badge">ASLEEP</span></header>
+      <div class="desk-body">
+        <div class="desk-screen"></div>
+        <div class="desk-sleep">
+          <div class="zzz" aria-hidden="true"><span>z</span><span>z</span><span>Z</span></div>
+          <p class="title">Jena's desktop is asleep</p>
+          <p class="why">no desktop stream configured yet</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="chat" class="panel" aria-label="Stream chat">
+      <header class="panel-head"><h2>Chat <span class="sub">· Twitch</span></h2><span id="chat-channel" class="chip">not connected</span></header>
+      <ul id="chat-list" aria-live="off"></ul>
+      <form id="talk" autocomplete="off">
+        <label class="sr" for="talk-input">Talk to Jena</label>
+        <input id="talk-input" maxlength="300" placeholder="talk to Jena…">
+        <button type="submit" aria-label="send">➤</button>
+      </form>
+    </section>
+
+    <section id="thoughts" class="panel" aria-label="Thought process chain">
+      <header class="panel-head"><h2>Thought chain</h2><span class="brain-badge is-off">JenaXI-0 is training — brain offline</span></header>
+      <div class="thought-list"></div>
+    </section>
+  </main>
+
+  <button id="dm-toggle" type="button" aria-controls="dm" title="private channel to Jena">💌</button>
+  <aside id="dm" class="locked" aria-hidden="true" aria-label="Private channel: mama and Jena">
+    <header><h2>mama 💌 Jena</h2><span class="priv">private · never on stream</span><button id="dm-close" type="button" aria-label="close">✕</button></header>
+    <form id="dm-unlock" class="lock">
+      <label for="dm-key">passcode</label>
+      <input id="dm-key" type="password" autocomplete="current-password" placeholder="passcode">
+      <button type="submit">unlock</button>
+      <p id="dm-err" role="alert"></p>
+    </form>
+    <ul id="dm-log"></ul>
+    <form id="dm-form" class="unlocked" autocomplete="off">
+      <input id="dm-input" maxlength="2000" placeholder="message Jena privately…" aria-label="private message">
+      <button type="submit">send</button>
+    </form>
+    <footer class="unlocked"><span id="dm-store"></span><button id="dm-lock" type="button">lock</button></footer>
+  </aside>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "desktopUrl": "wss://tend-wear-bottom-sys.trycloudflare.com/websockify",
+  "twitch": null,
+  "note": "Static fallback config. /api/config (Vercel env JENA_DESKTOP_URL, or the URL her machine announces) wins over this file; ?desktop= wins over both."
+}

@@ -1,0 +1,26 @@
+{
+  "name": "jena-magic-screen",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Jena's magic screen: live VRM avatar, virtual desktop, stream chat and thought chain. Runs as a website or an OBS browser source.",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/unpack-assets.mjs && node scripts/mediapipe-assets.mjs && vite build",
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0",
+    "@novnc/novnc": "^1.7.0",
+    "@pixiv/three-vrm": "^3.5.5",
+    "@vercel/blob": "^2.8.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

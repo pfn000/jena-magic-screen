@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.vercel/
+.env*
+public/bg-room.jpg
+public/mediapipe/
