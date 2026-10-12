@@ -16,13 +16,18 @@ const MIRROR = (b) => b.startsWith('left') ? 'right' + b.slice(4) : b.startsWith
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+const [_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8] = Array.from({ length: 8 }, () => new THREE.Vector3());
 
 export class Moves {
-  constructor(avatar, { log = () => {}, base = '/moves/', remember = null } = {}) {
+  constructor(avatar, { log = () => {}, base = '/moves/', remember = null, card = null } = {}) {
     this.avatar = avatar;
     this.log = log;
     this.base = base;
     this.remember = remember; // optional (event) => void: her memory, when there is one
+    this.card = card; // optional (trigger) => {step, done}: a thought-chain card (shows the video she learned from)
+    this.shown = new Map(); // clip id -> when its source video was last shown
+    this.guard = { left: 1, right: 1 };
+    this._hipInv = new THREE.Matrix4(); this._chestInv = new THREE.Matrix4();
     this.library = [];
     this.cache = new Map();
     this.recent = [];
@@ -87,6 +92,7 @@ export class Moves {
     const start = Math.random() * Math.max(0, dur - len);
     const rate = 0.86 + Math.random() * 0.24;
     const mirror = meta.mirror !== false && Math.random() < 0.4;
+    this.guard = { left: 1, right: 1 };
     this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
     this.recent = [meta.id, ...this.recent].slice(0, Math.min(4, Math.max(1, this.library.length - 2)));
     const what = meta.what || 'someone moving';
@@ -99,9 +105,90 @@ export class Moves {
     let line = pick(lines);
     if (mirror) line += ', mirrored so it starts on my other side';
     if (why) line += ` (${why})`;
-    this.log(line);
+    this.showSource(meta, line);
     if (this.remember) { try { this.remember({ type: 'move', clip: meta.id, what, source: meta.source?.url, mirror, rate: +rate.toFixed(2) }); } catch {} }
     return true;
+  }
+
+
+  // the video she learned it from, so anyone watching can see it too (thumbnail opens the video)
+  showSource(meta, line) {
+    const src = meta.source || {};
+    const vid = /[?&]v=([\w-]{11})/.exec(src.url || '')?.[1];
+    const last = this.shown.get(meta.id) || 0;
+    if (!this.card || !vid || Date.now() - last < 10 * 60000) { this.log(line); return; }
+    this.shown.set(meta.id, Date.now());
+    try {
+      const run = this.card({ user: 'Jena', source: 'a video I learned from', text: `"${(src.title || meta.what).slice(0, 90)}"${src.channel ? ` · ${src.channel}` : ''}`, thumb: `https://i.ytimg.com/vi/${vid}/mqdefault.jpg` });
+      const list = document.querySelector('.thought-list');
+      const img = list?.lastElementChild?.querySelector('img.thumb');
+      if (img) {
+        const t = src.start != null ? `&t=${Math.floor(src.start)}s` : '';
+        const a = document.createElement('a');
+        a.href = `https://www.youtube.com/watch?v=${vid}${t}`; a.target = '_blank'; a.rel = 'noopener';
+        a.title = 'the video Jena learned this move from';
+        img.replaceWith(a); a.appendChild(img);
+      }
+      run.step('body', line);
+      run.done();
+    } catch { this.log(line); }
+  }
+
+
+  // Her hands and forearms never go through her own body, and they stay away from her chest and the
+  // front of her hips (a learned move that would put them there is eased back toward her own idle arm).
+  keepClear(H, w, armBusy) {
+    const hips = H.getNormalizedBoneNode('hips'), chest = H.getNormalizedBoneNode('upperChest') || H.getNormalizedBoneNode('chest');
+    const lu = H.getNormalizedBoneNode('leftUpperArm'), ru = H.getNormalizedBoneNode('rightUpperArm'), neck = H.getNormalizedBoneNode('neck');
+    if (!hips || !chest || !lu || !ru || !neck) return;
+    H.normalizedHumanBonesRoot.updateMatrixWorld(true);
+    const P = (n, v) => n.getWorldPosition(v);
+    const sw = P(lu, _v1).distanceTo(P(ru, _v2));
+    const a = sw * 0.36, b = a * 0.75; // torso half-width / half-depth
+    const hipY = P(hips, _v1).y, neckY = P(neck, _v2).y;
+    this._hipInv.copy(hips.matrixWorld).invert();
+    this._chestInv.copy(chest.matrixWorld).invert();
+    const bad = (p) => {
+      const c = _v3.copy(p).applyMatrix4(this._chestInv), h = _v4.copy(p).applyMatrix4(this._hipInv);
+      const y = p.y;
+      // inside the torso (an elliptic column from below the hips up to the neck)
+      if (y > hipY - 0.1 && y < neckY && (c.x / a) ** 2 + (c.z / b) ** 2 < 1) return true;
+      // in front of her chest
+      if (y > hipY + 0.55 * (neckY - hipY) && y < neckY - 0.03 && Math.abs(c.x) < a * 0.85 && c.z > b * 0.4 && c.z < b + 0.16) return true;
+      // in front of her hips / lower belly
+      if (h.y > -0.16 && h.y < 0.07 && Math.abs(h.x) < a * 0.9 && h.z > -0.02 && h.z < 0.22) return true;
+      return false;
+    };
+    for (const side of ['left', 'right']) {
+      if (armBusy[side]) { this.guard[side] = 1; continue; }
+      const nodes = ['UpperArm', 'LowerArm', 'Hand'].map((s) => H.getNormalizedBoneNode(side + s));
+      const [up, lo, hand] = nodes;
+      if (!up || !lo || !hand) continue;
+      const test = () => {
+        hand.updateMatrixWorld(true);
+        const hp = P(hand, _v5), lp = P(lo, _v6);
+        const mid = _v7.copy(hp).lerp(lp, 0.5);
+        const tip = _v8.copy(hp).sub(lp).multiplyScalar(0.45).add(hp);
+        return bad(hp) || bad(mid) || bad(tip);
+      };
+      let k = this.guard[side];
+      if (test()) {
+        // back off toward her own arm until it's clear
+        for (const f of [0.6, 0.3, 0]) {
+          k = Math.min(k, f);
+          ['UpperArm', 'LowerArm', 'Hand'].forEach((s, i) => {
+            const bn = side + s, n = nodes[i];
+            if (this._proc?.[bn] && this._clip?.[bn]) n.quaternion.copy(this._proc[bn]).slerp(this._clip[bn], w * (WEIGHT[bn] ?? 0.8) * k);
+          });
+          up.updateMatrixWorld(true);
+          if (!test()) break;
+        }
+        this.guard[side] = k;
+        this.guardHits = (this.guardHits || 0) + 1;
+      } else {
+        this.guard[side] = Math.min(1, k + 0.02); // ease back in once clear
+      }
+    }
   }
 
   stop() { if (this.playing) this.playing.stopAt = this.playing.t; }
@@ -127,6 +214,7 @@ export class Moves {
     if (A.handOnHip) armBusy[A.handOnHip.side] = true;
     if (A.target?.leftUpperArm && A.target.leftUpperArm[2] > -0.6) armBusy.left = true;
     if (A.target?.rightUpperArm && A.target.rightUpperArm[2] < 0.6) armBusy.right = true;
+    for (const b of ARMS) { const n = H.getNormalizedBoneNode(b); if (n) (this._proc ||= {})[b] = (this._proc?.[b] || new THREE.Quaternion()).copy(n.quaternion); }
     for (const bone of [...BODY, ...ARMS]) {
       const src = p.mirror ? MIRROR(bone) : bone;
       const tr = c.tracks[src];
@@ -145,8 +233,11 @@ export class Moves {
         continue;
       }
       if (!node) continue;
-      node.quaternion.slerp(tq, w * (WEIGHT[bone] ?? 0.8));
+      if (!(this._clip ||= {})[bone]) this._clip[bone] = new THREE.Quaternion();
+      this._clip[bone].copy(tq);
+      node.quaternion.slerp(tq, w * (WEIGHT[bone] ?? 0.8) * (side ? this.guard[side] : 1));
     }
+    this.keepClear(H, w, armBusy);
     // hips: travel over her planted feet the way the person's did (scaled to her legs, clamped)
     const hips = H.getNormalizedBoneNode('hips');
     if (c.hips && hips && A.hipsRest) {

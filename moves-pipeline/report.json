@@ -1,5 +1,74 @@
 [
  {
+  "id": "AhE5LVWgNzA_10",
+  "ok": false,
+  "reasons": [
+   "feet out of frame"
+  ],
+  "frames": 288,
+  "detected": 0.9652777777777778,
+  "vis_legs": 0.823,
+  "vis_arms": 0.627,
+  "jitter": 0.0245,
+  "bone_cv": 0.181,
+  "feet_in_frame": 0.767,
+  "leglen": 0.825,
+  "energy_arms": 1.688,
+  "energy_body": 0.365,
+  "root_range": [
+   0.24,
+   0.23,
+   0.16
+  ],
+  "title": "How to Do the Floss Dance"
+ },
+ {
+  "id": "CNHJ72oDG_s",
+  "ok": true,
+  "reasons": [],
+  "frames": 235,
+  "detected": 1.0,
+  "vis_legs": 0.984,
+  "vis_arms": 0.958,
+  "jitter": 0.0021,
+  "bone_cv": 0.147,
+  "feet_in_frame": 1.0,
+  "leglen": 0.776,
+  "energy_arms": 0.303,
+  "energy_body": 0.043,
+  "root_range": [
+   0.095,
+   0.037,
+   0.06
+  ],
+  "title": "3D people animation : Casual Donna Standing and speaking \u00a9cg-people.com"
+ },
+ {
+  "id": "CPpVR1CWco8",
+  "ok": false,
+  "reasons": [
+   "legs not visible",
+   "jittery tracking",
+   "feet out of frame"
+  ],
+  "frames": 292,
+  "detected": 1.0,
+  "vis_legs": 0.11,
+  "vis_arms": 0.844,
+  "jitter": 0.0407,
+  "bone_cv": 0.197,
+  "feet_in_frame": 0.0,
+  "leglen": 0.734,
+  "energy_arms": 2.459,
+  "energy_body": 0.283,
+  "root_range": [
+   0.223,
+   0.207,
+   0.16
+  ],
+  "title": "Jumping girl is happy"
+ },
+ {
   "id": "DRyaRp3COvE",
   "ok": true,
   "reasons": [],
@@ -19,6 +88,27 @@
    0.12
   ],
   "title": "3D people animation : Casual Jessica standing and waiting \u00a9cg-people.com"
+ },
+ {
+  "id": "EYDDtTJ6TtQ_112",
+  "ok": true,
+  "reasons": [],
+  "frames": 333,
+  "detected": 1.0,
+  "vis_legs": 0.976,
+  "vis_arms": 0.944,
+  "jitter": 0.0097,
+  "bone_cv": 0.124,
+  "feet_in_frame": 1.0,
+  "leglen": 0.808,
+  "energy_arms": 2.283,
+  "energy_body": 0.227,
+  "root_range": [
+   0.24,
+   0.145,
+   0.148
+  ],
+  "title": "Five-Minute Full Body Stretch | Dance Warm Up"
  },
  {
   "id": "EYDDtTJ6TtQ_18",
@@ -42,6 +132,29 @@
   "title": "Five-Minute Full Body Stretch | Dance Warm Up"
  },
  {
+  "id": "EYDDtTJ6TtQ_58",
+  "ok": false,
+  "reasons": [
+   "limb lengths jumping (bad depth)"
+  ],
+  "frames": 318,
+  "detected": 1.0,
+  "vis_legs": 0.938,
+  "vis_arms": 0.726,
+  "jitter": 0.0048,
+  "bone_cv": 0.248,
+  "feet_in_frame": 1.0,
+  "leglen": 0.796,
+  "energy_arms": 0.842,
+  "energy_body": 0.082,
+  "root_range": [
+   0.082,
+   0.055,
+   0.134
+  ],
+  "title": "Five-Minute Full Body Stretch | Dance Warm Up"
+ },
+ {
   "id": "Eu_jgIfi7SQ",
   "ok": true,
   "reasons": [],
@@ -61,6 +174,30 @@
    0.16
   ],
   "title": "Weight Shift Reference"
+ },
+ {
+  "id": "G74_o_43_RQ_100",
+  "ok": false,
+  "reasons": [
+   "jittery tracking",
+   "limb lengths jumping (bad depth)"
+  ],
+  "frames": 288,
+  "detected": 0.9930555555555556,
+  "vis_legs": 0.937,
+  "vis_arms": 0.74,
+  "jitter": 0.0499,
+  "bone_cv": 0.269,
+  "feet_in_frame": 0.993,
+  "leglen": 0.806,
+  "energy_arms": 3.048,
+  "energy_body": 0.426,
+  "root_range": [
+   0.24,
+   0.167,
+   0.16
+  ],
+  "title": "Just Dance 2015 - Happy Pharrell Williams Gameplay - 5 Stars Rating [ HD ]"
  },
  {
   "id": "G74_o_43_RQ_30",
@@ -88,6 +225,48 @@
   "title": "Just Dance 2015 - Happy Pharrell Williams Gameplay - 5 Stars Rating [ HD ]"
  },
  {
+  "id": "WrJsrsVWkGA",
+  "ok": true,
+  "reasons": [],
+  "frames": 235,
+  "detected": 1.0,
+  "vis_legs": 0.985,
+  "vis_arms": 0.96,
+  "jitter": 0.0028,
+  "bone_cv": 0.161,
+  "feet_in_frame": 1.0,
+  "leglen": 0.788,
+  "energy_arms": 0.355,
+  "energy_body": 0.046,
+  "root_range": [
+   0.107,
+   0.044,
+   0.066
+  ],
+  "title": "3D people animation : Casual Sharon standing and speaking \u00a9cg-people.com"
+ },
+ {
+  "id": "cIdMN8szJps",
+  "ok": true,
+  "reasons": [],
+  "frames": 251,
+  "detected": 1.0,
+  "vis_legs": 0.954,
+  "vis_arms": 0.9,
+  "jitter": 0.0021,
+  "bone_cv": 0.06,
+  "feet_in_frame": 1.0,
+  "leglen": 0.811,
+  "energy_arms": 0.325,
+  "energy_body": 0.084,
+  "root_range": [
+   0.159,
+   0.044,
+   0.158
+  ],
+  "title": "3D people animation : Casual Julia standing and waiting \u00a9cg-people.com"
+ },
+ {
   "id": "clp3Ysai6w0",
   "ok": true,
   "reasons": [],
@@ -107,6 +286,52 @@
    0.038
   ],
   "title": "3D people animation : Casual Melissa Standing and speaking \u00a9cg-people.com"
+ },
+ {
+  "id": "fI9fiK8Yalg_60",
+  "ok": false,
+  "reasons": [
+   "lost the person",
+   "limb lengths jumping (bad depth)",
+   "feet out of frame"
+  ],
+  "frames": 288,
+  "detected": 0.8541666666666666,
+  "vis_legs": 0.606,
+  "vis_arms": 0.619,
+  "jitter": 0.0313,
+  "bone_cv": 0.315,
+  "feet_in_frame": 0.84,
+  "leglen": 0.798,
+  "energy_arms": 2.827,
+  "energy_body": 0.501,
+  "root_range": [
+   0.24,
+   0.23,
+   0.16
+  ],
+  "title": "Just Dance 2023 - CAN'T STOP THE FEELING! | Full Gameplay 4K 60FPS"
+ },
+ {
+  "id": "lgupcR-BIW0",
+  "ok": true,
+  "reasons": [],
+  "frames": 251,
+  "detected": 1.0,
+  "vis_legs": 0.955,
+  "vis_arms": 0.913,
+  "jitter": 0.0031,
+  "bone_cv": 0.056,
+  "feet_in_frame": 1.0,
+  "leglen": 0.798,
+  "energy_arms": 0.347,
+  "energy_body": 0.08,
+  "root_range": [
+   0.152,
+   0.05,
+   0.13
+  ],
+  "title": "3D people animation : Casual Sharon standing and waiting \u00a9cg-people.com"
  },
  {
   "id": "ohASxT9tTbg",
@@ -130,6 +355,51 @@
   "title": "3D people animation : Casual Jessica Standing and speaking \u00a9cg-people.com"
  },
  {
+  "id": "rVBHH5DwYFA_30",
+  "ok": true,
+  "reasons": [],
+  "frames": 288,
+  "detected": 0.9965277777777778,
+  "vis_legs": 0.837,
+  "vis_arms": 0.679,
+  "jitter": 0.0324,
+  "bone_cv": 0.227,
+  "feet_in_frame": 0.997,
+  "leglen": 0.776,
+  "energy_arms": 3.088,
+  "energy_body": 0.436,
+  "root_range": [
+   0.232,
+   0.119,
+   0.16
+  ],
+  "title": "The Macarena Dance 2022"
+ },
+ {
+  "id": "vLo3SASoZ_E_20",
+  "ok": false,
+  "reasons": [
+   "legs not visible",
+   "feet out of frame"
+  ],
+  "frames": 288,
+  "detected": 0.9652777777777778,
+  "vis_legs": 0.007,
+  "vis_arms": 0.638,
+  "jitter": 0.0116,
+  "bone_cv": 0.208,
+  "feet_in_frame": 0.0,
+  "leglen": 0.678,
+  "energy_arms": 0.424,
+  "energy_body": 0.056,
+  "root_range": [
+   0.146,
+   0.066,
+   0.159
+  ],
+  "title": "How to Do the Macarena"
+ },
+ {
   "id": "vetLPqfhXCc",
   "ok": true,
   "reasons": [],
@@ -149,5 +419,70 @@
    0.129
   ],
   "title": "Reference Video"
+ },
+ {
+  "id": "ymigWt5TOV8_30",
+  "ok": true,
+  "reasons": [],
+  "frames": 288,
+  "detected": 1.0,
+  "vis_legs": 0.989,
+  "vis_arms": 0.864,
+  "jitter": 0.0236,
+  "bone_cv": 0.167,
+  "feet_in_frame": 1.0,
+  "leglen": 0.783,
+  "energy_arms": 2.471,
+  "energy_body": 0.263,
+  "root_range": [
+   0.215,
+   0.112,
+   0.16
+  ],
+  "title": "Zumba Kids (easy dance) - I like to move it"
+ },
+ {
+  "id": "zrKyX669few_150",
+  "ok": true,
+  "reasons": [],
+  "frames": 288,
+  "detected": 1.0,
+  "vis_legs": 0.882,
+  "vis_arms": 0.882,
+  "jitter": 0.0351,
+  "bone_cv": 0.201,
+  "feet_in_frame": 1.0,
+  "leglen": 0.802,
+  "energy_arms": 2.387,
+  "energy_body": 0.352,
+  "root_range": [
+   0.24,
+   0.148,
+   0.16
+  ],
+  "title": "Jerusalema Dance Steps | Easy to learn | DJ Raphi"
+ },
+ {
+  "id": "zrKyX669few_40",
+  "ok": false,
+  "reasons": [
+   "jittery tracking"
+  ],
+  "frames": 288,
+  "detected": 1.0,
+  "vis_legs": 0.821,
+  "vis_arms": 0.717,
+  "jitter": 0.0476,
+  "bone_cv": 0.199,
+  "feet_in_frame": 1.0,
+  "leglen": 0.75,
+  "energy_arms": 2.641,
+  "energy_body": 0.422,
+  "root_range": [
+   0.24,
+   0.23,
+   0.16
+  ],
+  "title": "Jerusalema Dance Steps | Easy to learn | DJ Raphi"
  }
 ]

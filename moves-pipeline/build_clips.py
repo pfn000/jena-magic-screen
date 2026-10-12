@@ -22,9 +22,14 @@ META = {
  'vLo3SASoZ_E_20': dict(what='someone doing the Macarena', kind='dance', moods=['happy', 'relaxed'], label='macarena'),
  'rVBHH5DwYFA_30': dict(what='a dancer doing the Macarena', kind='dance', moods=['happy'], label='macarena 2'),
  'AhE5LVWgNzA_10': dict(what='someone doing the floss', kind='dance', moods=['happy'], label='floss'),
+ 'zrKyX669few_40': dict(what='a dancer doing the Jerusalema steps', kind='dance', moods=['happy', 'relaxed'], label='jerusalema'),
+ 'zrKyX669few_150': dict(what='the Jerusalema dance', kind='dance', moods=['happy'], label='jerusalema 2'),
+ 'ymigWt5TOV8_30': dict(what='a Zumba Kids dance to "I Like to Move It"', kind='dance', moods=['happy'], label='move it'),
+ '4q7F4UE4sXI_40': dict(what='a dance-along to "I\'m Still Standing"', kind='dance', moods=['happy'], label='still standing'),
+ 'MkksKwUEUzA_30': dict(what='a silly dance-along song', kind='dance', moods=['happy'], label='milkshake dance'),
  'fI9fiK8Yalg_60': dict(what='a Just Dance dancer doing "Can\'t Stop the Feeling"', kind='dance', moods=['happy'], label='feeling dance'),
 }
-OUT = sys.argv[1] if len(sys.argv) > 1 else '/home/user/moves/out'
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
 os.makedirs(OUT, exist_ok=True)
 clips, report = [], []
 for path in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'raw', '*.npz'))):
@@ -36,8 +41,9 @@ for path in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file
     reasons = []
     if q['detected'] <= 0.95: reasons.append('lost the person')
     if q['vis_legs'] <= 0.55: reasons.append('legs not visible')
-    if q['jitter'] >= 0.03: reasons.append('jittery tracking')
-    if q['bone_cv'] >= 0.2: reasons.append('limb lengths jumping (bad depth)')
+    jl, cl = (0.036, 0.23) if m['kind'] == 'dance' else (0.03, 0.2)
+    if q['jitter'] >= jl: reasons.append('jittery tracking')
+    if q['bone_cv'] >= cl: reasons.append('limb lengths jumping (bad depth)')
     if q['feet_in_frame'] <= 0.95: reasons.append('feet out of frame')
     if q['energy_arms'] + q['energy_body'] < 0.12: reasons.append('barely moves')
     q.pop('ok', None); report.append(dict(id=cid, ok=not reasons, reasons=reasons, **q, title=info.get('title')))

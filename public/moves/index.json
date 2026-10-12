@@ -3,6 +3,31 @@
  "note": "Jena's own animation clips. Each one she built herself by watching a short public video of a real person moving, tracking their body (MediaPipe Pose, world landmarks), smoothing it and retargeting it onto her VRM bones. Bones are quaternions (x,y,z,w)*scale per frame in VRM 1.0 normalized space; hips_offset is her hips' travel over her planted feet, in leg lengths.",
  "clips": [
   {
+   "id": "CNHJ72oDG_s",
+   "file": "CNHJ72oDG_s.json",
+   "label": "storytelling",
+   "what": "someone telling a story with their hands",
+   "kind": "talk",
+   "moods": [
+    "neutral",
+    "happy"
+   ],
+   "duration": 15.67,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=CNHJ72oDG_s",
+    "title": "3D people animation : Casual Donna Standing and speaking \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0021,
+    "legs_visible": 0.984,
+    "limb_stability": 0.853
+   }
+  },
+  {
    "id": "DRyaRp3COvE",
    "file": "DRyaRp3COvE.json",
    "label": "waiting",
@@ -26,6 +51,31 @@
     "jitter": 0.0018,
     "legs_visible": 0.962,
     "limb_stability": 0.948
+   }
+  },
+  {
+   "id": "EYDDtTJ6TtQ_112",
+   "file": "EYDDtTJ6TtQ_112.json",
+   "label": "loosen up",
+   "what": "a dancer loosening up",
+   "kind": "stretch",
+   "moods": [
+    "neutral",
+    "happy"
+   ],
+   "duration": 22.2,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=EYDDtTJ6TtQ",
+    "title": "Five-Minute Full Body Stretch | Dance Warm Up",
+    "channel": "DJ Raphi",
+    "start": 112.0,
+    "end": 135.0
+   },
+   "quality": {
+    "jitter": 0.0097,
+    "legs_visible": 0.976,
+    "limb_stability": 0.876
    }
   },
   {
@@ -79,6 +129,56 @@
    }
   },
   {
+   "id": "WrJsrsVWkGA",
+   "file": "WrJsrsVWkGA.json",
+   "label": "chatting",
+   "what": "someone chatting and gesturing",
+   "kind": "talk",
+   "moods": [
+    "neutral",
+    "relaxed"
+   ],
+   "duration": 15.67,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=WrJsrsVWkGA",
+    "title": "3D people animation : Casual Sharon standing and speaking \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0028,
+    "legs_visible": 0.985,
+    "limb_stability": 0.839
+   }
+  },
+  {
+   "id": "cIdMN8szJps",
+   "file": "cIdMN8szJps.json",
+   "label": "waiting 2",
+   "what": "a girl standing and waiting",
+   "kind": "idle",
+   "moods": [
+    "neutral",
+    "relaxed"
+   ],
+   "duration": 16.73,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=cIdMN8szJps",
+    "title": "3D people animation : Casual Julia standing and waiting \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0021,
+    "legs_visible": 0.954,
+    "limb_stability": 0.94
+   }
+  },
+  {
    "id": "clp3Ysai6w0",
    "file": "clp3Ysai6w0.json",
    "label": "explaining",
@@ -102,6 +202,31 @@
     "jitter": 0.0014,
     "legs_visible": 0.985,
     "limb_stability": 0.85
+   }
+  },
+  {
+   "id": "lgupcR-BIW0",
+   "file": "lgupcR-BIW0.json",
+   "label": "impatient wait",
+   "what": "someone waiting around, kinda impatient",
+   "kind": "idle",
+   "moods": [
+    "neutral",
+    "angry"
+   ],
+   "duration": 16.73,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=lgupcR-BIW0",
+    "title": "3D people animation : Casual Sharon standing and waiting \u00a9cg-people.com",
+    "channel": "cg-people.com",
+    "start": null,
+    "end": null
+   },
+   "quality": {
+    "jitter": 0.0031,
+    "legs_visible": 0.955,
+    "limb_stability": 0.944
    }
   },
   {
@@ -130,6 +255,30 @@
    }
   },
   {
+   "id": "rVBHH5DwYFA_30",
+   "file": "rVBHH5DwYFA_30.json",
+   "label": "macarena 2",
+   "what": "a dancer doing the Macarena",
+   "kind": "dance",
+   "moods": [
+    "happy"
+   ],
+   "duration": 19.2,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=rVBHH5DwYFA",
+    "title": "The Macarena Dance 2022",
+    "channel": "DJ Raphi",
+    "start": 30.0,
+    "end": 50.0
+   },
+   "quality": {
+    "jitter": 0.0324,
+    "legs_visible": 0.837,
+    "limb_stability": 0.773
+   }
+  },
+  {
    "id": "vetLPqfhXCc",
    "file": "vetLPqfhXCc.json",
    "label": "standing fidget",
@@ -152,6 +301,54 @@
     "jitter": 0.0038,
     "legs_visible": 0.95,
     "limb_stability": 0.857
+   }
+  },
+  {
+   "id": "ymigWt5TOV8_30",
+   "file": "ymigWt5TOV8_30.json",
+   "label": "move it",
+   "what": "a Zumba Kids dance to \"I Like to Move It\"",
+   "kind": "dance",
+   "moods": [
+    "happy"
+   ],
+   "duration": 19.2,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=ymigWt5TOV8",
+    "title": "Zumba Kids (easy dance) - I like to move it",
+    "channel": "Zumba with Dovydas",
+    "start": 30.0,
+    "end": 50.0
+   },
+   "quality": {
+    "jitter": 0.0236,
+    "legs_visible": 0.989,
+    "limb_stability": 0.833
+   }
+  },
+  {
+   "id": "zrKyX669few_150",
+   "file": "zrKyX669few_150.json",
+   "label": "jerusalema 2",
+   "what": "the Jerusalema dance",
+   "kind": "dance",
+   "moods": [
+    "happy"
+   ],
+   "duration": 19.2,
+   "mirror": true,
+   "source": {
+    "url": "https://www.youtube.com/watch?v=zrKyX669few",
+    "title": "Jerusalema Dance Steps | Easy to learn | DJ Raphi",
+    "channel": "DJ Raphi",
+    "start": 150.0,
+    "end": 170.0
+   },
+   "quality": {
+    "jitter": 0.0351,
+    "legs_visible": 0.882,
+    "limb_stability": 0.799
    }
   }
  ]

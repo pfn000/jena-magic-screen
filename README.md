@@ -41,7 +41,9 @@ couple of fun dances), tracks the person's body, and turns each one into **her o
    soles planted.
 3. **Quality gate:** a clip is rejected if the person was lost, the legs weren't visible, the tracking
    jittered, limb lengths jumped (bad depth), the feet left the frame, or barely anything moved
-   (`moves-pipeline/build_clips.py`, report in `moves-pipeline/report.json`).
+   (`moves-pipeline/build_clips.py`, report in `moves-pipeline/report.json`). Dances get slightly looser
+   jitter/depth limits, because fast real motion reads as jitter. Most fast dance videos still fail, and
+   that's on purpose.
 4. **Her library:** `public/moves/index.json` lists every clip with what it is, its duration, its
    quality, and the source video URL. The clips themselves are compact JSON quaternion tracks.
 
@@ -50,7 +52,11 @@ going on: idle/weight shifts when nothing's happening, stretching or dancing whe
 while, talking-with-hands when she has something longer to say, happy moves when someone hypes her up.
 She plays a different slice each time (random start, length, speed 0.86–1.1×, sometimes mirrored),
 crossfades it in and out over her procedural idle (her breathing and drift keep running underneath),
-and says so in her thought chain: "learned this from a video of someone stretching, trying it". Each
+and says so in her thought chain: "learned this from a video of someone stretching, trying it". The
+first time in a while she uses a clip, the thought chain also shows the video she learned it from (its
+thumbnail and title; tap the thumbnail to open the video). Her hands and forearms are kept out of her own
+body, and away from her chest and the front of her hips: if a learned move would put them there, that arm
+eases back toward her own idle arm until it's clear. Each
 move is also logged as a memory event (`/api/memory` when her memory service is there, plus a
 `jena:memory` browser event). Nobody controls this. There are no buttons.
 
