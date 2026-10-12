@@ -39,6 +39,7 @@ export class SelfVision {
   }
 
   async start() {
+    this.loop(); // her body view draws from her own bones right away; her eyes join once the pose model loads
     try {
       const { FilesetResolver, PoseLandmarker } = await import('@mediapipe/tasks-vision');
       const files = await FilesetResolver.forVisionTasks(WASM);
@@ -55,7 +56,6 @@ export class SelfVision {
       }
       if (!this.pose) throw err || new Error('no pose model');
       this.log('see', 'my eyes are on: I can see my own body now');
-      this.loop();
     } catch (e) {
       console.warn('self-vision off', e);
       this.log('status', `my self-vision didn't start (${String(e.message || e).slice(0, 80)})`);
@@ -85,6 +85,7 @@ export class SelfVision {
     ctx.fillStyle = '#ece6f6'; // her canvas is transparent; give her eyes a plain wall behind her
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(this.src, x0, y0, cw, ch, 0, 0, w, h);
+    if (!this.pose) return this.draw(null);
     const res = this.pose.detect(this.work); // each look is fresh: no tracking carried over from the last one
     const lm = res?.landmarks?.[0];
     this.lm = lm;
