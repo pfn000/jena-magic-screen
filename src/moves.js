@@ -156,7 +156,7 @@ export class Moves {
       // in front of her chest
       if (y > hipY + 0.55 * (neckY - hipY) && y < neckY - 0.03 && Math.abs(c.x) < a * 0.85 && c.z > b * 0.4 && c.z < b + 0.16) return true;
       // in front of her hips / lower belly
-      if (h.y > -0.16 && h.y < 0.07 && Math.abs(h.x) < a * 0.9 && h.z > -0.02 && h.z < 0.22) return true;
+      if (h.y > -0.2 && h.y < 0.08 && Math.abs(h.x) < a * 1.2 && h.z > 0.015 && h.z < 0.24) return true;
       return false;
     };
     for (const side of ['left', 'right']) {
@@ -183,6 +183,8 @@ export class Moves {
           up.updateMatrixWorld(true);
           if (!test()) break;
         }
+        // still in the way (her own idle arm sits close too): swing the arm out from her side until clear
+        for (let s = 0; s < 4 && test(); s++) { up.rotateZ(side === 'left' ? 0.09 : -0.09); up.updateMatrixWorld(true); }
         this.guard[side] = k;
         this.guardHits = (this.guardHits || 0) + 1;
       } else {
