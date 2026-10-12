@@ -148,6 +148,11 @@ export class SelfVision {
     }
     c.fillStyle = '#2bd1a0';
     for (const i of [0, 11, 12, 13, 14, 15, 16]) if (lm[i]) { c.beginPath(); c.arc(lm[i].x * w, lm[i].y * h, 3.5, 0, 7); c.fill(); }
-    if (this.label && this.last) this.label.textContent = `I see: L ${this.last.left} · R ${this.last.right}`;
+    if (this.label && this.last) {
+      // a side her eyes get wrong (checked against what she feels) shows as '?' instead of a false claim
+      const f = this.felt?.();
+      const side = (s) => (f && f[s] !== this.last[s] ? '?' : this.last[s]);
+      this.label.textContent = `I see: L ${side('left')} · R ${side('right')}`;
+    }
   }
 }
