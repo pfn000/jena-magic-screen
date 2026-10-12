@@ -65,13 +65,13 @@ const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) 
 const params = new URLSearchParams(location.search);
 if (params.get('selfview') !== '0') {
   const view = $('#self-view'), label = $('#self-view-label');
-  const startVision = () => new SelfVision($('#avatar-canvas'), {
+  const startVision = () => (window.__jenaVision = new SelfVision($('#avatar-canvas'), {
     log: (kind, text) => chain.self(kind, text),
     view, label,
     intent: () => avatar.armState(),
-  }).start();
+  })).start();
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
-} else { $('#self-view')?.remove(); $('#self-view-label')?.remove(); }
+} else $('#self-eye')?.remove();
 
 function runEvent(e, run, { privateRun = false } = {}) {
   if (e.type === 'meta') { if (typeof e.online === 'boolean') chain.setHealth({ online: e.online }); }
@@ -170,8 +170,8 @@ $('#talk').addEventListener('submit', (e) => {
   lastActivity = Date.now();
   const who = localStorage.getItem(KEY_STORE) ? 'mama' : 'guest';
   addChat({ user: who, text: clean(text), cls: 'from-you' });
-  autonomy.onMessage(who);
   thinkAbout({ message: text, source: 'stage', user: who });
+  autonomy.onMessage(who);
 });
 
 // ---------------- private DM drawer (never on stream) ----------------
@@ -242,7 +242,7 @@ $('#dm-form').addEventListener('submit', async (e) => {
   dmLog.scrollTop = dmLog.scrollHeight;
   // a real event in the thought chain (text shown only on this screen, never in OBS mode)
   const run = chain.start({ user: 'mama', source: 'private', private: true, text });
-  autonomy.onPrivateMessage();
+  setTimeout(() => autonomy.onPrivateMessage(), 50);
   const r = await fetch('/api/dm', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': k }, body: JSON.stringify({ text, origin: ORIGIN }) }).catch(() => null);
   const d = r ? await r.json().catch(() => ({})) : {};
   if (!r) run.step('status', "couldn't reach Jena's API");

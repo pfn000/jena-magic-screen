@@ -3,7 +3,9 @@
 // and says in the thought chain what she perceives, e.g. "I see my LEFT arm is up".
 // Left/right are HER sides: she faces the camera, so her left side is on the right of the image.
 const WASM = '/mediapipe/wasm';
-const MODELS = ['/mediapipe/pose_landmarker_lite.task', 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'];
+const q = new URLSearchParams(location.search);
+const VARIANT = q.get('vision') === 'lite' ? 'lite' : 'full';
+const MODELS = [`/mediapipe/pose_landmarker_${VARIANT}.task`, `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${VARIANT}/float16/1/pose_landmarker_${VARIANT}.task`];
 const BONES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24], [23, 24]];
 
 export class SelfVision {
@@ -32,7 +34,7 @@ export class SelfVision {
         try {
           this.pose = await PoseLandmarker.createFromOptions(files, {
             baseOptions: { modelAssetPath, delegate: 'CPU' },
-            runningMode: 'VIDEO', numPoses: 1,
+            runningMode: 'IMAGE', numPoses: 1,
             minPoseDetectionConfidence: 0.3, minPosePresenceConfidence: 0.3, minTrackingConfidence: 0.3,
           });
           break;
@@ -56,16 +58,21 @@ export class SelfVision {
   }
 
   frame() {
+    const m = this.intent?.();
+    if (m) { const k = `${m.left ? 'up' : 'down'}|${m.right ? 'up' : 'down'}`; if (k !== this.intentKey) { this.intentKey = k; this.intentSince = performance.now(); } }
     if (document.hidden || !this.src.width) return;
-    const s = Math.min(1, 320 / Math.max(this.src.width, this.src.height));
-    const w = Math.round(this.src.width * s), h = Math.round(this.src.height * s);
-    if (this.work.width !== w || this.work.height !== h) { this.work.width = w; this.work.height = h; }
+    // look at her upper body (head to hips, room above for raised hands): a square crop, centred on her
+    const W = this.src.width, H = this.src.height;
+    const S = Math.min(W, H * (+q.get('crop') || 0.5)), x0 = (W - S) / 2, y0 = 0;
+    const w = 384, h = 384;
+    if (this.work.width !== w) { this.work.width = w; this.work.height = h; }
     const ctx = this.work.getContext('2d', { willReadFrequently: true });
     ctx.fillStyle = '#e9e2f5'; // her canvas is transparent; give the model a plain wall behind her
     ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(this.src, 0, 0, w, h);
-    const res = this.pose.detectForVideo(this.work, performance.now());
+    ctx.drawImage(this.src, x0, y0, S, S, 0, 0, w, h);
+    const res = this.pose.detect(this.work); // each look is fresh: no tracking carried over from the last one
     const lm = res?.landmarks?.[0];
+    this.lm = lm;
     this.draw(lm);
     if (!lm) return this.lost();
     this.lostSince = 0;
@@ -105,8 +112,10 @@ export class SelfVision {
     else text = prev ? 'I see both my arms are down again' : 'I see myself standing, arms down';
     const meant = this.intent?.();
     if (meant) {
+      // compare with what she meant to do, once her intent has been steady for a moment (her eyes lag a bit)
       const want = `${meant.left ? 'up' : 'down'}|${meant.right ? 'up' : 'down'}`;
-      if (want !== `${arms.left}|${arms.right}`) text += ' (huh, not what I meant to do)';
+      if (want !== this.intentKey) { this.intentKey = want; this.intentSince = performance.now(); }
+      if (want !== `${arms.left}|${arms.right}` && performance.now() - this.intentSince > 2500) text += ' (huh, not what I meant to do)';
     }
     this.log('see', text);
   }
@@ -136,6 +145,6 @@ export class SelfVision {
     }
     c.fillStyle = '#2bd1a0';
     for (const i of [0, 11, 12, 13, 14, 15, 16]) if (lm[i]) { c.beginPath(); c.arc(lm[i].x * w, lm[i].y * h, 3.5, 0, 7); c.fill(); }
-    if (this.label && this.last) this.label.textContent = `what I see · L ${this.last.left} · R ${this.last.right}`;
+    if (this.label && this.last) this.label.textContent = `I see: L ${this.last.left} · R ${this.last.right}`;
   }
 }

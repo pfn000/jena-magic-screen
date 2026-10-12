@@ -12,7 +12,7 @@ startHealthLoop(15000); // JenaXI endpoint health, every 15 s
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
 const port = +process.env.PORT || 4173;
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.vrm': 'model/gltf-binary', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.vrm': 'model/gltf-binary', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.wasm': 'application/wasm', '.task': 'application/octet-stream' };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);

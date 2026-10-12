@@ -177,7 +177,7 @@ export async function* thinkEvents(input) {
       body: JSON.stringify(chatMode
         ? { model: p.model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
         : { model: p.model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 120, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(process.env.VERCEL ? 25000 : 45000), // Vercel function limit is 30 s
     });
   } catch (e) {
     r = null;
