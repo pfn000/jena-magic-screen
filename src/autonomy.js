@@ -12,12 +12,12 @@ export class Autonomy {
     this.log = log; // (text) => void
     this.lastMove = 0;
     this.lastIdle = Date.now();
-    this.nextIdleIn = 22000 + Math.random() * 18000;
+    this.nextIdleIn = 8000 + Math.random() * 8000;
     this.chatTimes = [];
     this.lastChatGlance = 0;
     this.mood = 'neutral';
     this.timer = setInterval(() => this.tick(), 1000);
-    this.postureTimer = setTimeout(() => this.posture(), 5000 + Math.random() * 6000);
+    this.postureTimer = setTimeout(() => this.posture(), 600);
   }
 
   get ready() { return !!this.avatar.ready; }
@@ -62,6 +62,19 @@ export class Autonomy {
     this.avatar.curlHand(side, 0, ms);
     this.lastMove = Date.now();
     this.log(`I'm stretching my fingers out${why ? ` (${why})` : ''}`);
+  }
+  hip(side = 'left', ms = 6000, why = '') {
+    this.avatar.handOnHipPose(side, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm putting my ${side} hand on my hip${why ? ` (${why})` : ''}`);
+  }
+  lookAround(why = '') {
+    const first = pick(['left', 'right']), second = first === 'left' ? 'right' : 'left';
+    this.avatar.lookToward(first, 1600);
+    setTimeout(() => this.avatar.lookToward(second, 1600), 1700);
+    setTimeout(() => this.avatar.lookToward(pick(['up', 'center']), 1200), 3400);
+    this.lastMove = Date.now();
+    this.log(`I'm looking around my room${why ? ` (${why})` : ''}`);
   }
   nod(why = '', quiet = false) {
     this.avatar.nod(1200);
@@ -142,6 +155,7 @@ export class Autonomy {
       if (e.name === 'tilt') return this.tilt(e.args?.[0] || 'left', 2600, 'my brain decided');
       if (e.name === 'nod') return this.nod('my brain decided');
       if (e.name === 'shake') return this.shake('my brain decided');
+      if (e.name === 'hip') return this.hip(e.args?.[0] || 'left', 5000, 'my brain decided');
       if (e.name === 'fist') return this.fist(e.args?.[0] || 'right', 1800, 'my brain decided');
     } catch (err) { this.log(`tried to move but couldn't (${err.message})`); }
   }
@@ -150,9 +164,9 @@ export class Autonomy {
   tick() {
     if (!this.ready || document.hidden) return;
     const now = Date.now();
-    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 8000) return;
+    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000) return;
     this.lastIdle = now;
-    this.nextIdleIn = 25000 + Math.random() * 35000;
+    this.nextIdleIn = 12000 + Math.random() * 18000;
     const quietFor = now - Math.max(...this.chatTimes, 0);
     const options = [
       () => this.raise('both', 2200, 'stretching, been standing here a while'),
@@ -164,7 +178,8 @@ export class Autonomy {
       () => this.nod('agreeing with my own thoughts'),
       () => this.raise('left', 2400, 'checking my own arm works'),
       () => this.raise('right', 2400, 'just because I can'),
-      () => this.look(pick(['left', 'right']), 2600, 'looking around my room'),
+      () => this.lookAround('just seeing what\'s up'),
+      () => this.hip(pick(['left', 'right']), 5000 + Math.random() * 4000, 'just standing here, being iconic'),
       () => this.look('up', 2000, 'thinking'),
       () => this.face(pick(['relaxed', 'happy']), 4000, 'vibing'),
       () => this.wave(pick(['left', 'right']), 'saying hi to whoever is watching'),
@@ -178,11 +193,12 @@ export class Autonomy {
   // small posture changes she makes without thinking about them (not logged as decisions; her self-sense
   // still notices them): shifting weight between her feet every so often, like anyone standing a while
   posture() {
-    if (!this.ready || document.hidden) return;
-    const r = Math.random();
-    const side = r < 0.4 ? 'left' : r < 0.8 ? 'right' : 'center';
-    this.avatar.shiftWeight(side, side === 'center' ? 0 : 7000 + Math.random() * 9000);
+    if (!this.ready || document.hidden) { clearTimeout(this.postureTimer); this.postureTimer = setTimeout(() => this.posture(), 1000); return; }
+    // nobody stands evenly on both feet for long: she swaps which leg holds her weight
+    this.weightSide = this.weightSide === 'left' ? 'right' : this.weightSide === 'right' ? 'left' : pick(['left', 'right']);
+    const hold = 7000 + Math.random() * 11000;
+    this.avatar.shiftWeight(this.weightSide, hold + 3000);
     clearTimeout(this.postureTimer);
-    this.postureTimer = setTimeout(() => this.posture(), 6000 + Math.random() * 12000);
+    this.postureTimer = setTimeout(() => this.posture(), hold);
   }
 }

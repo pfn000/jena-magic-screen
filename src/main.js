@@ -8,6 +8,7 @@ import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
+import { FacePanel } from './facepanel.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -71,14 +72,17 @@ const params = new URLSearchParams(location.search);
 const selfSense = new SelfSense(avatar, {
   log: (text) => chain.self('sense', text),
   readout: params.get('selfview') !== '0' ? $('#self-readout') : null,
+  faceReadout: params.get('selfview') !== '0' ? $('#face-readout') : null,
 });
+if (params.get('selfview') !== '0') new FacePanel(avatar, $('#self-face'));
 if (params.get('selfview') !== '0') {
   const view = $('#self-view'), label = $('#self-view-label');
   const startVision = () => (window.__jenaVision = new SelfVision($('#avatar-canvas'), {
     log: (kind, text) => chain.self(kind, text),
     view, label,
     intent: () => avatar.armState(),
-    felt: () => ({ left: selfSense.feel.leftArm, right: selfSense.feel.rightArm }),
+    avatar,
+    felt: () => ({ left: selfSense.feel.leftArm === 'up' ? 'up' : 'down', right: selfSense.feel.rightArm === 'up' ? 'up' : 'down' }),
   })).start();
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
 } else $('#self-eye')?.remove();

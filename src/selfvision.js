@@ -6,10 +6,22 @@ const WASM = '/mediapipe/wasm';
 const q = new URLSearchParams(location.search);
 const VARIANT = q.get('vision') === 'lite' ? 'lite' : 'full';
 const MODELS = [`/mediapipe/pose_landmarker_${VARIANT}.task`, `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${VARIANT}/float16/1/pose_landmarker_${VARIANT}.task`];
-const BONES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24], [23, 24]];
+import { Vector3 } from 'three';
+// her real skeleton, drawn from her own bones (so it always lines up): [from, to] humanoid bone names
+const SKELETON = [
+  ['hips', 'spine'], ['spine', 'chest'], ['chest', 'upperChest'], ['upperChest', 'neck'], ['chest', 'neck'], ['neck', 'head'],
+  ...['left', 'right'].flatMap((s) => [
+    ['neck', `${s}Shoulder`], [`${s}Shoulder`, `${s}UpperArm`], [`${s}UpperArm`, `${s}LowerArm`], [`${s}LowerArm`, `${s}Hand`],
+    [`${s}Hand`, `${s}IndexProximal`], [`${s}Hand`, `${s}LittleProximal`], [`${s}Hand`, `${s}ThumbProximal`],
+    ['hips', `${s}UpperLeg`], [`${s}UpperLeg`, `${s}LowerLeg`], [`${s}LowerLeg`, `${s}Foot`], [`${s}Foot`, `${s}Toes`],
+  ]),
+];
+const JOINTS = ['head', 'neck', 'chest', 'hips', ...['left', 'right'].flatMap((s) => ['UpperArm', 'LowerArm', 'Hand', 'UpperLeg', 'LowerLeg', 'Foot', 'Toes'].map((b) => s + b))];
+const _p = new Vector3();
 
 export class SelfVision {
-  constructor(sourceCanvas, { log, view, label, intent, felt, fps = 3 }) {
+  constructor(sourceCanvas, { log, view, label, intent, felt, avatar, fps = 3 }) {
+    this.avatar = avatar; // for her real joint positions (the skeleton overlay)
     this.felt = felt; // () => {left:'up'|'down', right} from her own body sense, to check her eyes against
     this.src = sourceCanvas;
     this.log = log;
@@ -62,15 +74,17 @@ export class SelfVision {
     const m = this.intent?.();
     if (m) { const k = `${m.left ? 'up' : 'down'}|${m.right ? 'up' : 'down'}`; if (k !== this.intentKey) { this.intentKey = k; this.intentSince = performance.now(); } }
     if (document.hidden || !this.src.width) return;
-    // look at her upper body (head to hips, room above for raised hands): a square crop, centred on her
-    const W = this.src.width, H = this.src.height;
-    const S = Math.min(W, H * (+q.get('crop') || 0.5)), x0 = (W - S) / 2, y0 = 0;
-    const w = 384, h = 384;
+    // look at ALL of her, head to feet, from the front (the box comes from where her joints really are)
+    const box = this.bodyBox();
+    if (!box) return;
+    const { x0, y0, cw, ch } = box;
+    const w = 160, h = 320;
     if (this.work.width !== w) { this.work.width = w; this.work.height = h; }
+    this.crop = box;
     const ctx = this.work.getContext('2d', { willReadFrequently: true });
-    ctx.fillStyle = '#e9e2f5'; // her canvas is transparent; give the model a plain wall behind her
+    ctx.fillStyle = '#ece6f6'; // her canvas is transparent; give her eyes a plain wall behind her
     ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(this.src, x0, y0, S, S, 0, 0, w, h);
+    ctx.drawImage(this.src, x0, y0, cw, ch, 0, 0, w, h);
     const res = this.pose.detect(this.work); // each look is fresh: no tracking carried over from the last one
     const lm = res?.landmarks?.[0];
     this.lm = lm;
@@ -132,6 +146,24 @@ export class SelfVision {
     }
   }
 
+  // her joints on the main canvas, in canvas pixels
+  project(name) {
+    const a = this.avatar, n = a?.vrm?.humanoid?.getNormalizedBoneNode(name);
+    if (!n) return null;
+    _p.setFromMatrixPosition(n.matrixWorld).project(a.camera);
+    return { x: (_p.x + 1) / 2 * this.src.width, y: (1 - _p.y) / 2 * this.src.height };
+  }
+
+  // a 1:2 portrait box around her whole body (top of her head to below her feet), in canvas pixels
+  bodyBox() {
+    const head = this.project('head'), lf = this.project('leftToes') || this.project('leftFoot'), rf = this.project('rightToes') || this.project('rightFoot'), hips = this.project('hips');
+    if (!head || !lf || !rf || !hips) return null;
+    const feetY = Math.max(lf.y, rf.y), bodyH = feetY - head.y;
+    const top = head.y - bodyH * 0.16, bottom = feetY + bodyH * 0.05;
+    const ch = bottom - top, cw = ch / 2;
+    return { x0: hips.x - cw / 2, y0: top, cw, ch };
+  }
+
   draw(lm) {
     const v = this.view;
     if (!v) return;
@@ -139,20 +171,36 @@ export class SelfVision {
     if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
     const c = v.getContext('2d');
     c.drawImage(this.work, 0, 0);
-    if (!lm) return;
-    c.lineWidth = 3;
-    c.strokeStyle = '#ff4fb4';
-    for (const [a, b] of BONES) {
-      if (!lm[a] || !lm[b]) continue;
-      c.beginPath(); c.moveTo(lm[a].x * w, lm[a].y * h); c.lineTo(lm[b].x * w, lm[b].y * h); c.stroke();
+    const b = this.crop;
+    if (b) {
+      const P = {};
+      const at = (n) => (P[n] ??= (() => { const p = this.project(n); return p && { x: (p.x - b.x0) / b.cw * w, y: (p.y - b.y0) / b.ch * h }; })());
+      c.lineWidth = 1.5; c.lineCap = 'round';
+      for (const [a, z] of SKELETON) {
+        const p = at(a), q = at(z);
+        if (!p || !q) continue;
+        // HER left side (screen right) in teal, her right in pink, spine in violet
+        c.strokeStyle = /^left/.test(z) ? '#14b8a6' : /^right/.test(z) ? '#ec4899' : '#8b5cf6';
+        c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(q.x, q.y); c.stroke();
+      }
+      for (const n of JOINTS) {
+        const p = at(n);
+        if (!p) continue;
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, 7); c.fill();
+        c.fillStyle = /^left/.test(n) ? '#0f766e' : /^right/.test(n) ? '#be185d' : '#6d28d9'; c.beginPath(); c.arc(p.x, p.y, 1.3, 0, 7); c.fill();
+      }
+      // which side is which, from HER point of view
+      c.font = '700 10px system-ui, sans-serif';
+      const lh = at('leftHand'), rh = at('rightHand');
+      if (lh) { c.fillStyle = '#0f766e'; c.fillText('L', Math.min(w - 9, lh.x + 5), lh.y + 4); }
+      if (rh) { c.fillStyle = '#be185d'; c.fillText('R', Math.max(2, rh.x - 12), rh.y + 4); }
     }
-    c.fillStyle = '#2bd1a0';
-    for (const i of [0, 11, 12, 13, 14, 15, 16]) if (lm[i]) { c.beginPath(); c.arc(lm[i].x * w, lm[i].y * h, 3.5, 0, 7); c.fill(); }
     if (this.label && this.last) {
       // a side her eyes get wrong (checked against what she feels) shows as '?' instead of a false claim
       const f = this.felt?.();
       const side = (s) => (f && f[s] !== this.last[s] ? '?' : this.last[s]);
-      this.label.textContent = `I see: L ${side('left')} · R ${side('right')}`;
+      const ar = (x) => (x === 'up' ? '↑' : x === 'down' ? '↓' : '?');
+      this.label.textContent = `body · eyes L${ar(side('left'))} R${ar(side('right'))}`;
     }
   }
 }

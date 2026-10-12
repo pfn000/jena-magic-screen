@@ -12,10 +12,12 @@ const damp = (cur, target, lambda, dt) => THREE.MathUtils.damp(cur, target, lamb
 // Rest pose and poses, in normalized bone space (VRM 1.0 conventions, model faces the camera).
 // For her LEFT upper arm, +z lifts the arm up toward her head; for her RIGHT arm it's -z.
 // Arms hang relaxed: a little forward of the body, elbows softly bent, wrists loose.
+// Upper arms a little out from her sides, elbows bowed out and bent (~25°) so the forearms come back
+// in toward her thighs, wrists loose. Visible from the front, not a mannequin's straight arms.
 const REST = {
-  leftUpperArm: [-0.04, 0, -1.26], rightUpperArm: [-0.04, 0, 1.26],
-  leftLowerArm: [0, -0.36, -0.06], rightLowerArm: [0, 0.36, 0.06],
-  leftHand: [0, -0.1, -0.12], rightHand: [0, 0.1, 0.12],
+  leftUpperArm: [-0.06, 0, -1.12], rightUpperArm: [-0.06, 0, 1.12],
+  leftLowerArm: [0, -0.42, -0.3], rightLowerArm: [0, 0.42, 0.3],
+  leftHand: [0, -0.15, -0.18], rightHand: [0, 0.15, 0.18],
 };
 // smooth 1D value noise: never-repeating, organic drift (each channel gets its own random table)
 function noise() {
@@ -25,6 +27,7 @@ function noise() {
 }
 const _v = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
 const _q = [0, 1, 2].map(() => new THREE.Quaternion());
+const _tgt = new THREE.Vector3(), _hip = new THREE.Vector3();
 // Raised ("hand up, like in class"): upper arm lifted out to the side and up, forearm turned so the
 // palm faces forward (x twist), elbow softly bent so the hand leans in toward her head (y flex).
 // Right side mirrors the left: x stays, y and z flip.
@@ -152,11 +155,21 @@ export class Avatar {
       m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = -1; return m;
     };
     const g = new THREE.Group();
-    g.add(disc(1.5, 1.1, tex(0.28, 0, '255,240,250'), 0.0005)); // the floor she stands on
-    g.add(disc(0.62, 0.42, tex(0.3, 0, '70,40,90'), 0.001)); // soft shadow under her
+    // the rug she stands on: a soft lavender oval with a lighter rim, clearly a floor at any size
+    const rug = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 256;
+      const g2 = c.getContext('2d');
+      const gr = g2.createRadialGradient(128, 128, 20, 128, 128, 128);
+      gr.addColorStop(0, 'rgba(196,170,230,0.85)'); gr.addColorStop(0.78, 'rgba(214,190,240,0.8)');
+      gr.addColorStop(0.86, 'rgba(255,240,252,0.85)'); gr.addColorStop(0.93, 'rgba(214,190,240,0.55)'); gr.addColorStop(1, 'rgba(214,190,240,0)');
+      g2.fillStyle = gr; g2.fillRect(0, 0, 256, 256);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    })();
+    g.add(disc(1.25, 0.95, rug, 0.0005));
+    g.add(disc(0.7, 0.45, tex(0.45, 0, '60,30,85'), 0.001)); // soft shadow under her
     this.footShadows = {};
     for (const s of ['left', 'right']) {
-      const m = disc(0.16, 0.26, tex(0.55, 0, '50,25,70'), 0.0015);
+      const m = disc(0.2, 0.3, tex(0.8, 0, '40,18,60'), 0.0015);
       m.position.x = this.feet[s].x; m.position.z = this.feet[s].z + 0.03;
       this.footShadows[s] = m; g.add(m);
     }
@@ -166,11 +179,12 @@ export class Avatar {
 
   // Two-bone IK: keep the foot planted on its anchor whatever her hips do. Works in the normalized rig,
   // where +x on a lower leg bends the knee backwards. Afterwards the foot is turned flat to the floor.
-  plantFoot(side, lift = 0) {
+  plantFoot(side, lift = 0, free = 0) {
     const H = this.vrm.humanoid;
     const U = H.getNormalizedBoneNode(side + 'UpperLeg'), K = H.getNormalizedBoneNode(side + 'LowerLeg'), F = H.getNormalizedBoneNode(side + 'Foot');
     if (!U || !K || !F || !this.feet) return;
-    const target = this.feet[side];
+    const target = _tgt.copy(this.feet[side]);
+    if (free) { target.y += 0.05 * free; target.z -= 0.015 * free; } // heel up: the ankle rises a little
     U.updateMatrixWorld(true);
     const pu = U.getWorldPosition(_v[0]), pk = K.getWorldPosition(_v[1]), pf = F.getWorldPosition(_v[2]);
     const a = pk.distanceTo(pu), b = pf.distanceTo(pk);
@@ -183,12 +197,18 @@ export class Avatar {
     const from = _v[3].subVectors(pf, pu).normalize(), to = _v[4].subVectors(target, pu).normalize();
     const swing = _q[0].setFromUnitVectors(from, to);
     const wq = U.getWorldQuaternion(_q[1]).premultiply(swing);
+    if (free) {
+      // relaxed free leg: the bent knee rolls in toward her middle (the foot stays where it is)
+      const axis = _v[3].subVectors(target, pu).normalize();
+      wq.premultiply(_q[0].setFromAxisAngle(axis, (side === 'left' ? 1 : -1) * 0.7 * free));
+    }
     U.quaternion.copy(U.parent.getWorldQuaternion(_q[2]).invert().multiply(wq));
     U.updateMatrixWorld(true);
     // flat foot: in the normalized rig every bone's rest world rotation equals the rig root's
     const root = H.normalizedHumanBonesRoot.getWorldQuaternion(_q[1]);
     F.quaternion.copy(F.parent.getWorldQuaternion(_q[2]).invert().multiply(root));
     if (lift) F.rotateX(-lift); // toes up (heel stays down) for a foot tap
+    if (free) F.rotateX(0.45 * free); // toes stay on the floor while the heel is up
     F.updateMatrixWorld(true);
   }
 
@@ -291,6 +311,40 @@ export class Avatar {
       c.until = ms ? performance.now() + ms : 0;
     }
   }
+  // Hand on her hip (HER left/right), for ms: the arm is solved onto her hip with the elbow out.
+  handOnHipPose(side = 'left', ms = 5000) {
+    if (side !== 'left' && side !== 'right') throw new Error(`handOnHip: side must be 'left' or 'right' (got ${side})`);
+    clearTimeout(this.armTimers[side]);
+    const sg = side === 'left' ? 1 : -1;
+    // a starting shape that bends the right way (upper arm out and back, elbow flexed); IK finishes it
+    Object.assign(this.target, { [side + 'UpperArm']: [0.35, 0, -sg * 0.75], [side + 'LowerArm']: [0, -sg * 1.7, 0], [side + 'Hand']: [0, 0, 0] });
+    this.handOnHip = { side, until: performance.now() + ms, w: 0 };
+    this.armTimers[side] = setTimeout(() => { if (this.handOnHip?.side === side) this.handOnHip.release = true; this.lowerArm(side); }, ms);
+  }
+  placeHandOnHip(h, now) {
+    const H = this.vrm.humanoid;
+    if (h.release) { h.w = damp(h.w, 0, 6, 0.016); if (h.w < 0.02) { this.handOnHip = null; return; } } else h.w = Math.min(1, h.w + 0.05);
+    const U = H.getNormalizedBoneNode(h.side + 'UpperArm'), K = H.getNormalizedBoneNode(h.side + 'LowerArm'), W = H.getNormalizedBoneNode(h.side + 'Hand');
+    const hips = H.getNormalizedBoneNode('hips');
+    if (!U || !K || !W || !hips) return;
+    hips.updateMatrixWorld(true);
+    const sg = h.side === 'left' ? 1 : -1;
+    // her hip: a bit out to her side, just above the hip joint, slightly behind the front
+    _hip.set(sg * 0.15, 0.06, -0.01).applyMatrix4(hips.matrixWorld);
+    U.updateMatrixWorld(true);
+    const pu = U.getWorldPosition(_v[0]), pk = K.getWorldPosition(_v[1]), pw = W.getWorldPosition(_v[2]);
+    const a = pk.distanceTo(pu), b = pw.distanceTo(pk);
+    const d = THREE.MathUtils.clamp(_hip.distanceTo(pu), 0.05, a + b - 1e-4);
+    const cur = _v[3].subVectors(pu, pk).angleTo(_v[4].subVectors(pw, pk));
+    const want = Math.acos(THREE.MathUtils.clamp((a * a + b * b - d * d) / (2 * a * b), -1, 1));
+    K.rotation.y += -sg * (cur - want) * h.w; // elbow flex axis (her left flexes with -y)
+    K.updateMatrixWorld(true);
+    W.getWorldPosition(pw);
+    const swing = _q[0].setFromUnitVectors(_v[3].subVectors(pw, pu).normalize(), _v[4].subVectors(_hip, pu).normalize());
+    _q[1].identity().slerp(swing, h.w);
+    const wq = U.getWorldQuaternion(_q[2]).premultiply(_q[1]);
+    U.quaternion.copy(U.parent.getWorldQuaternion(_q[1]).invert().multiply(wq));
+  }
   nod(ms = 1200) { this.act.nod = { until: performance.now() + ms, start: performance.now() }; }
   shakeHead(ms = 1200) { this.act.shake = { until: performance.now() + ms, start: performance.now() }; }
   tapFoot(side = 'right', ms = 3000) { this.act.tap = { side, until: performance.now() + ms, start: performance.now() }; }
@@ -361,32 +415,36 @@ export class Avatar {
       // hips carry the weight shift: they slide over the standing leg and that hip rises (contrapposto);
       // the feet stay planted (IK below), so the free knee softens on its own
       const hips = H.getNormalizedBoneNode('hips');
+      const sway = N.sw(t * 0.16);
       if (hips && this.hipsRest) {
-        hips.position.set(this.hipsRest.x + L * 0.04 + N.sw(t * 0.16) * 0.012, this.hipsRest.y - 0.012 - Math.abs(L) * 0.012 + breathe * 0.002, this.hipsRest.z + N.py(t * 0.11) * 0.008);
+        hips.position.set(this.hipsRest.x + L * 0.075 + sway * 0.022, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003, this.hipsRest.z + N.py(t * 0.11) * 0.012);
       }
-      set('hips', 0, N.px(t * 0.1) * 0.05, L * 0.045 + N.sw(t * 0.16) * 0.01);
-      set('spine', 0.02 + breathe * 0.012 + N.sx(t * 0.13) * 0.015, N.sy(t * 0.12) * 0.04, -L * 0.06 + N.sz(t * 0.15) * 0.015);
-      set('chest', breathe * 0.02, N.cy(t * 0.14) * 0.02, -L * 0.015);
-      set('upperChest', breathe * 0.012, 0, 0);
-      set('neck', N.nx(t * 0.2) * 0.03, N.ny(t * 0.17) * 0.05, L * 0.03);
+      // contrapposto: the standing leg's hip rises (+z lifts her left side), the spine and shoulders answer it
+      set('hips', 0, N.px(t * 0.1) * 0.07 + L * 0.06, L * 0.11 + sway * 0.02);
+      set('spine', 0.03 + breathe * 0.02 + N.sx(t * 0.13) * 0.03, N.sy(t * 0.12) * 0.06, -L * 0.13 + N.sz(t * 0.15) * 0.03);
+      set('chest', breathe * 0.035, N.cy(t * 0.14) * 0.035, -L * 0.03);
+      set('upperChest', breathe * 0.02, 0, 0);
+      set('neck', N.nx(t * 0.2) * 0.05, N.ny(t * 0.17) * 0.08, L * 0.04);
       if (this.look.until && now > this.look.until) { this.look.ty = 0; this.look.tx = 0; this.look.until = 0; }
       this.look.y = damp(this.look.y, this.look.ty, 4, dt);
       this.look.x = damp(this.look.x, this.look.tx, 4, dt);
       // +z on the head rolls it toward HER right, so her chosen tilt (+ = her left) goes in negated
-      set('head', N.hx(t * 0.27) * 0.045 + this.look.x + nodX, N.hy(t * 0.21) * 0.1 + this.look.y + shakeY, N.hz(t * 0.24) * 0.05 - A.tilt.v);
+      set('head', N.hx(t * 0.27) * 0.06 + this.look.x + nodX, N.hy(t * 0.21) * 0.14 + this.look.y + shakeY, N.hz(t * 0.24) * 0.05 - A.tilt.v - L * 0.06);
       // shoulders lift a touch on each breath in
-      set('leftShoulder', 0, 0, inhale * 0.025); set('rightShoulder', 0, 0, -inhale * 0.025);
+      set('leftShoulder', 0, 0, -0.05 + inhale * 0.045); set('rightShoulder', 0, 0, 0.05 - inhale * 0.045); // shoulders down, lifting on each breath
       // relaxed arms drift a little (only while they're down; a raised arm stays where she put it)
       const restL = this.target.leftUpperArm[2] < 0 ? 1 : 0, restR = this.target.rightUpperArm[2] > 0 ? 1 : 0;
-      add('leftUpperArm', N.al(t * 0.19) * 0.05 * restL, 0, (N.al(t * 0.13 + 40) * 0.035 + inhale * 0.012) * restL);
-      add('rightUpperArm', N.ar(t * 0.19) * 0.05 * restR, 0, -(N.ar(t * 0.13 + 40) * 0.035 + inhale * 0.012) * restR);
-      add('leftLowerArm', 0, -(0.5 + 0.5 * N.el(t * 0.15)) * 0.12 * restL, 0);
-      add('rightLowerArm', 0, (0.5 + 0.5 * N.er(t * 0.15)) * 0.12 * restR, 0);
+      add('leftUpperArm', N.al(t * 0.19) * 0.09 * restL, 0, (N.al(t * 0.13 + 40) * 0.06 + inhale * 0.02) * restL);
+      add('rightUpperArm', N.ar(t * 0.19) * 0.09 * restR, 0, -(N.ar(t * 0.13 + 40) * 0.06 + inhale * 0.02) * restR);
+      add('leftLowerArm', 0, -(0.5 + 0.5 * N.el(t * 0.15)) * 0.2 * restL, 0);
+      add('rightLowerArm', 0, (0.5 + 0.5 * N.er(t * 0.15)) * 0.2 * restR, 0);
       // legs: start straight-ish (knees a hair forward of locked), then IK plants each foot
       for (const s of ['left', 'right']) { set(s + 'UpperLeg', 0, 0, 0); set(s + 'LowerLeg', 0.03, 0, 0); set(s + 'Foot', 0, 0, 0); }
       H.normalizedHumanBonesRoot.updateMatrixWorld(true);
-      this.plantFoot('left', A.tap?.side === 'left' ? tap : 0);
-      this.plantFoot('right', A.tap?.side === 'right' ? tap : 0);
+      // the free leg (weight on the other one) rests on the ball of its foot: heel up, knee bent
+      this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));
+      this.plantFoot('right', A.tap?.side === 'right' ? tap : 0, Math.max(0, L));
+      if (this.handOnHip) this.placeHandOnHip(this.handOnHip, now);
       // fingers: relaxed cascade at rest (little finger curls most), drifting a bit; fist / open when she chooses
       for (const s of ['left', 'right']) {
         const c = A.curl[s];

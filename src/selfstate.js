@@ -26,6 +26,7 @@ function hyst(prev, v, on, off, pos, neg, none = 'none') {
 }
 
 const SAY = {
+  leftArm: {}, rightArm: {},
   headTurn: { left: "my head's turned to my left", right: "my head's turned to my right", none: "I'm facing front again" },
   headTilt: { left: "my head's tilted left", right: "my head's tilted right", none: "my head's straight again" },
   headPitch: { down: "I'm looking down", up: "my chin's up", none: 'head level again' },
@@ -40,10 +41,11 @@ const handSay = (side, v) => v === 'fist' ? `my ${side} hand's in a fist` : v ==
 const footSay = (side, v) => v === 'tapping' ? `I'm tapping my ${side} foot` : `my ${side} foot's still`;
 
 export class SelfSense {
-  constructor(avatar, { log, readout, hz = 5 } = {}) {
+  constructor(avatar, { log, readout, faceReadout, hz = 5 } = {}) {
     this.avatar = avatar;
     this.log = log || (() => {});
-    this.readout = readout; // element for the compact live readout
+    this.readout = readout; // element for the compact live body readout
+    this.faceReadout = faceReadout; // element for the live face values
     this.state = { t: 0, frame: 0, model: null, bones: {}, expressions: {}, lookAt: { yaw: 0, pitch: 0 }, head: { yaw: 0, pitch: 0, roll: 0 }, feel: {}, counts: { bones: 0, expressions: 0 } };
     this.smooth = {}; // readout values, eased so the numbers don't jitter
     this.feel = { headTurn: 'none', headTilt: 'none', headPitch: 'none', lean: 'none', face: 'neutral', eyes: 'none', leftHand: 'relaxed', rightHand: 'relaxed', leftFoot: 'still', rightFoot: 'still', leftArm: 'down', rightArm: 'down', eyesClosed: false, talking: false };
@@ -116,7 +118,7 @@ export class SelfSense {
     const next = {};
     // head, from where it really points (world-space), with hysteresis so idle drift isn't news
     next.headTurn = hyst(F.headTurn, hd.yaw, 13, 8, 'left', 'right');
-    next.headTilt = hyst(F.headTilt, hd.roll, 7, 4, 'left', 'right');
+    next.headTilt = hyst(F.headTilt, hd.roll, 9.5, 6, 'left', 'right');
     next.headPitch = hyst(F.headPitch, hd.pitch, 9, 5, 'down', 'up');
     // weight: where her hips sit over her feet (+x = her left)
     const hips = B('hips'), lf = B('leftFoot'), rf = B('rightFoot');
@@ -125,7 +127,9 @@ export class SelfSense {
     for (const s of ['left', 'right']) {
       const sh = B(s + 'UpperArm'), hand = B(s + 'Hand');
       const prev = F[s + 'Arm'];
-      next[s + 'Arm'] = hand.py > sh.py + (prev === 'up' ? 0.0 : 0.05) ? 'up' : 'down';
+      const sg = s === 'left' ? 1 : -1;
+      const hipD = Math.hypot(hand.px - (hips.px + sg * 0.15), hand.py - (hips.py + 0.06), hand.pz - hips.pz);
+      next[s + 'Arm'] = hand.py > sh.py + (prev === 'up' ? 0.0 : 0.05) ? 'up' : hipD < (prev === 'hip' ? 0.14 : 0.1) ? 'hip' : 'down';
     }
     for (const s of ['left', 'right']) {
       let c = 0, k = 0;
@@ -175,7 +179,9 @@ export class SelfSense {
     if (k.endsWith('Foot') && v === 'still') text = null; // stopping isn't news
     if (!text) return;
     // the same body part going back and forth isn't news every time: once per ~20 s each
-    if (performance.now() - (this.perKey[k] || -1e9) < 20000 && (v === 'none' || v === 'neutral' || v === 'relaxed')) return;
+    const quiet = k === 'lean' ? 45000 : 20000; // weight shifts are constant; only mention them now and then
+    if (performance.now() - (this.perKey[k] || -1e9) < quiet && (k === 'lean' || v === 'none' || v === 'neutral' || v === 'relaxed')) return;
+    if (k === 'leftArm' || k === 'rightArm') { if (v === 'hip') text = `my ${k.slice(0, -3)} hand's on my hip`; else return; }
     this.queue = this.queue.filter((q) => q.k !== k); // only the latest per body part
     this.queue.push({ k, text });
   }
@@ -199,21 +205,32 @@ export class SelfSense {
     const B = (n) => S.bones[n];
     const knee = (s) => (B(s + 'UpperLeg') && B(s + 'Foot') ? 180 - ang(B(s + 'UpperLeg') && { x: B(s + 'UpperLeg').px, y: B(s + 'UpperLeg').py, z: B(s + 'UpperLeg').pz }, { x: B(s + 'LowerLeg').px, y: B(s + 'LowerLeg').py, z: B(s + 'LowerLeg').pz }, { x: B(s + 'Foot').px, y: B(s + 'Foot').py, z: B(s + 'Foot').pz }) : 0);
     const elbow = (s) => (B(s + 'UpperArm') && B(s + 'Hand') ? 180 - ang({ x: B(s + 'UpperArm').px, y: B(s + 'UpperArm').py, z: B(s + 'UpperArm').pz }, { x: B(s + 'LowerArm').px, y: B(s + 'LowerArm').py, z: B(s + 'LowerArm').pz }, { x: B(s + 'Hand').px, y: B(s + 'Hand').py, z: B(s + 'Hand').pz }) : 0);
-    const top = Object.entries(S.expressions).filter(([, w]) => w > 0.08).sort((a, b) => b[1] - a[1]).slice(0, 3)
-      .map(([n, w]) => `${n} ${Math.round(w * 100)}`).join(' ');
     const hand = (v) => (v === 'fist' ? 'fist' : v === 'open' ? 'open' : 'soft');
+    const arm = (v) => (v === 'hip' ? 'on hip' : v);
     const lines = [
-      `head ${lr(sm('hy', S.head.yaw))} tilt ${lr(sm('hr', S.head.roll))} ${ud(sm('hp', S.head.pitch))}`,
-      `arms L ${F.leftArm} · R ${F.rightArm}`,
-      `elbow L${Math.round(sm('el', elbow('left')))}° R${Math.round(sm('er', elbow('right')))}°`,
-      `hands L ${hand(F.leftHand)} · R ${hand(F.rightHand)}`,
-      `weight ${F.lean === 'none' ? 'even' : F.lean === 'left' ? 'on L' : 'on R'}${F.leftFoot === 'tapping' ? ' · tap L' : F.rightFoot === 'tapping' ? ' · tap R' : ''}`,
-      `knee L${Math.round(sm('kl', knee('left')))}° R${Math.round(sm('kr', knee('right')))}°`,
-      `face ${F.face}${F.eyesClosed ? ' · blink' : ''}${F.talking ? ' · talk' : ''}`,
-      `eyes ${lr(sm('ey', S.lookAt.yaw))} ${ud(sm('ep', S.lookAt.pitch))}`,
-      top ? `blend ${top}` : 'blend —',
-      `${S.counts.bones} bones · ${S.counts.expressions} expr`,
+      `head ${lr(sm('hy', S.head.yaw))} ${ud(sm('hp', S.head.pitch))}`,
+      `tilt ${lr(sm('hr', S.head.roll))}`,
+      `arm L ${arm(F.leftArm)}`, `arm R ${arm(F.rightArm)}`,
+      `elbow L${Math.round(sm('el', elbow('left')))} R${Math.round(sm('er', elbow('right')))}`,
+      `hand L ${hand(F.leftHand)} R ${hand(F.rightHand)}`,
+      `weight ${F.lean === 'none' ? 'even' : F.lean === 'left' ? 'L' : 'R'}${F.leftFoot === 'tapping' ? ' · tap L' : F.rightFoot === 'tapping' ? ' · tap R' : ''}`,
+      `knee L${Math.round(sm('kl', knee('left')))} R${Math.round(sm('kr', knee('right')))}`,
+      `${S.counts.bones} bones`,
     ];
+    const E = (n) => Math.round((S.expressions[n] || 0) * 100);
+    const moods = MOODS.filter((m) => E(m) > 8).sort((a, b) => E(b) - E(a)).map((m) => `${m} ${E(m)}`).join(' ') || 'neutral';
+    const extra = (S.custom || []).filter((n) => E(n) > 8).map((n) => `${n} ${E(n)}`).join(' ');
+    const face = [
+      `gaze ${lr(sm('ey', S.lookAt.yaw))} ${ud(sm('ep', S.lookAt.pitch))}`,
+      `blink L${E('blinkLeft') || E('blink')} R${E('blinkRight') || E('blink')}${F.eyesClosed ? ' shut' : ''}`,
+      `aa${E('aa')} ih${E('ih')} ou${E('ou')}`,
+      `ee${E('ee')} oh${E('oh')}`,
+      `${moods}${F.talking ? ' · talking' : ''}`,
+      ...(extra ? [extra] : []),
+      `${S.counts.expressions} expressions`,
+    ];
+    const ft = face.join('\n');
+    if (this.faceReadout && ft !== this._lastFace) { this.faceReadout.textContent = ft; this._lastFace = ft; }
     const txt = lines.join('\n');
     if (txt !== this._last) { el.textContent = txt; this._last = txt; }
   }

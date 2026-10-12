@@ -46,6 +46,13 @@ export class ThoughtChain {
 
   // Jena's own body + self-vision log: consecutive entries share one card.
   self(kind, text) {
+    // the same thought twice in a row (or again within a minute) isn't news
+    const now = Date.now();
+    if (text === this.lastSelf && now - this.lastSelfAt < 60000) return;
+    this.recentSelf = (this.recentSelf || []).filter((r) => now - r.t < 60000);
+    if (this.recentSelf.some((r) => r.text === text)) return;
+    this.recentSelf.push({ text, t: now });
+    this.lastSelf = text; this.lastSelfAt = now;
     if (!this.selfCard || !this.selfCard.isConnected || this.selfCard.querySelectorAll('.step').length >= 6) {
       this.list.querySelector('.empty')?.remove();
       const card = document.createElement('article');
