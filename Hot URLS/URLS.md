@@ -1,0 +1,14 @@
+# Here are hot URLS ready at desposal and for her to store
+- https://github.com/VAST-AI-Research/UniRig
+- https://GitHub.com
+- https://Grok.com
+- https://google.com
+- https://google.com/images [ ideas ] 
+- https://google.com
+- vercel.com
+- Amazon.com [ don't get any ideas missy ]
+- https://agenticskills.io/skills/find-skills [ yes for skills ]
+- https://skillsmp.com/ [ also for searching skills ]
+- https://colab.research.google.com/
+- https://gitlab.com/evlaV/holo-PKGBUILD [ yes for installing and running SteamOS on this system ]
+- https://open-design.ai/ [ for coding ]
