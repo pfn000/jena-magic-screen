@@ -253,6 +253,7 @@ export class Avatar {
     const sides = side === 'both' ? ['left', 'right'] : [side];
     for (const s of sides) {
       if (!RAISED[s]) throw new Error(`raiseArm: side must be 'left', 'right' or 'both' (got ${side})`);
+      if (this.handOnHip?.side === s) this.handOnHip = null; // a new arm move replaces hand-on-hip
       Object.assign(this.target, structuredClone(RAISED[s]));
       clearTimeout(this.armTimers[s]);
       if (holdMs) this.armTimers[s] = setTimeout(() => this.lowerArm(s), holdMs);
@@ -263,6 +264,7 @@ export class Avatar {
   lowerArm(side = 'both') {
     const sides = side === 'both' ? ['left', 'right'] : [side];
     for (const s of sides) {
+      if (this.handOnHip?.side === s && !this.handOnHip.release) this.handOnHip.release = true;
       for (const b of ['UpperArm', 'LowerArm', 'Hand']) this.target[s + b] = [...REST[s + b]];
       if (this.wave?.side === s) this.wave = null;
     }
@@ -315,11 +317,13 @@ export class Avatar {
   handOnHipPose(side = 'left', ms = 5000) {
     if (side !== 'left' && side !== 'right') throw new Error(`handOnHip: side must be 'left' or 'right' (got ${side})`);
     clearTimeout(this.armTimers[side]);
+    if (this.handOnHip && this.handOnHip.side !== side) this.lowerArm(this.handOnHip.side);
     const sg = side === 'left' ? 1 : -1;
     // a starting shape that bends the right way (upper arm out and back, elbow flexed); IK finishes it
     Object.assign(this.target, { [side + 'UpperArm']: [0.35, 0, -sg * 0.75], [side + 'LowerArm']: [0, -sg * 1.7, 0], [side + 'Hand']: [0, 0, 0] });
     this.handOnHip = { side, until: performance.now() + ms, w: 0 };
-    this.armTimers[side] = setTimeout(() => { if (this.handOnHip?.side === side) this.handOnHip.release = true; this.lowerArm(side); }, ms);
+    const mine = this.handOnHip;
+    this.armTimers[side] = setTimeout(() => { if (this.handOnHip === mine) this.lowerArm(side); }, ms);
   }
   placeHandOnHip(h, now) {
     const H = this.vrm.humanoid;
