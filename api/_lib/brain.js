@@ -103,6 +103,11 @@ const TAGS = {
   wave_left: { type: 'action', name: 'wave', args: ['left'] },
   look_left: { type: 'action', name: 'look', args: ['left'] },
   look_right: { type: 'action', name: 'look', args: ['right'] },
+  tilt_left: { type: 'action', name: 'tilt', args: ['left'] },
+  tilt_right: { type: 'action', name: 'tilt', args: ['right'] },
+  nod: { type: 'action', name: 'nod', args: [] },
+  shake_head: { type: 'action', name: 'shake', args: [] },
+  fist: { type: 'action', name: 'fist', args: ['right'] },
 };
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'];
 
@@ -114,7 +119,7 @@ export function extractTags(text) {
     if ((tag === 'mood' || tag === 'face') && arg && MOODS.includes(arg.toLowerCase())) { events.push({ type: 'mood', value: arg.toLowerCase() }); return ''; }
     if (MOODS.includes(tag)) { events.push({ type: 'mood', value: tag }); return ''; }
     return all;
-  }).replace(/\s{2,}/g, ' ').trim();
+  }).replace(/[\u2581\u200b\u200c\u200d\ufeff]/g, ' ').replace(/\s{2,}/g, ' ').trim();
   return { text: clean, events };
 }
 

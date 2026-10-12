@@ -77,7 +77,7 @@ async function chat(req) {
   const ev = await thinkAll({ message: clip(b.message, 2000), source: 'api', user: clip(b.user, 40) || 'api' });
   return json({
     brain: brainName(),
-    reply: ev.filter((e) => e.type === 'say').map((e) => e.text).join(' '),
+    reply: ev.filter((e) => e.type === 'say').map((e) => e.text).join(' ').trim(),
     mood: [...ev].reverse().find((e) => e.type === 'mood')?.value || 'neutral',
     actions: ev.filter((e) => e.type === 'action'),
     steps: ev.filter((e) => e.type === 'step'),

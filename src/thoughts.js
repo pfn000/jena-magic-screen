@@ -1,7 +1,7 @@
 // The thought process chain panel: each run is a card; steps stream in one at a time.
 // Only real events: what people say to her, file drops, her own movements, what she sees of herself,
 // and what her brain (JenaXI) actually answers. Nothing is invented.
-const ICON = { notice: '📥', think: '🧠', tool: '🔧', feel: '💢', plan: '🗺️', say: '💬', status: '⚠️', body: '🤸', see: '👁️', private: '🔒' };
+const ICON = { notice: '📥', think: '🧠', tool: '🔧', feel: '💢', plan: '🗺️', say: '💬', status: '⚠️', body: '🤸', see: '👁️', sense: '🫧', private: '🔒' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const EMPTY = '<p class="empty">Nothing yet. Real events show up here as they happen: what you say to Jena, chat that mentions her, file drops, her own moves, what she sees of herself, and what her brain answers.</p>';
 

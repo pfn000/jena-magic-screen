@@ -17,6 +17,7 @@ export class Autonomy {
     this.lastChatGlance = 0;
     this.mood = 'neutral';
     this.timer = setInterval(() => this.tick(), 1000);
+    this.postureTimer = setTimeout(() => this.posture(), 5000 + Math.random() * 6000);
   }
 
   get ready() { return !!this.avatar.ready; }
@@ -42,6 +43,41 @@ export class Autonomy {
     this.lastMove = Date.now();
     this.log(`I'm looking ${dir === 'left' || dir === 'right' ? `to my ${dir}` : dir}${why ? ` (${why})` : ''}`);
   }
+  tilt(side = 'left', ms = 2600, why = '') {
+    this.avatar.tiltHead(side, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm tilting my head to my ${side}${why ? ` (${why})` : ''}`);
+  }
+  shift(side = 'left', ms = 7000, why = '') {
+    this.avatar.shiftWeight(side, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm putting my weight on my ${side} leg${why ? ` (${why})` : ''}`);
+  }
+  fist(side = 'right', ms = 1800, why = '') {
+    this.avatar.curlHand(side, 1, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm making a fist with my ${side === 'both' ? 'hands' : side + ' hand'}${why ? ` (${why})` : ''}`);
+  }
+  stretchFingers(side = 'both', ms = 1500, why = '') {
+    this.avatar.curlHand(side, 0, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm stretching my fingers out${why ? ` (${why})` : ''}`);
+  }
+  nod(why = '', quiet = false) {
+    this.avatar.nod(1200);
+    this.lastMove = Date.now();
+    if (!quiet) this.log(`I'm nodding${why ? ` (${why})` : ''}`);
+  }
+  shake(why = '', quiet = false) {
+    this.avatar.shakeHead(1200);
+    this.lastMove = Date.now();
+    if (!quiet) this.log(`I'm shaking my head${why ? ` (${why})` : ''}`);
+  }
+  tap(side = 'right', ms = 3200, why = '') {
+    this.avatar.tapFoot(side, ms);
+    this.lastMove = Date.now();
+    this.log(`I'm tapping my ${side} foot${why ? ` (${why})` : ''}`);
+  }
   face(mood, ms = 5000, why = '', quiet = false) {
     const m = this.avatar.setExpression(mood, 1, ms);
     this.mood = m;
@@ -64,10 +100,24 @@ export class Autonomy {
     this.wave('right', `${user} said my name`);
     this.face('happy', 4000, '', true);
   }
-  onMessage(user) {
+  onMessage(user, text = '') {
     if (!this.ready) return;
     this.lastIdle = Date.now();
-    if (Date.now() - this.lastMove > 3000) { this.avatar.lookToward('center'); this.face('happy', 3500, `${user} is talking to me`); }
+    if (Date.now() - this.lastMove > 3000) {
+      this.avatar.lookToward('center');
+      this.face('happy', 3500, `${user} is talking to me`);
+      if (/\?\s*$/.test(text)) this.avatar.tiltHead(Math.random() < 0.5 ? 'left' : 'right', 2400, 0.18); // a question: curious tilt
+      else this.avatar.nod(1000);
+    }
+  }
+  // what she just said out loud: body language that goes with her own words
+  onSay(text = '') {
+    if (!this.ready) return;
+    const t = String(text).toLowerCase();
+    if (/^(lmao |lol |nah|nope|no\b)/.test(t)) this.shake('', true);
+    else if (/^(yes|yeah|yep|ok|okay|sure|bet)\b/.test(t)) this.nod('', true);
+    else if (/\?\s*$/.test(t)) this.avatar.tiltHead(Math.random() < 0.5 ? 'left' : 'right', 2200, 0.15);
+    if (/!{1,}|\b(lets go|let's go|yay|hype)\b/.test(t) && Math.random() < 0.5) this.avatar.curlHand('right', 1, 1400);
   }
   onPrivateMessage() {
     if (!this.ready) return;
@@ -89,6 +139,10 @@ export class Autonomy {
       if (e.name === 'lowerArm') return this.lower('my brain decided');
       if (e.name === 'wave') return this.wave(e.args?.[0] || 'right', 'my brain decided');
       if (e.name === 'look') return this.look(e.args?.[0] || 'left', 2500, 'my brain decided');
+      if (e.name === 'tilt') return this.tilt(e.args?.[0] || 'left', 2600, 'my brain decided');
+      if (e.name === 'nod') return this.nod('my brain decided');
+      if (e.name === 'shake') return this.shake('my brain decided');
+      if (e.name === 'fist') return this.fist(e.args?.[0] || 'right', 1800, 'my brain decided');
     } catch (err) { this.log(`tried to move but couldn't (${err.message})`); }
   }
 
@@ -99,8 +153,15 @@ export class Autonomy {
     if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 8000) return;
     this.lastIdle = now;
     this.nextIdleIn = 25000 + Math.random() * 35000;
+    const quietFor = now - Math.max(...this.chatTimes, 0);
     const options = [
       () => this.raise('both', 2200, 'stretching, been standing here a while'),
+      () => this.tilt(pick(['left', 'right']), 2800, 'thinking about something'),
+      () => this.shift(pick(['left', 'right']), 9000, 'my legs are tired'),
+      () => this.fist(pick(['left', 'right']), 1600, 'squeezing my hand, just fidgeting'),
+      () => this.stretchFingers('both', 1500, 'cracking my knuckles, kinda'),
+      () => this.tap(pick(['left', 'right']), 3200, quietFor > 60000 ? "it's quiet in here" : 'bopping to nothing'),
+      () => this.nod('agreeing with my own thoughts'),
       () => this.raise('left', 2400, 'checking my own arm works'),
       () => this.raise('right', 2400, 'just because I can'),
       () => this.look(pick(['left', 'right']), 2600, 'looking around my room'),
@@ -108,6 +169,20 @@ export class Autonomy {
       () => this.face(pick(['relaxed', 'happy']), 4000, 'vibing'),
       () => this.wave(pick(['left', 'right']), 'saying hi to whoever is watching'),
     ];
-    pick(options)();
+    // never the same thing twice in a row
+    let i; do { i = Math.floor(Math.random() * options.length); } while (options.length > 2 && (i === this.lastIdlePick || i === this.prevIdlePick));
+    this.prevIdlePick = this.lastIdlePick; this.lastIdlePick = i;
+    options[i]();
+  }
+
+  // small posture changes she makes without thinking about them (not logged as decisions; her self-sense
+  // still notices them): shifting weight between her feet every so often, like anyone standing a while
+  posture() {
+    if (!this.ready || document.hidden) return;
+    const r = Math.random();
+    const side = r < 0.4 ? 'left' : r < 0.8 ? 'right' : 'center';
+    this.avatar.shiftWeight(side, side === 'center' ? 0 : 7000 + Math.random() * 9000);
+    clearTimeout(this.postureTimer);
+    this.postureTimer = setTimeout(() => this.posture(), 6000 + Math.random() * 12000);
   }
 }

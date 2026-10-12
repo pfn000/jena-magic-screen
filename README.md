@@ -14,6 +14,8 @@ Nothing on this page is fake, simulated or borrowed: no demo chat, no made-up th
 |---|---|
 | Avatar | Her VRM rendered live with three.js + @pixiv/three-vrm: breathing, blinking, eye saccades, expressions, lip flap. |
 | Her body is HERS | No movement buttons or commands. A behaviour controller (`src/autonomy.js`) picks her own gestures, gaze and expressions from what is actually happening (chat activity, someone saying her name, messages to her, file drops, idle time) and from her brain's own action tags. Every move is logged in the thought chain in her words: "I'm raising my left arm". Left/right always means HER left/right. |
+| Self-sense (her whole body) | Every frame she reads her REAL body off the live VRM: all humanoid bones the model has (hips, spine, chest, neck, head, eyes, shoulders, arms, hands, every finger joint, legs, feet, toes: local rotation + where each joint really is) and every expression / blend shape (blink, aa/ih/ou/ee/oh, happy/angry/sad/relaxed/surprised, lookUp/Down/Left/Right, plus any custom ones) and where her eyes point. It's all in `window.jena.selfState`. A compact live readout sits under "what I see", and notable changes go in the thought chain in her words ("my head's tilted left", "I'm smiling", "my weight's on my right leg"). HER left = screen right. Her self-vision is checked against it, so she never claims something her body says isn't true. |
+| Natural idle | Procedural, never-repeating motion: breathing with a wandering rate, weight shifts between her feet (feet stay planted with leg IK), hip sway, relaxed arms with soft elbows and curled fingers, head and eye drift, saccades, blinks. She stands on the floor (soles placed exactly at floor level, soft contact shadows). |
 | Self-vision | A few times a second she looks at her own rendered body with a real pose model (MediaPipe Pose Landmarker, in the browser, CPU/WASM) and says what she perceives: "I see my LEFT arm is up". A little "what I see" view with the detected skeleton sits in the corner (`?selfview=0` hides it). If what she sees disagrees with what she meant to do, she says so. |
 | Virtual desktop | Live, **view-only** noVNC stream of her machine's X desktop. Shows "Jena's desktop is asleep" when the stream is down, and retries. |
 | Chat | Real Twitch chat from **her** channel only (anonymous read-only IRC). With no channel set it says **"Twitch chat: not connected — set your channel"**. Never anyone else's chat. |
@@ -35,7 +37,7 @@ llama.cpp's `llama-server` (OpenAI-compatible). No hosted AI APIs, no keys.
 | `JENA_LLM_API_KEY` | none | only if llama-server runs with `--api-key` |
 
 Her replies can move her own body with tags, which are stripped from what she says:
-`[raise_left_arm] [raise_right_arm] [raise_both_arms] [lower_arms] [wave] [wave_left] [look_left] [look_right] [mood:happy]`.
+`[raise_left_arm] [raise_right_arm] [raise_both_arms] [lower_arms] [wave] [wave_left] [look_left] [look_right] [tilt_left] [tilt_right] [nod] [shake_head] [fist] [mood:happy]`.
 
 ```bash
 GGUF=/path/to/JenaXI.gguf ./box/start-jenaxi.sh     # serves her and prints a JENA_LLM_BASE_URL for Vercel

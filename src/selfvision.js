@@ -9,7 +9,8 @@ const MODELS = [`/mediapipe/pose_landmarker_${VARIANT}.task`, `https://storage.g
 const BONES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24], [23, 24]];
 
 export class SelfVision {
-  constructor(sourceCanvas, { log, view, label, intent, fps = 3 }) {
+  constructor(sourceCanvas, { log, view, label, intent, felt, fps = 3 }) {
+    this.felt = felt; // () => {left:'up'|'down', right} from her own body sense, to check her eyes against
     this.src = sourceCanvas;
     this.log = log;
     this.view = view; // optional <canvas> to show what she sees
@@ -105,18 +106,20 @@ export class SelfVision {
   }
 
   say(arms, prev) {
-    let text;
-    if (arms.left === 'up' && arms.right === 'up') text = 'I see BOTH my arms are up';
-    else if (arms.left === 'up') text = 'I see my LEFT arm is up';
-    else if (arms.right === 'up') text = 'I see my RIGHT arm is up';
-    else text = prev ? 'I see both my arms are down again' : 'I see myself standing, arms down';
-    const meant = this.intent?.();
-    if (meant) {
-      // compare with what she meant to do, once her intent has been steady for a moment (her eyes lag a bit)
-      const want = `${meant.left ? 'up' : 'down'}|${meant.right ? 'up' : 'down'}`;
-      if (want !== this.intentKey) { this.intentKey = want; this.intentSince = performance.now(); }
-      if (want !== `${arms.left}|${arms.right}` && performance.now() - this.intentSince > 2500) text += ' (huh, not what I meant to do)';
+    const desc = (a) => (a.left === 'up' && a.right === 'up' ? 'BOTH my arms are up' : a.left === 'up' ? 'my LEFT arm is up' : a.right === 'up' ? 'my RIGHT arm is up' : 'both my arms are down');
+    // her eyes are checked against what she can feel; she never claims what her body says isn't true
+    const felt = this.felt?.();
+    if (felt && (felt.left !== arms.left || felt.right !== arms.right)) {
+      const now = performance.now();
+      if (now - (this.lastDoubt || -1e9) > 60000) {
+        this.lastDoubt = now;
+        this.log('see', `my eyes say ${desc(arms)}, but I can feel ${desc(felt)}, so I'm trusting my body`);
+      }
+      return;
     }
+    let text;
+    if (arms.left === 'down' && arms.right === 'down') text = prev ? 'I see both my arms are down again' : 'I see myself standing, arms down';
+    else text = `I see ${desc(arms)}`;
     this.log('see', text);
   }
 

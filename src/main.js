@@ -7,9 +7,12 @@ import { ThoughtChain } from './thoughts.js';
 import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { SelfVision } from './selfvision.js';
+import { SelfSense } from './selfstate.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// her replies: no stray leading/trailing spaces (her tokenizer starts words with a space) or invisible chars
+const tidy = (s) => String(s ?? '').replace(/^[\s\u2581\u200b\u200c\u200d\ufeff]+|[\s\u2581\u200b\u200c\u200d\ufeff]+$/g, '');
 const ORIGIN = Math.random().toString(36).slice(2, 10);
 const KEY_STORE = 'jena.dmKey';
 
@@ -39,6 +42,7 @@ const avatar = new Avatar($('#avatar-canvas'), {
 const bubble = $('#speech');
 let bubbleTimer;
 function say(text) {
+  text = tidy(text);
   if (!text) return;
   const ms = avatar.talkFor(text);
   bubble.textContent = text;
@@ -63,12 +67,18 @@ setInterval(pollHealth, 15000);
 // ---------------- her own body: autonomy + self-vision ----------------
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
 const params = new URLSearchParams(location.search);
+// her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
+const selfSense = new SelfSense(avatar, {
+  log: (text) => chain.self('sense', text),
+  readout: params.get('selfview') !== '0' ? $('#self-readout') : null,
+});
 if (params.get('selfview') !== '0') {
   const view = $('#self-view'), label = $('#self-view-label');
   const startVision = () => (window.__jenaVision = new SelfVision($('#avatar-canvas'), {
     log: (kind, text) => chain.self(kind, text),
     view, label,
     intent: () => avatar.armState(),
+    felt: () => ({ left: selfSense.feel.leftArm, right: selfSense.feel.rightArm }),
   })).start();
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
 } else $('#self-eye')?.remove();
@@ -79,6 +89,8 @@ function runEvent(e, run, { privateRun = false } = {}) {
   else if (e.type === 'step') run.step(e.kind, e.text);
   else if (e.type === 'mood' || e.type === 'action') autonomy.fromBrain(e);
   else if (e.type === 'say') {
+    e = { ...e, text: tidy(e.text) };
+    if (!privateRun) autonomy.onSay(e.text);
     if (privateRun) run.step('private', cfg.obs || !e.text ? 'replied privately' : `replied privately: “${e.text}”`);
     else { run.step('say', e.text); say(e.text); }
   }
@@ -171,7 +183,7 @@ $('#talk').addEventListener('submit', (e) => {
   const who = localStorage.getItem(KEY_STORE) ? 'mama' : 'guest';
   addChat({ user: who, text: clean(text), cls: 'from-you' });
   thinkAbout({ message: text, source: 'stage', user: who });
-  autonomy.onMessage(who);
+  autonomy.onMessage(who, text);
 });
 
 // ---------------- private DM drawer (never on stream) ----------------
@@ -211,7 +223,7 @@ function renderDM(log) {
   dmLog.innerHTML = log.map((m) => {
     const who = m.from === 'jena' ? 'jena' : m.from === 'system' ? 'system' : 'mama';
     const time = new Date(m.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    let body = esc(m.text || '');
+    let body = esc(m.from === 'jena' ? tidy(m.text) : m.text || '');
     if (m.kind === 'file') {
       const img = /^image\//.test(m.type || '') ? `<img src="${esc(m.url)}" alt="">` : '';
       body = `${img}<a href="${esc(m.url)}" target="_blank" rel="noopener">📎 ${esc(m.name)}</a><small>${Math.round((m.size || 0) / 1024)} KB · ${esc(m.store || '')}</small>`;
@@ -310,11 +322,13 @@ window.jena = {
   bones: () => avatar.bones(),
   expressions: () => avatar.expressions(),
   arms: () => avatar.armState(),
+  // everything she feels of her own body right now: all bones (degrees), all expressions (0-1), eyes, and what it means
+  get selfState() { return selfSense.snapshot(); },
   desktop: (url) => desktop.setUrl(url),
   config: cfg,
 };
 // ?debug=1 only: lets a test harness trigger her own autonomy moves to check self-vision left/right
-if (params.get('debug') === '1') window.__jenaDebug = { autonomy };
+if (params.get('debug') === '1') window.__jenaDebug = { autonomy, avatar, selfSense };
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';
