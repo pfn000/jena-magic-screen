@@ -264,17 +264,49 @@ def nap(secs):
         time.sleep(0.5)
         with lock:
             if events_in: return
+VID_DIR = os.path.join(HOME, 'Videos')
+def local_video(vid):
+    """a small local copy (<=480p) so it plays smoothly here: no ads, no popups, software decode is easy"""
+    os.makedirs(VID_DIR, exist_ok=True)
+    have = [f for f in os.listdir(VID_DIR) if f.startswith(vid + '.') and not f.endswith('.part')]
+    if have: return os.path.join(VID_DIR, have[0])
+    for extra in ([], ['-f', 'b[height<=480]/b']):
+        sh(['nice', '-n', '15', 'yt-dlp', '-q', '--no-playlist', '--js-runtimes', 'node', '-S', 'res:480', *extra,
+            '-o', os.path.join(VID_DIR, '%(id)s.%(ext)s'), 'https://www.youtube.com/watch?v=' + vid], timeout=180)
+        if any(f.startswith(vid + '.') and not f.endswith('.part') for f in os.listdir(VID_DIR)): break
+    have = [f for f in os.listdir(VID_DIR) if f.startswith(vid + '.') and not f.endswith('.part')]
+    return os.path.join(VID_DIR, have[0]) if have else None
+
+def fetch_videos():
+    """keep local copies of every video she learned from, one at a time, slowly"""
+    time.sleep(60)
+    for url, title, label in my_videos():
+        m = re.search(r'[?&]v=([\w-]{11})', url)
+        if m: local_video(m.group(1)); time.sleep(5)
+
 def act_watch(video=None):
     vids = my_videos()
     if not vids and not video: return act_read()
     url, title, label = video or random.choice(vids)
     vid = re.search(r'[?&]v=([\w-]{11})', url)
-    page = f'https://www.youtube.com/watch?v={vid.group(1)}' if vid else url
-    did(f'watching "{title[:70]}" again, the video I learned my {label} move from')
+    path = local_video(vid.group(1)) if vid else None
     with lock:
-        watching['video'] = {'url': url, 'title': title, 'label': label, 'since': int(time.time() * 1000)}
-    firefox(page)
-    nap(random.uniform(25, 40))
+        watching['video'] = {'url': url, 'title': title, 'label': label, 'since': int(time.time() * 1000), 'player': 'ffplay (local copy)' if path else 'firefox'}
+    if path:
+        did(f'watching "{title[:70]}" again, the video I learned my {label} move from')
+        W, H = screen_size()
+        vw, vh = min(960, W - 80), min(540, H - 90)
+        p = subprocess.Popen(['ffplay', '-loglevel', 'quiet', '-an', '-autoexit', '-x', str(vw), '-y', str(vh), '-left', str((W - vw) // 2), '-top', '30',
+                              '-window_title', f'{title[:60]} (watching)', path], env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        end = time.time() + random.uniform(25, 45)
+        while time.time() < end and p.poll() is None:
+            time.sleep(0.5)
+            with lock:
+                if events_in: break
+        if p.poll() is None: p.terminate()
+    else:
+        did(f'could not get a local copy of "{title[:50]}", opening it on YouTube instead')
+        firefox(url); nap(25)
     with lock:
         watching['video'] = None
 
@@ -418,7 +450,8 @@ def hands():
                     did(f'{ev.get("user") or "someone"} sent me a link, opening exactly {u[:90]}')
                     firefox(u); time.sleep(4); scroll_some()
                 elif re.search(r'\b(video|watch|dance|dancing|move|moves)\b', text, re.I) and my_videos():
-                    act_watch()
+                    dances = [v for v in my_videos() if re.search(r'dance|macarena|zumba|jerusalema', (v[1] + ' ' + v[2]), re.I)]
+                    act_watch(random.choice(dances) if dances and re.search(r'danc', text, re.I) else None)
                 elif re.search(r'\b(search|look up|lookup|google|find|github|repo|what is|who is|how (do|does|to))\b', text, re.I) or wiki_for(text):
                     act_search(text)
                     if random.random() < 0.5: act_note(' '.join(text.split()[:8]))
@@ -619,6 +652,6 @@ async def door():
         await srv.serve_forever()
 
 if __name__ == '__main__':
-    for f in (eyes, ears) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
+    for f in (eyes, ears, fetch_videos) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
         threading.Thread(target=f, daemon=True).start()
     asyncio.run(door())

@@ -20,8 +20,9 @@ export class ThoughtChain {
     const online = !!h?.online;
     const loading = !online && h?.detail === 'JenaXI is loading';
     this.online = online;
-    this.badge.textContent = online ? 'JenaXI online' : loading ? 'JenaXI waking up…' : 'JenaXI-0 is training — brain offline';
-    this.badge.title = online ? 'her own model is answering' : 'her brain (JenaXI.gguf on llama-server) is not answering yet; checked every 15 s';
+    if (h?.name) this.model = h.name;
+    this.badge.textContent = online ? `${this.model || 'JenaXI'} online` : loading ? 'JenaXI waking up…' : 'brain offline';
+    this.badge.title = online ? 'her own model is answering, on her own box' : `her brain is not answering${h?.detail ? ': ' + h.detail : ''}; checked every 15 s. Messages you send now are saved as Queued.`;
     this.badge.classList.toggle('is-live', online);
     this.badge.classList.toggle('is-off', !online);
   }

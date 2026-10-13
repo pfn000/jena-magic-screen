@@ -52,8 +52,9 @@ function say(text) {
   bubble.classList.add('show');
   clearTimeout(bubbleTimer);
   bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms + 2600);
-  addChat({ user: 'Jena', text, cls: 'from-jena' });
+  if (!twitchLive) addChat({ user: 'Jena', text, cls: 'from-jena' }); // with Twitch on, her own talk lives in the thought chain
 }
+let twitchLive = false;
 
 // ---------------- thought chain ----------------
 const chain = new ThoughtChain($('#thoughts'), { obs: cfg.obs });
@@ -62,7 +63,7 @@ chain.setHealth(cfg.apiInfo?.brainHealth || { online: false });
 async function pollHealth() {
   if (!cfg.api) return chain.setHealth({ online: false });
   const d = await fetch('/api/health', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-  if (d?.brain) chain.setHealth(d.brain);
+  if (d?.brain) { chain.setHealth(d.brain); window.dispatchEvent(new CustomEvent('jena-health', { detail: d.brain })); }
 }
 pollHealth();
 setInterval(pollHealth, 15000);
@@ -89,6 +90,18 @@ if (params.get('selfview') !== '0') {
     felt: () => ({ left: selfSense.feel.leftArm === 'up' ? 'up' : 'down', right: selfSense.feel.rightArm === 'up' ? 'up' : 'down' }),
   })).start();
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
+  // collapse her POV panels so they don't clutter the page (she keeps seeing herself either way)
+  const eye = $('#self-eye');
+  if (eye) {
+    const btn = document.createElement('button');
+    btn.id = 'self-toggle'; btn.type = 'button';
+    const KEY = 'jena.selfCollapsed';
+    const set = (c) => { document.body.classList.toggle('self-collapsed', c); btn.textContent = c ? '👁 her views' : '✕ hide views'; btn.title = c ? 'show her BODY and FACE self-views' : 'hide her self-views (she still sees herself)'; localStorage.setItem(KEY, c ? '1' : '0'); };
+    btn.onclick = () => set(!document.body.classList.contains('self-collapsed'));
+    eye.parentElement.appendChild(btn);
+    const saved = localStorage.getItem(KEY);
+    set(saved == null ? matchMedia('(max-width: 900px)').matches : saved === '1');
+  }
 } else $('#self-eye')?.remove();
 
 // every brain run on this page, as it really happened (the dev panel reads these)
@@ -119,7 +132,7 @@ function thinkAbout(input, { broadcast = true, thumb } = {}) {
     for await (const e of src) runEvent(e, run);
     run.done();
   }).catch((e) => console.warn('think failed', e));
-  return busy;
+  return busy.then(() => run._dev);
 }
 
 // replay runs that happened on other screens (e.g. mama's phone -> the OBS page)
@@ -150,30 +163,38 @@ let lastActivity = Date.now();
 
 // ---------------- chat ----------------
 const chatList = $('#chat-list');
-function addChat({ user, text, color, parts, cls = '' }) {
+function addChat({ user, text, color, parts, cls = '', tag = '' }) {
   chatList.querySelector('.chat-empty')?.remove();
   const li = document.createElement('li');
   li.className = `msg ${cls}`;
+  li.dataset.time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const body = parts
     ? parts.map((p) => (p.emote ? `<img class="emote" alt="${esc(p.alt)}" src="https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(p.emote)}/default/dark/1.0">` : esc(p.text))).join('')
     : esc(text);
-  li.innerHTML = `<b style="${color ? `color:${esc(color)}` : ''}">${esc(user)}</b><span>${body}</span>`;
+  li.innerHTML = `<b style="${color ? `color:${esc(color)}` : ''}">${esc(user)}</b><span>${body}</span><em class="tag">${esc(tag)}</em>`;
   const atBottom = chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 80;
   chatList.appendChild(li);
   while (chatList.children.length > 120) chatList.firstElementChild.remove();
-  if (atBottom) chatList.scrollTop = chatList.scrollHeight;
+  if (atBottom || cls === 'from-you') chatList.scrollTop = chatList.scrollHeight;
+  return li;
 }
 const chatLabel = $('#chat-channel');
 let lastMention = 0;
 if (!cfg.twitch) {
-  chatLabel.textContent = 'not connected';
+  chatLabel.textContent = 'Twitch off';
   chatLabel.dataset.state = 'off';
-  chatList.innerHTML = '<li class="chat-empty"><b>Twitch chat: not connected — set your channel</b><span>add <code>?twitch=yourname</code> to the link, or set <code>TWITCH_CHANNEL</code> on the server</span></li>';
+  $('#chat')?.classList.add('mode-chat');
+  if ($('#chat .sub')) $('#chat .sub').textContent = '· with Jena';
+  chatList.innerHTML = '<li class="chat-empty"><b>Say hi to Jena 👋</b><span>Twitch is off, so this is a normal chat with her. When a Twitch channel is set (<code>?twitch=name</code> or <code>TWITCH_CHANNEL</code>) this panel switches to Twitch chat and her own talk moves to the thought chain.</span></li>';
 } else new TwitchChat({
   channel: cfg.twitch,
   onStatus: (s) => {
     chatLabel.textContent = `#${s.channel}${s.state === 'joined' ? '' : ' · ' + s.state}`;
     chatLabel.dataset.state = s.state;
+    twitchLive = s.state === 'joined';
+    $('#chat')?.classList.toggle('mode-twitch', twitchLive);
+    $('#chat')?.classList.toggle('mode-chat', !twitchLive);
+    const sub = $('#chat .sub'); if (sub) sub.textContent = twitchLive ? '· Twitch' : '· with Jena';
   },
   onMessage: (m) => {
     addChat({ user: m.user, text: m.text, color: m.color, parts: m.parts });
@@ -186,17 +207,55 @@ if (!cfg.twitch) {
   },
 });
 
+// ---------------- queued messages: sent while her brain is offline, answered when she's back ----------------
+const QUEUE = 'jena.queue';
+const loadQ = () => { try { return JSON.parse(localStorage.getItem(QUEUE) || '[]'); } catch { return []; } };
+const saveQ = (q) => localStorage.setItem(QUEUE, JSON.stringify(q.slice(-30)));
+let brainOnline = !!cfg.apiInfo?.brainHealth?.online;
+const queuedEls = new Map();
+for (const q of loadQ()) queuedEls.set(q.id, addChat({ user: q.user, text: clean(q.text), cls: 'from-you queued', tag: 'Queued' }));
+function send(text, who, el) {
+  lastActivity = Date.now();
+  if (!brainOnline) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    saveQ([...loadQ(), { id, text, user: who, at: Date.now() }]);
+    el.classList.add('queued'); el.querySelector('.tag').textContent = 'Queued';
+    queuedEls.set(id, el);
+    chain.self('status', `brain offline, so I saved ${who}'s message as Queued. I'll answer it when I'm back`);
+    return;
+  }
+  el.querySelector('.tag').textContent = '';
+  autonomy.onMessage(who, text);
+  thinkAbout({ message: text, source: 'stage', user: who }).then((r) => {
+    // her brain dropped out mid-message: keep it as Queued instead of losing it
+    if (r && !r.events.some((x) => x.type === 'say') && r.events.some((x) => x.type === 'status' && /offline|not reachable|unreachable/i.test(x.text))) {
+      brainOnline = false; send(text, who, el);
+    }
+  });
+}
+async function flushQueue() {
+  const q = loadQ();
+  if (!q.length || !brainOnline) return;
+  saveQ([]);
+  for (const m of q) {
+    const el = queuedEls.get(m.id);
+    if (el) { el.classList.remove('queued'); el.querySelector('.tag').textContent = `answered later (sent ${new Date(m.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})`; }
+    await thinkAbout({ message: m.text, source: 'stage', user: m.user });
+  }
+}
+window.addEventListener('jena-health', (e) => { const was = brainOnline; brainOnline = !!e.detail.online; if (brainOnline && !was) flushQueue(); });
+setTimeout(flushQueue, 3000);
+
 $('#talk').addEventListener('submit', (e) => {
   e.preventDefault();
   const input = $('#talk-input');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-  lastActivity = Date.now();
   const who = localStorage.getItem(KEY_STORE) ? 'mama' : 'guest';
-  addChat({ user: who, text: clean(text), cls: 'from-you' });
-  thinkAbout({ message: text, source: 'stage', user: who });
-  autonomy.onMessage(who, text);
+  const el = twitchLive ? null : addChat({ user: who, text: clean(text), cls: 'from-you' });
+  if (twitchLive) { chain.self('status', `${who} (off-Twitch): ${text.slice(0, 120)}`); thinkAbout({ message: text, source: 'stage', user: who }); return; }
+  send(text, who, el);
 });
 
 // ---------------- private DM drawer (never on stream) ----------------
