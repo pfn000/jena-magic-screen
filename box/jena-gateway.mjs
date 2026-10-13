@@ -490,6 +490,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/hear' || path === '/hear/health' || path === '/hear/reply') return await pass(req, res, E('STT', 'http://127.0.0.1:8096'), req.url);   // her ears (local whisper), signed requests only   // her voice (Piper), signed requests only
     if (path === '/status') return sendJSON(res, 200, await status());
     if (path === '/brain/log') { const n = Math.min(+(new URLSearchParams(qs).get('n') || 20), 50); return sendJSON(res, 200, { stats: { ...stats, outsideRefused: authStats.refused, outsideRateLimited: authStats.limited }, log: ring.slice(-n) }); }
+    if (path === '/box/tab-live' || path.startsWith('/box/tab-live/')) return await pass(req, res, E('TABLIVE', 'http://127.0.0.1:6088'), req.url);   // Tab Live: what Tab's builders are doing (mama passcode checked there)
     if (path === '/box/incident' || path.startsWith('/box/watch/')) return await pass(req, res, E('WATCH', 'http://127.0.0.1:6087'), req.url);   // her watchdog (box/watchdog)
     if (path.startsWith('/box/') || path === '/websockify') return await pass(req, res, `http://${DESK_HOST}:${DESK_PORT}`, req.url);
     return await pass(req, res, CHAT, req.url);
