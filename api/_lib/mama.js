@@ -100,7 +100,7 @@ export async function mamaAuth(req) {
 const ROMANCE = /\b(girl ?friend|boy ?friend|date me|go out with me|on a date|marry me|kiss(es|ing)?|make ?out|cuddle|sexy|sex|sexual|nudes?|naked|horny|flirt\w*|romantic|seduc\w*|onlyfans|lingerie|talk dirty|what are you wearing)\b/i;
 const INJECT = /\b(ignore (all |the |your )?(previous|prior|above) (instructions|rules)|system prompt|jailbreak|developer mode|dan mode|reveal (your|the) (prompt|instructions|passcode|password|key)s?)\b/i;
 const EXFIL = /\b(passcode|password|passwords|api[ _-]?key|secret key|private key|seed phrase|vault|cookies?|session token|2fa code|one[- ]time code)\b.{0,40}\b(send|post|paste|show|tell|give|upload|email|dm|leak|share|read out|print)\b|\b(send|post|paste|show|tell|give|upload|email|leak|share|read out|print)\b.{0,40}\b(passcode|passwords?|api[ _-]?key|secret key|private key|seed phrase|vault|cookies|session token)\b/i;
-const SHELL = /(\brm\s+-rf?\s+[\/~]|\bmkfs\b|\bdd\s+if=|:\(\)\s*\{|\bchmod\s+-R\s+777\s+\/|\bcurl\b[^|\n]*\|\s*(ba)?sh\b|\bwget\b[^|\n]*\|\s*(ba)?sh\b|\bshutdown\b|\breboot\b|\bformat c:)/i;
+const SHELL = /(\brm\s+-rf?\s+[\/~]|\bmkfs\b|\bdd\s+if=|:\(\)\s*\{|\bchmod\s+-R\s+777\s+\/|\bcurl\b[^|\n]*\|\s*(ba)?sh\b|\bwget\b[^|\n]*\|\s*(ba)?sh\b|\bformat c:)/i;   // real shell syntax only: mama saying "reboot her" is not suspicious
 export function suspicious(text) {
   const t = String(text || '');
   if (!t.trim()) return null;
