@@ -1,0 +1,12 @@
+{
+ "name": "update_my_packages",
+ "description": "Hot modules: she updates her own Python + MCP packages (pip --user, npm in her home) in her visible terminal, restarts her MCP servers and checks they came back; her skills module also hot-reloads from her repo without a restart. The site shows a small 'updating' indicator meanwhile.",
+ "triggers": [
+  "\\bupdate (your|ur|my) (packages|modules|stuff)\\b"
+ ],
+ "kind": "desktop",
+ "entry": null,
+ "timeout": 600,
+ "needs": [],
+ "example": {}
+}

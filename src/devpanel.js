@@ -2,6 +2,7 @@
 // Everything here is read live from the real sources: the site's API, her box (through its tunnel),
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
+import RFB from '@novnc/novnc';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ago = (ts) => { if (!ts) return '—'; const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${(s / 3600).toFixed(1)}h ago`; };
 const gb = (b) => (b == null ? '?' : (b / 1e9).toFixed(1) + ' GB');
@@ -37,6 +38,17 @@ export class DevPanel {
         out.textContent = `running ${e.target.dataset.run}…`;
         out.textContent = JSON.stringify(await post({ action: 'run', name: e.target.dataset.run, input: { text: v, query: v, question: v, url: v } }), null, 1).slice(0, 4000);
       }
+      if (e.target.dataset.mama) {
+        const mo = this.body.querySelector('#dp-mama-out');
+        if (!key) { mo.textContent = 'unlock the private DM drawer with your passcode first'; return; }
+        const act = e.target.dataset.mama;
+        const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key }, body: JSON.stringify({ action: act, text: this.body.querySelector('#dp-pop')?.value || '' }) }).then((x) => x.json()).catch((er) => ({ error: er.message }));
+        if (act === 'notify') mo.textContent = r.ok ? 'popped up on her desktop (covered on the public page + stream while it is up)' : JSON.stringify(r);
+        if (act === 'apikey') mo.textContent = r.ok ? `Jena's API key (keep it secret; only you can see this):\n${r.key}\n\nOpenAI-compatible:\ncurl ${location.origin}/api/v1/chat/completions -H "Authorization: Bearer ${r.key}" -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"hi jena"}]}'` : JSON.stringify(r);
+        if (act === 'takeover') { if (r.ok) this.takeover(r.ws); else mo.textContent = JSON.stringify(r); }
+        this.mamaOut = mo.textContent;
+        return;
+      }
       if (e.target.dataset.create) {
         if (!key) { out.textContent = 'unlock the private DM drawer with your passcode first'; return; }
         out.textContent = 'she is drafting it…';
@@ -56,6 +68,20 @@ export class DevPanel {
     };
     window.addEventListener('pointerdown', onTap, true);
     if (new URLSearchParams(location.search).get('dev') === '1') setTimeout(() => this.open(), 500);
+  }
+  // mama drives her real desktop (full mouse + keyboard) through a one-time token; her own hands pause meanwhile
+  takeover(ws) {
+    document.getElementById('takeover')?.remove();
+    const box = document.createElement('section');
+    box.id = 'takeover';
+    box.innerHTML = '<header>🖐 You are driving Jena\'s desktop (her hands are paused) <span class="to-st">connecting…</span><button style="margin-left:auto">give it back ✕</button></header><div class="to-screen"></div>';
+    document.body.appendChild(box);
+    const rfb = new RFB(box.querySelector('.to-screen'), ws, { shared: true });
+    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true;
+    const st = box.querySelector('.to-st');
+    rfb.addEventListener('connect', () => (st.textContent = 'connected'));
+    rfb.addEventListener('disconnect', (ev) => (st.textContent = ev.detail?.clean ? 'disconnected' : 'connection dropped (token used or expired? press take over again)'));
+    box.querySelector('button').onclick = () => { try { rfb.disconnect(); } catch {} box.remove(); };
   }
   open() { this.el.hidden = false; this.refresh(); this.timer = setInterval(() => this.refresh(), 4000); }
   close() { this.el.hidden = true; clearInterval(this.timer); }
@@ -124,7 +150,8 @@ export class DevPanel {
       else if (!a) h += notOn;
       else {
         const flagged = a.activity.filter((x) => x.flag);
-        h += `<h3>Jena asked for help (${a.help.length})</h3><ol>${a.help.slice().reverse().map((x) => `<li><small>${ago(x.ts)}</small> ${esc(x.text)}</li>`).join('') || '<li>nothing yet</li>'}</ol>
+        h += `<h3>Mama's controls</h3><p><input id="dp-pop" placeholder="message to pop up on her desktop" size="40"> <button data-mama="notify">💌 pop it up</button> <button data-mama="takeover">🖐 take over her desktop</button> <button data-mama="apikey">🔑 her API key</button></p><pre id="dp-mama-out"></pre>
+          <h3>Jena asked for help (${a.help.length})</h3><ol>${a.help.slice().reverse().map((x) => `<li><small>${ago(x.ts)}</small> ${esc(x.text)}</li>`).join('') || '<li>nothing yet</li>'}</ol>
           <h3>Flagged (${flagged.length})</h3><ol>${flagged.slice().reverse().map((x) => `<li class="dp-warn"><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)} · ${esc(x.flag)}</small></li>`).join('') || '<li>nothing flagged</li>'}</ol>
           <h3>Everything she searched / opened (newest first)</h3><ol>${a.activity.slice().reverse().slice(0, 120).map((x) => `<li${x.flag ? ' class="dp-warn"' : ''}><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)}</small></li>`).join('') || '<li>nothing yet</li>'}</ol>`;
       }
@@ -166,10 +193,12 @@ export class DevPanel {
     h += `<p class="dp-foot">refreshed ${ago(this.data.at)} · auto-refresh every 4 s</p>`;
     if (this.body.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; // don't wipe what mama is typing
     const outKeep = this.body.querySelector('#dp-skill-out')?.textContent;
+    const mamaKeep = this.body.querySelector('#dp-mama-out')?.textContent;
     const keepOpen = [...this.body.querySelectorAll('details[open]')].length;
     this.body.innerHTML = h;
     if (keepOpen) this.body.querySelectorAll('details').forEach((x) => (x.open = true));
     if (outKeep && this.body.querySelector('#dp-skill-out')) this.body.querySelector('#dp-skill-out').textContent = outKeep;
+    if (mamaKeep && this.body.querySelector('#dp-mama-out')) this.body.querySelector('#dp-mama-out').textContent = mamaKeep;
   }
 }
 

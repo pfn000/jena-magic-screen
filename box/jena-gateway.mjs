@@ -61,6 +61,15 @@ function rawToMessages(prompt) {
   return [{ role: 'system', content: sys || SYS }, ...msgs];
 }
 
+function apiKeyOk(auth) {
+  const m = String(auth || '').match(/^Bearer\s+(\S+)$/i);
+  if (!m) return false;
+  let want = '';
+  try { want = fs.readFileSync(E('JENA_API_KEY_HASH', '/home/jena/.jena/api_key.sha256'), 'utf8').trim(); } catch { return false; }
+  const got = crypto.createHash('sha256').update(m[1]).digest('hex');
+  return want.length === 64 && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(got));
+}
+
 // ---------------------------------------------------------------- brain log (real requests, real answers)
 const ring = [];
 const stats = { requests: 0, errors: 0, guarded: 0, totalMs: 0, lastAt: 0 };
@@ -227,6 +236,17 @@ const server = http.createServer(async (req, res) => {
     const [path, qs] = req.url.split('?');
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
     if (req.method === 'POST' && /^\/(v1\/)?(chat\/)?completions?$/.test(path)) return await brain(req, res, path, CHAT, 'JenaXI-chat');
+    // Jena's own OpenAI-compatible API for other apps: Bearer key checked against the sha256 her box stores
+    // (the key itself is only ever shown to mama in the dev panel). /japi/v1/models and /japi/v1/chat/completions.
+    if (path.startsWith('/japi/')) {
+      if (!apiKeyOk(req.headers.authorization)) return sendJSON(res, 401, { error: { message: 'invalid or missing API key (Authorization: Bearer jena-...)', type: 'invalid_request_error' } });
+      if (path === '/japi/v1/models') return sendJSON(res, 200, { object: 'list', data: [{ id: 'JenaXI-chat', object: 'model', owned_by: 'jena' }, { id: 'JenaXI-0', object: 'model', owned_by: 'jena' }] });
+      if (req.method === 'POST' && path === '/japi/v1/chat/completions') {
+        req.headers['x-jena-origin'] = 'api';
+        return await brain(req, res, '/v1/chat/completions', CHAT, 'JenaXI-chat');
+      }
+      return sendJSON(res, 404, { error: { message: 'Jena API has /v1/models and /v1/chat/completions' } });
+    }
     if (req.method === 'POST' && /^\/jx0\/v1\/(chat\/)?completions$/.test(path)) return await brain(req, res, path, JX0, 'JenaXI-0');
     if (path.startsWith('/jx0/')) return await pass(req, res, JX0, req.url.slice(4));
     if (path === '/status') return sendJSON(res, 200, await status());

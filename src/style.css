@@ -297,3 +297,9 @@ body.obs #body-views { display: none; }
 #skills-pub ul{margin:4px 0;padding-left:16px;max-height:160px;overflow:auto}
 #skills-pub li{margin:2px 0}
 .run.desk header .src{color:#8fd3ff}
+
+.desk-private{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#ffd8ee 0%,#e9d6ff 75%);color:#4a2660;font-weight:900;font-size:clamp(14px,2vw,22px);z-index:3;text-align:center;padding:12px}
+.desk-flag{position:absolute;left:10px;bottom:10px;z-index:3;padding:4px 10px;border-radius:99px;background:rgba(30,18,48,.82);color:#ffe9f7;font-size:12px;font-weight:800}
+#takeover{position:fixed;inset:4vh 4vw;z-index:9999;background:#140d22;border:2px solid #ff7ad9;border-radius:14px;display:flex;flex-direction:column}
+#takeover header{display:flex;gap:10px;align-items:center;padding:8px 12px;color:#ffe9f7;font-weight:800}
+#takeover .to-screen{flex:1;min-height:0}

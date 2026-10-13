@@ -22,6 +22,7 @@ import jena_skills as skills
 DISPLAY = os.environ.get('DISP', ':99')
 PORT = int(os.environ.get('JENA_BOX_PORT', '6081'))
 WS_UPSTREAM = ('127.0.0.1', int(os.environ.get('WEBSOCKIFY_PORT', '6080')))
+WS_MAMA = ('127.0.0.1', int(os.environ.get('WEBSOCKIFY_MAMA_PORT', '6082')))   # full-control VNC, only via a one-time mama token
 BRAIN = os.environ.get('JENA_BRAIN', 'http://127.0.0.1:8088/v1')
 SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
 HOME = os.path.expanduser('~')
@@ -443,6 +444,61 @@ skills.desktop_skills['explore_my_box'] = skill_explore
 def act_explore():
     use_skill('explore_my_box', 'explore my own computer')
 
+# ---------------------------------------------------------------- hot modules: she updates her own packages
+# and hot-reloads her skills module from her repo without restarting; the site shows a small indicator meanwhile.
+import importlib, filecmp, shutil
+updating = {}
+PKG_STAMP = os.path.join(STATE, 'packages_updated')
+def set_updating(phase=None, what=''):
+    updating.clear()
+    if phase: updating.update(phase=phase, what=what, since=int(time.time() * 1000))
+
+def skill_update_packages(inp):
+    global skills
+    if not terminal(): return {'ok': False, 'summary': 'my terminal did not open'}
+    set_updating('installing', 'my python + MCP packages')
+    did('updating my own packages (pip + npm, only my user)', 'skill')
+    type_('clear; pip install --user -U -q mcp mcp-server-fetch mcp-server-git; npm update --prefix ~/.npm-global; echo done\n', 25)
+    r1 = subprocess.run(['/usr/local/bin/python3', '-m', 'pip', 'install', '--user', '-U', '-q', 'mcp', 'mcp-server-fetch', 'mcp-server-git'], capture_output=True, text=True, timeout=600)
+    r2 = subprocess.run(['npm', 'update', '--prefix', os.path.join(HOME, '.npm-global')], capture_output=True, text=True, timeout=600)
+    set_updating('restarting', 'my MCP servers')
+    mcp = skills.mcp_status(refresh=True)
+    vers = subprocess.run(['/usr/local/bin/python3', '-m', 'pip', 'list', '--user', '--format=freeze'], capture_output=True, text=True, timeout=60).stdout
+    vers = ', '.join(l for l in vers.splitlines() if l.split('==')[0] in ('mcp', 'mcp-server-fetch', 'mcp-server-git'))
+    open(PKG_STAMP, 'w').write(str(time.time()))
+    set_updating()
+    ok = r1.returncode == 0 and r2.returncode == 0 and all(m.get('connected') for m in mcp.values() if isinstance(m, dict))
+    did(f'packages updated ({vers}); MCP servers back up: {"yes" if ok else "NOT all"}', 'skill')
+    return {'ok': ok, 'summary': f'updated: {vers}' + ('' if ok else f' · pip {r1.returncode} npm {r2.returncode} ' + (r1.stderr or r2.stderr)[-160:]), 'versions': vers}
+skills.desktop_skills['update_my_packages'] = skill_update_packages
+
+def hot_reload_skills():
+    """if her repo has a newer skills module, swap it in live (no restart)"""
+    global skills
+    new = os.path.join(HOME, 'jena-repo', 'box', 'desktop', 'jena_skills.py'); cur = skills.__file__
+    if not os.path.exists(new) or filecmp.cmp(new, cur, shallow=False): return False
+    set_updating('reloading', 'my skills module (from my repo)')
+    keep = dict(skills.desktop_skills)
+    try:
+        shutil.copy(new, cur); time.sleep(1.5)
+        skills = importlib.reload(skills); skills.desktop_skills.update(keep)
+        did('hot-reloaded my skills module from my repo, no restart', 'skill')
+    except Exception as e:
+        did(f'tried to hot-reload my skills module but it failed: {str(e)[:80]}', 'skill')
+    set_updating()
+    return True
+
+def upkeep():
+    while True:
+        time.sleep(300)
+        try:
+            hot_reload_skills()
+            last = float(open(PKG_STAMP).read()) if os.path.exists(PKG_STAMP) else 0
+            if time.time() - last > 86400 and not mama['driving']:
+                with lock: events_in.append({'text': 'update my packages', 'user': 'jena', 'ts': time.time(), 'skill': 'update_my_packages'})
+        except Exception as e:
+            print('upkeep', e, flush=True)
+
 def use_skill(name, text):
     did(f'using skill: {name}', 'skill')
     res = skills.run(name, {'text': text, 'query': text, 'question': text})
@@ -558,6 +614,8 @@ def hands():
     while True:
         try:
             ev = None
+            if mama['driving']:
+                time.sleep(2); continue          # mama has her desktop: hands off
             with lock:
                 if events_in: ev = events_in.popleft()
             unstick()
@@ -679,6 +737,27 @@ def eyes():
 
 # ---------------------------------------------------------------- listen to the site (backup to POST /box/event)
 seen_recent = deque(maxlen=30)
+# ---------------------------------------------------------------- mama-only doors
+# The site checks mama's passcode; it forwards it here and her box checks it again against a stored sha256
+# (~/.jena/mama.sha256), so nobody who finds the tunnel URL can drive her desktop, run skills or read the log.
+import secrets
+MAMA_HASH = os.path.join(STATE, 'mama.sha256')
+takeover_tokens = {}          # token -> expiry
+mama = {'driving': 0, 'private_until': 0}
+def is_mama(hdrs):
+    try: want = open(MAMA_HASH).read().strip()
+    except Exception: return False
+    got = hashlib.sha256((hdrs.get('x-jena-key') or '').encode()).hexdigest()
+    return bool(want) and secrets.compare_digest(want, got)
+
+def mama_popup(text):
+    """mama's message pops up on her desktop (the site covers the desktop panel for everyone else meanwhile)"""
+    text = re.sub(r'\s+', ' ', str(text))[:300]
+    mama['private_until'] = time.time() + 30
+    spawn(['xmessage', '-center', '-timeout', '28', '-buttons', 'ok mama:0', '-title', 'message from mama',
+           '-bg', '#ffe3f3', '-fg', '#3b1d4a', '-fn', '-*-dejavu sans-bold-r-*-*-20-*-*-*-*-*-*-*', 'mama says: ' + text])
+    did('got a private message from mama (popped up on my screen)', 'help')
+
 def take_event(e):
     text = str(e.get('text') or '')[:300]
     if not text or not safe(text) or str(e.get('source')) in ('private', 'dm') or e.get('private'): return False
@@ -707,7 +786,8 @@ def ears():
 # ---------------------------------------------------------------- the door (http + websocket passthrough)
 def payload():
     with lock:
-        return dict(screen, actions=list(actions)[-8:], video=watching['video'], now=int(time.time() * 1000))
+        return dict(screen, actions=list(actions)[-8:], video=watching['video'], now=int(time.time() * 1000),
+                    mama_driving=mama['driving'] > 0, private=time.time() < mama['private_until'], updating=updating.copy())
 
 CORS = b'Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
 
@@ -723,6 +803,44 @@ async def pipe(r, w):
         try: w.close()
         except Exception: pass
 
+API_KEY = os.path.join(STATE, 'api_key')
+async def mama_door(p, method, body):
+    loop = asyncio.get_running_loop()
+    try: b = json.loads(body or b'{}')
+    except Exception: b = {}
+    if p == '/box/skills/run':
+        name = str(b.get('name', '')); spec = skills.load().get(name, {})
+        if spec.get('kind') == 'desktop':
+            with lock: events_in.append({'text': str(b.get('input', {}).get('question') or b.get('input', {}).get('text') or ''), 'user': 'mama', 'ts': time.time(), 'skill': name})
+            return 200, json.dumps({'ok': True, 'queued': True, 'summary': f'{name} queued on her desktop'}).encode()
+        res = await loop.run_in_executor(None, skills.run, name, b.get('input') or {})
+        did(f'using skill: {name} → {res.get("summary", "")[:140]}', 'skill')
+        return 200, json.dumps(res).encode()
+    if p == '/box/skills/create':
+        res = await loop.run_in_executor(None, skills.create, str(b.get('name', '')), str(b.get('goal', ''))[:500])
+        did(f'drafted a new skill "{res["name"]}": {res["status"]}', 'skill')
+        return 200, json.dumps(res).encode()
+    if p == '/box/activity':
+        try: lines = open(ACT).read().strip().splitlines()[-200:]
+        except Exception: lines = []
+        try: helps = open(HELP).read().strip().splitlines()[-20:]
+        except Exception: helps = []
+        return 200, json.dumps({'activity': [json.loads(l) for l in lines if l.strip()], 'help': [json.loads(l) for l in helps if l.strip()]}).encode()
+    if p == '/box/mama/notify':
+        mama_popup(b.get('text', '')); return 200, json.dumps({'ok': True, 'shown_for_s': 28}).encode()
+    if p == '/box/mama/takeover':
+        tok = secrets.token_urlsafe(24); takeover_tokens[tok] = time.time() + 60
+        return 200, json.dumps({'ok': True, 'token': tok, 'path': '/websockify-mama?t=' + tok, 'valid_s': 60}).encode()
+    if p == '/box/mama/apikey':
+        if b.get('rotate') or not os.path.exists(API_KEY):
+            k = 'jena-' + secrets.token_urlsafe(30)
+            with open(API_KEY, 'w') as f: f.write(k)
+            os.chmod(API_KEY, 0o600)
+            with open(API_KEY + '.sha256', 'w') as f: f.write(hashlib.sha256(k.encode()).hexdigest())
+            os.chmod(API_KEY + '.sha256', 0o640)
+        return 200, json.dumps({'ok': True, 'key': open(API_KEY).read().strip()}).encode()
+    return 404, json.dumps({'ok': False, 'summary': 'no such mama door'}).encode()
+
 async def client(reader, writer):
     try:
         head = await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), 15)
@@ -734,6 +852,22 @@ async def client(reader, writer):
     except ValueError:
         writer.close(); return
     p = path.split('?')[0]
+    if p == '/websockify-mama':
+        tok = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '').get('t', [''])[0]
+        exp = takeover_tokens.pop(tok, 0)
+        if not tok or exp < time.time():
+            writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
+        try:
+            ur, uw = await asyncio.open_connection(*WS_MAMA)
+        except Exception:
+            writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
+        uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
+        mama['driving'] += 1; did('mama took over my desktop, my hands are off', 'help')
+        try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+        finally:
+            mama['driving'] = max(0, mama['driving'] - 1)
+            if not mama['driving']: did('mama gave my desktop back', 'help')
+        return
     if p.startswith('/websockify'):
         try:
             ur, uw = await asyncio.open_connection(*WS_UPSTREAM)
@@ -764,19 +898,9 @@ async def client(reader, writer):
         out = json.dumps({'ok': ok}).encode()
     elif p == '/box/skills' and method == 'GET':
         out = json.dumps(skills.listing()).encode()
-    elif p == '/box/skills/run' and method == 'POST':
-        try:
-            b = json.loads(body or b'{}'); name = str(b.get('name', ''))
-            spec = skills.load().get(name, {})
-            if spec.get('kind') == 'desktop':
-                with lock: events_in.append({'text': str(b.get('input', {}).get('question') or b.get('input', {}).get('text') or ''), 'user': 'mama', 'ts': time.time(), 'skill': name})
-                out = json.dumps({'ok': True, 'queued': True, 'summary': f'{name} queued on her desktop'}).encode()
-            else:
-                res = await asyncio.get_running_loop().run_in_executor(None, skills.run, name, b.get('input') or {})
-                did(f'using skill: {name} → {res.get("summary", "")[:140]}', 'skill')
-                out = json.dumps(res).encode()
-        except Exception as e:
-            out = json.dumps({'ok': False, 'summary': str(e)[:200]}).encode()
+    elif p in ('/box/skills/run', '/box/skills/create', '/box/activity') or p.startswith('/box/mama/'):
+        if not is_mama(hdrs): status, out = 401, json.dumps({'ok': False, 'summary': "mama's passcode is needed for this"}).encode()
+        else: status, out = await mama_door(p, method, body)
     elif p == '/box/skills/auto' and method == 'POST':
         # the site asks first: does this message need one of her skills? script skills run now so her brain
         # answers from real results; desktop skills (ask_grok, explore_my_box) are queued for her hands
@@ -803,25 +927,11 @@ async def client(reader, writer):
                 out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms')}).encode()
         except Exception as e:
             out = json.dumps({'name': None, 'error': str(e)[:200]}).encode()
-    elif p == '/box/skills/create' and method == 'POST':
-        try:
-            b = json.loads(body or b'{}')
-            res = await asyncio.get_running_loop().run_in_executor(None, skills.create, str(b.get('name', '')), str(b.get('goal', ''))[:500])
-            did(f'drafted a new skill "{res["name"]}": {res["status"]}', 'skill')
-            out = json.dumps(res).encode()
-        except Exception as e:
-            out = json.dumps({'ok': False, 'summary': str(e)[:200]}).encode()
-    elif p == '/box/activity':
-        try: lines = open(ACT).read().strip().splitlines()[-200:]
-        except Exception: lines = []
-        try: helps = open(HELP).read().strip().splitlines()[-20:]
-        except Exception: helps = []
-        out = json.dumps({'activity': [json.loads(l) for l in lines if l.strip()], 'help': [json.loads(l) for l in helps if l.strip()]}).encode()
     elif p in ('/', '/health', '/box/health'):
         out = json.dumps({'ok': True, 'who': "Jena's desktop"}).encode()
     else:
         status, out = 404, b'{"error":"not here"}'
-    reason = {200: 'OK', 204: 'No Content', 404: 'Not Found'}[status]
+    reason = {200: 'OK', 204: 'No Content', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found'}.get(status, 'OK')
     writer.write(f'HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {len(out)}\r\nCache-Control: no-store\r\nConnection: close\r\n'.encode() + CORS + b'\r\n' + out)
     try: await writer.drain()
     except Exception: pass
@@ -834,6 +944,6 @@ async def door():
         await srv.serve_forever()
 
 if __name__ == '__main__':
-    for f in (eyes, ears, fetch_videos, skills.sync_loop) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
+    for f in (eyes, ears, fetch_videos, skills.sync_loop, upkeep) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
         threading.Thread(target=f, daemon=True).start()
     asyncio.run(door())

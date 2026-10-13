@@ -10,7 +10,7 @@ export const cors = () =>
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Jena-Key, X-File-Name',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Jena-Key, X-File-Name, Authorization',
     },
   });
 

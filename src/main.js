@@ -76,6 +76,13 @@ async function pollDesk() {
   if (!cfg.api || document.hidden) return;
   const d = await fetch('/api/box?what=screen', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
   const acts = d?.data?.actions || [];
+  // mama's private popups are covered for everyone but mama (and always on stream); show when mama drives / she updates
+  const dk = $('#desktop'), sd = d?.data || {};
+  const isMama = !!localStorage.getItem('jena.dmKey') && !cfg.obs;
+  dk.querySelector('.desk-private').hidden = !(sd.private && !isMama);
+  const flag = dk.querySelector('.desk-flag');
+  const fl = sd.mama_driving ? '🖐 mama is driving her desktop' : sd.updating?.phase ? `⟳ ${sd.updating.phase === 'installing' ? 'updating' : sd.updating.phase} ${sd.updating.what || ''}…` : '';
+  flag.hidden = !fl; flag.textContent = fl;
   if (!deskSeen) { deskSeen = acts.length ? acts[acts.length - 1].ts - 1 : 1; acts.splice(0, Math.max(0, acts.length - 2)); }
   for (const a of acts) {
     if (a.ts <= deskSeen) continue;
@@ -85,7 +92,7 @@ async function pollDesk() {
   }
 }
 pollDesk();
-setInterval(pollDesk, 8000);
+setInterval(pollDesk, 5000);
 
 // public list of her skills, read live from her box when opened (nothing listed that doesn't run there)
 const skillsPub = $('#skills-pub');

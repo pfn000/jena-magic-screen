@@ -77,9 +77,38 @@ async function boxDo(req) {
   const b = await body(req);
   const path = b.action === 'create' ? '/box/skills/create' : '/box/skills/run';
   try {
-    const r = await fetch(box.url + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b), signal: AbortSignal.timeout(25000) });
+    const r = await fetch(box.url + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(b), signal: AbortSignal.timeout(25000) });
     return json(await r.json(), r.status);
   } catch (e) { return json({ ok: false, summary: `box did not answer: ${e.message}` }, 502); }
+}
+
+// Mama-only: pop a message up on her desktop, get a one-time token to take over her desktop, see her API key.
+async function mamaDo(req) {
+  const k = checkKey(req);
+  if (!k.ok) return json({ error: k.why }, 401);
+  const box = await boxLink();
+  if (!box) return json({ error: 'her box is offline' }, 503);
+  const b = await body(req);
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey' }[b.action];
+  if (!action) return json({ error: 'unknown action' }, 400);
+  try {
+    const r = await fetch(`${box.url}/box/mama/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+    const d = await r.json();
+    if (action === 'takeover' && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
+    return json(d, r.status);
+  } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
+}
+
+// Jena's own OpenAI-compatible API: https://<site>/api/v1/chat/completions with "Authorization: Bearer jena-…".
+// The key is checked on her box (only its sha256 is stored there); this just passes the request through.
+async function jenaApi(req) {
+  const sub = new URL(req.url).pathname.replace(/^\/api\/v1\/?/, '') || (new URL(req.url).searchParams.get('route') || '').replace(/^v1\/?/, '');
+  const box = await boxLink();
+  if (!box) return json({ error: { message: 'Jena is offline (her box is not reachable right now)' } }, 503);
+  try {
+    const r = await fetch(`${box.url}/japi/v1/${sub}`, { method: req.method, headers: { 'Content-Type': 'application/json', Authorization: req.headers.get('authorization') || '' }, body: req.method === 'POST' ? await req.text() : undefined, signal: AbortSignal.timeout(25000) });
+    return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') || 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
+  } catch (e) { return json({ error: { message: `her box did not answer: ${e.message}` } }, 502); }
 }
 
 // Public, read-only list of the skills she has (names, what they do, how often they worked). No inputs/outputs.
@@ -101,7 +130,7 @@ async function boxProxy(req) {
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
   const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity' }[what] || '/status';
   try {
-    const r = await fetch(box.url + path, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(box.url + path, { headers: what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
     return json({ online: true, box: { url: box.url, announcedAt: box.ts, via: box.via }, data: d });
   } catch (e) {
@@ -199,6 +228,8 @@ async function dm(req) {
   const text = clip(b.text, 2000).trim();
   if (!text) return json({ error: 'empty message' }, 400);
   const mine = await pushItem('dm', { from: 'mama', kind: 'text', text });
+  // mama's message also pops up on Jena's own desktop (the site covers the desktop panel for everyone else meanwhile)
+  boxLink().then((bx) => bx && fetch(`${bx.url}/box/mama/notify`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(5000) })).catch(() => null);
   const ev = await thinkAll({ message: text, source: 'dm', user: 'mama' });
   // other screens (the OBS page) only learn THAT mama sent something private, never the words
   try {
@@ -233,6 +264,8 @@ async function handle(req) {
     if (route === 'box') return await boxProxy(req);
     if (route === 'deploys') return await deploys();
     if (route === 'skills') return await publicSkills();
+    if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
+    if (route === 'v1') return await jenaApi(req);
     if (route === 'hot') { try { return json({ list: await hotUrls(), source: 'Hot URLS/URLS.md in her repo (read live)' }); } catch (e) { return json({ error: e.message }, 502); } }
     if (route === 'boxdo' && req.method === 'POST') return await boxDo(req);
     if (route === 'search') { const u = new URL(req.url); return json(await multiSearch(clip(u.searchParams.get('q'), 200), clip(u.searchParams.get('src'), 60))); }

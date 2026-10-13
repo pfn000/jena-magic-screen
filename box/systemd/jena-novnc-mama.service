@@ -1,0 +1,10 @@
+[Unit]
+Description=websockify for mama's takeover VNC (127.0.0.1:6082 -> 5901)
+After=jena-vnc-mama.service
+[Service]
+User=user
+ExecStart=/usr/bin/websockify 127.0.0.1:6082 localhost:5901
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
