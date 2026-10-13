@@ -109,7 +109,7 @@ async function intentSkillsAuto(req, res, raw) {
   const it = I.intent(text, { lastQ: lq, pending: pend });
   if (req.headers['x-jena-intent-dry'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '')) return sendJSON(res, 200, { dry: true, side, intent: it, decision: !it || it.confidence < I.ASK_AT ? 'pass_to_her_own_matcher' : I.MAMA_ONLY.has(it.action) && side !== 'mama' ? 'ignored_not_mama' : it.confidence < I.DO_AT ? 'ask_first' : 'do' });   // proof/tests only, localhost
   if (!it || it.confidence < I.ASK_AT) return pass();
-  if (I.MAMA_ONLY.has(it.action) && side !== 'mama') { intentLog(side, it, 'not_mama'); return pass(); }
+  if (I.MAMA_ONLY.has(it.action) && side !== 'mama') { intentLog(side, it, 'not_mama'); if (it.action !== 'stop' && it.action !== 'instead') say(T.pickOne(['only mama can make me do that one.', "that's a mama-only thing, sorry chat.", 'nope, only mama gets that button.'])); return sendJSON(res, 200, { name: null }); }
   if (it.confidence < I.DO_AT) { PENDING[side] = { it, ts: Date.now() }; say(I.ASK(it.label)); intentLog(side, it, 'asked'); return sendJSON(res, 200, { name: null, intent: { asked: it.label } }); }
   PENDING[side] = null; intentLog(side, it, 'do');
   if (it.action === 'stop' || it.action === 'instead') return sendJSON(res, 200, { name: null });   // her brain queues these (mama-verified there)
@@ -132,7 +132,14 @@ async function intentSkillsAuto(req, res, raw) {
     return sendJSON(res, 200, { name: null, intent: { did: it.label } });
   }
   // her skills: hand the desk a phrasing its own matcher runs (ask grok / check my email / make an asset / search)
-  return pass({ ...b, text: it.canon || text });
+  const r = await fetch(DESK() + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...b, text: it.canon || text }), signal: AbortSignal.timeout(60000) }).catch((e) => null);
+  const out = r ? await r.json().catch(() => ({})) : { name: null, error: 'her desktop did not answer' };
+  // what she says comes from what the skill really did, never from her small brain guessing
+  if (it.action === 'web_search') { const top = out.top; say(out.ok && top?.title ? T.pickOne([`found it. top hit: ${top.title}. link's in my thoughts.`, `okay, looked it up. best source: ${top.title}. link's in my thoughts.`]) : `i looked, but the search came back empty${out.summary ? ` (${String(out.summary).slice(0, 80)})` : ''}.`); }
+  else if (it.action === 'ask_grok') say(out.name ? T.pickOne([`asking grok now: "${String(it.args.question || '').slice(0, 80)}". watch my desktop.`, `on it, typing it into grok rn.`]) : "couldn't get to grok just now.");
+  else if (it.action === 'check_email') say(out.name ? T.pickOne(['checking my inbox, one sec.', 'opening my mail, gimme a sec.']) : "couldn't open my mail right now.");
+  else if (it.action === 'make_picture') say(out.ok ? `made it${out.asset?.title ? `: ${out.asset.title}` : ''}. ${String(out.summary || '').slice(0, 120)}` : `tried to make it but it didn't work${out.summary ? `: ${String(out.summary).slice(0, 100)}` : ''}.`);
+  res.writeHead(r ? r.status : 502, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ ...out, intent: { did: it.label } }));
 }
 function forgetLastMamaFact() { const f = mamaFacts().at(-1); if (f) fs.appendFileSync(MAMA_FACTS, JSON.stringify({ revoke: f.ts, at: Date.now() }) + '\n'); return f || null; }
 function queueForDesk(c, via) {   // "stop" / "do X instead": her desktop agent reads this file between steps
@@ -293,6 +300,7 @@ async function brain(req, res, url, base, modelName) {
       if (caught.length) { rec.caught = caught; rec.oops = OOPS[Math.floor(Math.random() * OOPS.length)]; logCatch(caught, userText); }
       }
     }
+    if (/\b(enter|give|tell|type|send|share|what'?s|need)\b[^.?!]{0,40}\b(password|passcode|username|login details|credentials|2fa code)\b/i.test(text)) { text = T.pickOne(["i never ask for passwords. mama signs me in herself, in a private window.", "nope, no passwords in chat ever. mama does sign-ins herself."]); rec.routed = (rec.routed || 'model') + '+no_credentials'; }
     // no markdown symbols (TTS reads them out loud); an *action* rides as its own field, shown not spoken
     { const dm = T.demark(text); text = dm.text || text.replace(/[*#`]/g, ''); rec.action = (routed && routed.action) || dm.action || null; }
   } catch (e) {
