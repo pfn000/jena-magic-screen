@@ -53,7 +53,9 @@ AUTO_IDEAS = ['just dance kids', 'easy tiktok dance tutorial', 'zumba kids warm 
     'stretching routine for kids', 'jumping jacks exercise demo', 'tai chi for beginners short', 'yoga for kids short',
     'salsa basic step tutorial', 'charleston dance basic step', 'macarena dance kids', 'penguin dance kids',
     'waving hello reference', 'clapping reference video', 'thinking pose reference', 'excited jump celebration reference',
-    'shrug gesture reference', 'victory pose reference', 'gangnam style dance tutorial', 'kpop dance tutorial easy mirrored', 'moonwalk tutorial']
+    'shrug gesture reference', 'victory pose reference', 'gangnam style dance tutorial', 'kpop dance tutorial easy mirrored', 'moonwalk tutorial',
+    '3D people animation casual standing talking', '3D people animation casual walking in place', '3D people animation cheering',
+    'mocap reference idle standing', 'mocap reference dance', 'animation reference clapping full body', 'animation reference stretching full body']
 def auto_request(reqs):
     # aim: one NEW clip per AUTO_MIN minutes. A rejected try (bad tracking) doesn't count, so she tries another
     # idea a few minutes later; nothing is queued while something is still waiting.
@@ -66,7 +68,7 @@ def auto_request(reqs):
     import random
     q = random.choice(ideas)
     kind = 'idle' if 'reference' in q else 'stretch' if re.search(r'stretch|yoga|tai chi|jumping', q) else 'dance'
-    r = {'id': 'q_' + re.sub(r'\W+', '_', q.lower())[:30], 'url': f'ytsearch5:{q}', 'start': 0.0, 'end': 15.0,
+    r = {'id': 'q_' + re.sub(r'\W+', '_', q.lower())[:30], 'url': f'ytsearch5:{q} full body', 'start': 0.0, 'end': 15.0,
          'what': f'someone doing "{q}" (a video I picked myself)', 'label': q[:30], 'kind': kind, 'asked': 'my own idea (idle time)', 'auto': True, 'ts': int(time.time() * 1000)}
     with open(REQ, 'a') as f: f.write(json.dumps(r) + '\n')
     return r

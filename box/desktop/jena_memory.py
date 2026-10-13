@@ -79,6 +79,12 @@ def choose(options, mood='neutral', context=None, now=None):
     is never repeated within an hour (unless mama asked, which doesn't go through here)."""
     now = now or time.time()
     hist = rows(6)
+    # an 'exact' option is the same task every time (htop, tidy, exploring her box): never twice within its cooldown
+    # (60 min by default). Options whose content changes each time (a new video, page, site) are handled by pick_fresh.
+    ok = [o for o in options if not (o.get('exact') and any(r.get('action') == o['name'] and now - r['ts'] / 1000 < o.get('cooldown', HOUR) for r in hist))]
+    options = ok or options
+    prev = hist[-1].get('action') if hist else None
+    options = [o for o in options if o['name'] != prev] or options      # never the same kind of thing twice in a row
     scored = []
     for o in options:
         w = float(o.get('weight', 1)) * float((o.get('moods') or {}).get(mood, 1)) * float((o.get('context') or {}).get(context, 1))

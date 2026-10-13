@@ -857,7 +857,9 @@ LEARN_IDEAS = ['just dance kids', 'easy tiktok dance tutorial', 'zumba kids warm
     'yoga for kids short', 'cheer motions tutorial', 'salsa basic step tutorial', 'charleston dance basic step',
     'hand jive dance', 'macarena dance kids', 'baby shark dance', 'penguin dance kids', 'wave arms dance tutorial',
     'idle standing pose reference', 'waving hello reference', 'clapping reference video', 'thinking pose reference',
-    'excited jump celebration reference', 'shrug gesture reference', 'victory pose reference']
+    'excited jump celebration reference', 'shrug gesture reference', 'victory pose reference',
+    '3D people animation casual standing talking', '3D people animation casual walking in place', '3D people animation cheering',
+    'mocap reference idle standing', 'mocap reference dance', 'animation reference clapping full body', 'animation reference stretching full body']
 
 def act_learn():
     """she picks something new to learn a move from (her learn_move pipeline does the rest, one at a time)"""
@@ -874,7 +876,7 @@ def act_learn():
     q = random.choice(ideas)
     vid = 'q_' + re.sub(r'\W+', '_', q.lower())[:30]
     kind = 'idle' if 'reference' in q else 'stretch' if re.search(r'stretch|yoga|tai chi|jumping', q) else 'dance'
-    req = {'id': vid, 'url': f'ytsearch5:{q}', 'start': 0.0, 'end': 15.0, 'what': f'someone doing "{q}" (a video I picked myself)',
+    req = {'id': vid, 'url': f'ytsearch5:{q} full body', 'start': 0.0, 'end': 15.0, 'what': f'someone doing "{q}" (a video I picked myself)',
            'label': q[:30], 'kind': kind, 'asked': 'my own idea (idle time)', 'auto': True, 'ts': int(time.time() * 1000)}
     try:
         with open(MOVE_REQ, 'a') as f: f.write(json.dumps(req) + '\n')
@@ -903,7 +905,7 @@ def wiki_random():
         t, x = d.get('title', '') or '', d.get('extract', '') or ''
         u = (d.get('content_urls') or {}).get('desktop', {}).get('page')
         if not u or len(x) < 250 or d.get('type') != 'standard' or memory.seen('read:' + u): continue
-        if re.search(r'\b(commune|village|municipality|census|unincorporated|footballer|politician|election|war|murder|shooting|killed|death|crime|thriller|horror|terror\\w*)\b', x[:300], re.I): continue
+        if re.search(r'\b(commune|village|municipality|census|unincorporated|footballer|politician|election|war|murder|shooting|killed|death|crime|thriller|horror|terror\w*)\b', x[:300], re.I): continue
         if safe(t + ' ' + x) and not FLAG.search(t + ' ' + x):
             return d.get('normalizedtitle') or t, u, x
     return None
@@ -956,10 +958,10 @@ def idle_menu():
         dict(name='hot', fn=act_hot, weight=0.6),
         dict(name='note', fn=act_note, weight=0.8, moods={'social': 1.4, 'sleepy': 1.3}),
         dict(name='python', fn=act_python, weight=0.6, moods={'bored': 1.2}),
-        dict(name='fetch', fn=act_fetch, weight=0.4),
-        dict(name='htop', fn=act_htop, weight=0.4),
-        dict(name='explore_box', fn=act_explore, weight=0.5, moods={'curious': 1.2}),
-        dict(name='tidy', fn=act_tidy, weight=0.3),
+        dict(name='fetch', fn=act_fetch, weight=0.4, exact=True),
+        dict(name='htop', fn=act_htop, weight=0.4, exact=True),
+        dict(name='explore_box', fn=act_explore, weight=0.5, moods={'curious': 1.2}, exact=True, cooldown=3 * 3600),
+        dict(name='tidy', fn=act_tidy, weight=0.3, exact=True),
     ]
 
 def idle_choice():
@@ -1407,31 +1409,10 @@ async def pipe(r, w):
         except Exception: pass
 
 API_KEY = os.path.join(STATE, 'api_key')
-_MAMASEC = {'mod': None, 'mtime': 0}
-def _mamasec():
-    """import jena_mamasec, reloading it whenever its file changes (no desk restart for security-door updates)"""
-    import importlib
-    try:
-        fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jena_mamasec.py')
-        mt = os.path.getmtime(fp)
-        if _MAMASEC['mod'] is None:
-            import jena_mamasec; _MAMASEC['mod'] = jena_mamasec
-        elif mt != _MAMASEC['mtime']:
-            _MAMASEC['mod'] = importlib.reload(_MAMASEC['mod'])
-        _MAMASEC['mtime'] = mt
-    except Exception:
-        pass
-    return _MAMASEC['mod']
-
 async def mama_door(p, method, body):
     loop = asyncio.get_running_loop()
     try: b = json.loads(body or b'{}')
     except Exception: b = {}
-    if p.startswith('/box/mama/sec/'):   # mama's trusted devices, passkeys, Accounts vault, GitHub sign-in (jena_mamasec.py, hot-reloaded)
-        mod = _mamasec()
-        if mod is None: return 503, json.dumps({'ok': False, 'summary': 'the security module is not on my box yet'}).encode()
-        st, out = await loop.run_in_executor(None, mod.door, p, b)
-        return st, json.dumps(out).encode()
     if p == '/box/skills/run':
         name = str(b.get('name', '')); spec = skills.load().get(name, {})
         if spec.get('kind') == 'desktop':
