@@ -1,0 +1,82 @@
+# Jena's compute offload lane (free GitHub-hosted runners, public repo): heavy CPU work that would pin her box runs
+# here instead. Her box asks with `~/jena-apps/offload.py submit <job> <input>`; Tab dispatches it through the connected
+# GitHub app; results land in release jena-compute-<job> as <request_id>.tar.gz + <request_id>.manifest.json and the box
+# pulls them back. A nightly cron runs the queue in ops/compute/queue.json so the box stays free for chat.
+name: jena-compute
+run-name: "jena-compute ${{ inputs.job || 'nightly' }} [${{ inputs.request_id || 'nightly' }}]"
+on:
+  workflow_dispatch:
+    inputs:
+      job: { description: "move_extract | mama_session | model_job | ux_test", required: true, type: string }
+      input: { description: "https URL or blob:<sha>", required: false, type: string, default: "" }
+      params: { description: "job parameters (see ops/compute/jena_compute.py)", required: false, type: string, default: "" }
+      request_id: { description: "id Jena's box uses to find the result", required: true, type: string }
+  schedule:
+    - cron: "23 7 * * *"
+permissions:
+  contents: write
+concurrency:
+  group: jena-compute-${{ inputs.request_id || 'nightly' }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.p.outputs.matrix }}
+      count: ${{ steps.p.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: ops/compute }
+      - id: p
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          JOB: ${{ inputs.job }}
+          INPUT: ${{ inputs.input }}
+          PARAMS: ${{ inputs.params }}
+          REQ: ${{ inputs.request_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ops/compute/plan.py | tee -a "$GITHUB_OUTPUT"
+  run:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: "ops/compute\nmoves-pipeline" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: ops/compute/jena_compute.py }
+      - name: deps
+        shell: bash
+        env: { JOB: "${{ matrix.job }}" }
+        run: |
+          case "$JOB" in
+            move_extract) pip install -q mediapipe==0.10.21 opencv-python-headless numpy scipy pillow yt-dlp ;;
+            mama_session) sudo apt-get install -y -qq ffmpeg >/dev/null ;;
+            model_job) pip install -q onnx onnxruntime ;;
+            ux_test) npm i -g playwright@1 >/dev/null && npx -y playwright install --with-deps chromium >/dev/null && echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV" ;;
+          esac
+      - name: run ${{ matrix.job }}
+        env:
+          JOB: ${{ matrix.job }}
+          INPUT: ${{ matrix.input }}
+          PARAMS: ${{ matrix.params }}
+          REQ: ${{ matrix.request_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: python ops/compute/jena_compute.py
+      - uses: actions/upload-artifact@v4
+        with: { name: "jena-compute-${{ matrix.request_id }}", path: out/, retention-days: 7 }
+      - name: publish to release jena-compute-${{ matrix.job }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB: ${{ matrix.job }}
+        run: |
+          tag="jena-compute-$JOB"
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --title "Jena compute: $JOB" --notes "Results of Jena's offloaded $JOB jobs (<request_id>.tar.gz + <request_id>.manifest.json)."
+          gh release upload "$tag" out/* -R "$GITHUB_REPOSITORY" --clobber

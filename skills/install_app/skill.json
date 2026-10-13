@@ -1,0 +1,18 @@
+{
+ "name": "install_app",
+ "description": "Install a real app on her desktop through her GitHub app pipeline (GitHub's free machines build it from source or fetch the official release, or run a Windows-only program and send the result back), or say what's installing right now. Only apps on her list (ops/apps/apps.json). It never installs while mama is using her desktop, never logs into anything, and refuses an install that would leave her disk under 1 GB free.",
+ "triggers": [
+  "\\b(install|set ?up|download|get)\\b\\s+(me\\s+|yourself\\s+|the\\s+|an?\\s+)?(app\\s+|program\\s+)?(st|btop|steam|du-windows|terminal|st terminal)\\b",
+  "\\b(install|set ?up)\\b\\s+(the\\s+)?(app|program)\\b",
+  "\\bwhat(\\s+apps?|'s|\\s+is)?\\s+(are\\s+)?(you\\s+)?(installing|setting up|downloading)\\b",
+  "\\b(app|install)s?\\s+status\\b",
+  "\\bwhat apps can (you|u) install\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 15,
+ "needs": [],
+ "example": {
+  "text": "install st"
+ }
+}

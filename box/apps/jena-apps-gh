@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+# jena-apps-gh: the ONLY door from Jena's unix user to GitHub for her app/compute pipeline. Runs as Tab's box user
+# (sudoers: jena may run exactly this file as user) and talks to GitHub through the connected GitHub app, so the
+# token never reaches Jena, a file, or a log. Allowlisted ops, allowlisted workflows, validated inputs; JSON out.
+import json, os, re, subprocess, sys, time, uuid
+CLI = '/home/user/tab/connected-apps-cli.mjs'
+REPO = 'pfn000/jena-magic-screen'
+TASK = os.environ.get('TAB_TASK_ID', '')          # the Tab turn running this (the connector binds to that turn's own identity)
+TOKEN_FILE = '/etc/jena-apps/gh-token'             # optional: a repo-scoped token mama created herself (Actions r/w on this repo only)
+JENA_SPOOL = '/home/jena/jena-apps/spool'
+WORKFLOWS = {'jena-apps.yml', 'jena-compute.yml'}
+SAFE = re.compile(r'^[A-Za-z0-9 ._:/?&=%@+,#~-]{0,400}$')
+
+def req(method, url, body=None, tries=4):
+    if not re.fullmatch(r'[a-f0-9-]{36}', TASK or ''):
+        if os.path.exists(TOKEN_FILE): return req_token(method, url, body)
+        return {'ok': False, 'error': 'no GitHub door here: run inside a Tab turn (connected GitHub app) or add /etc/jena-apps/gh-token'}
+    d = f'/home/user/tab/tasks/{TASK}'; os.makedirs(d, exist_ok=True)
+    p = f'{d}/gh-{uuid.uuid4().hex[:10]}.json'
+    r = {'toolkit': 'github', 'method': method, 'url': url, 'headers': {'Accept': 'application/vnd.github+json'}}
+    if body is not None: r['body'] = body
+    with open(p, 'w') as f: json.dump(r, f)
+    last = None
+    try:
+        for k in range(tries):
+            out = subprocess.run(['/usr/bin/node', CLI, 'connected_apps.request', p], capture_output=True, text=True, timeout=180)
+            try: j = json.loads(out.stdout)
+            except Exception: j = {'ok': False, 'error': 'connector answered no JSON'}
+            last = j; st = status(j)
+            if st == 429 or (st and int(st) >= 500) or j.get('ok') is False and st is None:
+                time.sleep(15 * (k + 1)); continue
+            break
+    finally:
+        try: os.remove(p)
+        except Exception: pass
+    return last
+
+def req_token(method, url, body=None):
+    import urllib.request, urllib.error
+    tok = open(TOKEN_FILE).read().strip()
+    r = urllib.request.Request('https://api.github.com' + url, method=method, data=json.dumps(body).encode() if body is not None else None,
+                               headers={'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json', 'User-Agent': 'jena-apps'})
+    try:
+        with urllib.request.urlopen(r, timeout=60) as resp:
+            raw = resp.read(); return {'ok': True, 'result': {'status': resp.status, 'body': json.loads(raw) if raw else None}}
+    except urllib.error.HTTPError as e:
+        return {'ok': True, 'result': {'status': e.code, 'body': {'message': e.read()[:300].decode('utf-8', 'replace')}}}
+
+def status(j):
+    if isinstance(j, dict) and isinstance(j.get('result'), dict) and j['result'].get('status'): return j['result']['status']
+    return (j or {}).get('status') if isinstance(j, dict) else None
+
+def data(j):
+    # the connector stores bodies over ~8 KB and returns only body_head; callers keep requests small (per_page=1)
+    if isinstance(j, dict) and isinstance(j.get('result'), dict):
+        r = j['result']
+        if r.get('body') is not None: return r['body']
+        if r.get('body_head'):
+            try: return json.loads(r['body_head'])
+            except Exception: return r['body_head']
+    return j.get('data') if isinstance(j, dict) else None
+
+RUN_RX = re.compile(r'"id":(\d+),"name":"[^"]*","node_id":"[^"]*","head_branch":"[^"]*","head_sha":"[0-9a-f]+","path":"[^"]*","display_title":"([^"]*)","run_number":\d+,"event":"(\w+)","status":"(\w+)","conclusion":(?:null|"(\w+)")')
+def runs_page(wf, page):
+    d = data(req('GET', f'/repos/{REPO}/actions/workflows/{wf}/runs?event=workflow_dispatch&per_page=1&page={page}&nocache={time.time_ns()}'))
+    if isinstance(d, dict): return [(str(r['id']), r.get('display_title') or '', r['status'], r['conclusion']) for r in d.get('workflow_runs', [])]
+    return [(m[0], m[1], m[3], m[4] or None) for m in RUN_RX.findall(d or '')]
+
+def out(o): print(json.dumps(o)); sys.exit(0)
+
+def main(a):
+    op = a[0] if a else ''
+    if op == 'dispatch':
+        wf, inputs = a[1], json.loads(a[2])
+        if wf not in WORKFLOWS: out({'ok': False, 'error': f'workflow {wf} not allowed'})
+        if not isinstance(inputs, dict) or len(inputs) > 8: out({'ok': False, 'error': 'bad inputs'})
+        for k, v in inputs.items():
+            if not re.fullmatch(r'[a-z_]{1,30}', k) or not isinstance(v, str) or not SAFE.match(v): out({'ok': False, 'error': f'bad input {k}'})
+        j = req('POST', f'/repos/{REPO}/actions/workflows/{wf}/dispatches', {'ref': 'main', 'inputs': inputs})
+        st = status(j)
+        out({'ok': st in (200, 201, 204), 'status': st, 'error': None if st in (200, 201, 204) else str(data(j) or j)[:300]})
+    if op == 'find-run':
+        wf, rid = a[1], a[2]
+        if wf not in WORKFLOWS or not re.fullmatch(r'[A-Za-z0-9._-]{4,80}', rid): out({'ok': False, 'error': 'bad args'})
+        for page in range(1, 7):   # newest first; a request is found within the last few dispatches
+            rows = runs_page(wf, page)
+            if not rows: break
+            for rid_, title, st, concl in rows:
+                if f'[{rid}]' in title:
+                    out({'ok': True, 'found': True, 'id': int(rid_), 'status': st, 'conclusion': concl,
+                         'html_url': f'https://github.com/{REPO}/actions/runs/{rid_}'})
+        out({'ok': True, 'found': False})
+    if op == 'run':
+        rid = int(a[1])
+        r = data(req('GET', f'/repos/{REPO}/actions/runs/{rid}?nocache={time.time_ns()}'))
+        if isinstance(r, str):
+            m = re.search(r'"status":"(\w+)","conclusion":(?:null|"(\w+)")', r); r = {'id': rid, 'status': m and m[1], 'conclusion': m and m[2]}
+        r = r or {}
+        jobs = []
+        for page in range(1, 6):   # one job per page keeps each answer small
+            jd = data(req('GET', f'/repos/{REPO}/actions/runs/{rid}/jobs?per_page=1&page={page}&nocache={time.time_ns()}'))
+            if isinstance(jd, dict):
+                got = [{'name': x['name'], 'status': x['status'], 'conclusion': x['conclusion']} for x in jd.get('jobs', [])]
+            else:
+                got = [{'name': m[2], 'status': m[0], 'conclusion': m[1] or None} for m in re.findall(r'"status":"(\w+)","conclusion":(?:null|"(\w+)"),"created_at":"[^"]*","started_at":(?:null|"[^"]*"),"completed_at":(?:null|"[^"]*"),"name":"([^"]*)"', jd or '')][:1]
+            if not got: break
+            jobs += got
+        out({'ok': bool(r.get('status')), 'id': rid, 'status': r.get('status'), 'conclusion': r.get('conclusion'),
+             'html_url': f'https://github.com/{REPO}/actions/runs/{rid}', 'jobs': jobs})
+    if op == 'artifacts':
+        rid = int(a[1])
+        d = data(req('GET', f'/repos/{REPO}/actions/runs/{rid}/artifacts')) or {}
+        out({'ok': True, 'artifacts': [{'id': x['id'], 'name': x['name'], 'size': x['size_in_bytes'], 'expired': x['expired']} for x in d.get('artifacts', [])]})
+    if op == 'release':
+        tag = a[1]
+        if not re.fullmatch(r'jena-(app|compute)-[A-Za-z0-9._-]{1,60}', tag): out({'ok': False, 'error': 'bad tag'})
+        d = data(req('GET', f'/repos/{REPO}/releases/tags/{tag}?nocache={time.time_ns()}')) or {}
+        out({'ok': bool(d.get('id')), 'tag': tag, 'html_url': d.get('html_url'),
+             'assets': [{'name': x['name'], 'size': x['size'], 'url': x['browser_download_url'], 'updated_at': x['updated_at']} for x in d.get('assets', [])]})
+    if op == 'drain':
+        out(drain())
+    out({'ok': False, 'error': 'unknown op; ops: dispatch, find-run, run, artifacts, release, drain'})
+
+def _call(args):
+    # run one op in-process and return its JSON
+    import io, contextlib
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf): main(args)
+    except SystemExit: pass
+    try: return json.loads(buf.getvalue().strip().splitlines()[-1])
+    except Exception: return {'ok': False, 'error': 'no answer'}
+
+def drain():
+    # Called inside a Tab turn: dispatch Jena's pending requests and write each run's state back into its spool file.
+    import glob
+    done = []
+    for p in sorted(x for x in glob.glob(f'{JENA_SPOOL}/*.json') if not x.endswith('.manifest.json')):
+        try: s = json.load(open(p))
+        except Exception: continue
+        st, changed = s.get('state'), False
+        if st == 'pending':
+            try:
+                for key, field in (('upload', 'input'), ('upload_params', 'params')):
+                    if s.get(key) and not s.get(key + '_sha'):
+                        fp = os.path.join(JENA_SPOOL, os.path.basename(s[key]))
+                        if os.path.getsize(fp) > 25 << 20: raise ValueError('upload over 25 MB')
+                        import base64
+                        b = data(req('POST', f'/repos/{REPO}/git/blobs', {'content': base64.b64encode(open(fp, 'rb').read()).decode(), 'encoding': 'base64'}))
+                        if not isinstance(b, dict) or not b.get('sha'): raise RuntimeError('blob upload failed')
+                        s[key + '_sha'] = b['sha']
+                        s['inputs'][field] = ('blob:' if field == 'input' else '') + b['sha']
+            except Exception as e:
+                s['state'] = 'dispatch_failed'; s['dispatch'] = {'ok': False, 'error': f'upload: {e}'[:200]}
+                tmp = p + '.tmp'; json.dump(s, open(tmp, 'w'), indent=1); os.replace(tmp, p); done.append({'file': os.path.basename(p), 'state': s['state']}); continue
+            r = _call(['dispatch', s['workflow'], json.dumps(s['inputs'])])
+            s['dispatch'] = r; s['dispatched_at'] = time.time(); changed = True
+            s['state'] = 'dispatched' if r.get('ok') else 'dispatch_failed'
+        if s.get('state') in ('dispatched', 'running') and time.time() - s.get('dispatched_at', 0) > 3:
+            if not s.get('run_id'):
+                f = _call(['find-run', s['workflow'], s['inputs']['request_id']])
+                if f.get('found'): s.update(run_id=f['id'], run_url=f['html_url']); changed = True
+            if s.get('run_id'):
+                r = _call(['run', str(s['run_id'])])
+                if r.get('ok'):
+                    s['run'] = {'status': r['status'], 'conclusion': r['conclusion'], 'jobs': r['jobs']}
+                    s['state'] = 'completed' if r['status'] == 'completed' else 'running'; changed = True
+        if changed:
+            s['drained_at'] = time.time()
+            tmp = p + '.tmp'; json.dump(s, open(tmp, 'w'), indent=1); os.replace(tmp, p)
+            done.append({'file': os.path.basename(p), 'state': s['state'], 'run_url': s.get('run_url')})
+    return {'ok': True, 'updated': done}
+
+if __name__ == '__main__':
+    try: main(sys.argv[1:])
+    except SystemExit: raise
+    except Exception as e: out({'ok': False, 'error': f'{type(e).__name__}: {str(e)[:200]}'})
