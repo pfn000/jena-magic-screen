@@ -82,6 +82,7 @@ function mamaFacts() {
   const gone = new Set(L.filter((x) => x.revoke).map((x) => x.revoke));
   return L.filter((f) => f.right && !f.revoked && !gone.has(f.ts)).slice(-200);
 }
+const RECENT = { mama: [], pub: [] };   // last replies per side, so a repeated question gets a different wording
 const LAST_FILE = `${STATE}/last_turn.json`;   // the last exchange per side (mama / public), kept across restarts
 const LAST = (() => { try { return { mama: null, pub: null, ...JSON.parse(fs.readFileSync(LAST_FILE, 'utf8')) }; } catch { return { mama: null, pub: null }; } })();
 function forgetLastMamaFact() { const f = mamaFacts().at(-1); if (f) fs.appendFileSync(MAMA_FACTS, JSON.stringify({ revoke: f.ts, at: Date.now() }) + '\n'); return f || null; }
@@ -191,14 +192,17 @@ async function brain(req, res, url, base, modelName) {
     const rawEval = req.headers['x-jena-eval-raw'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '');   // baseline eval only: the old path, no truth code
     const sysText = facts + '\n' + messages.filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n');
     const routed = ROMANCE_IN.test(userText) || rawEval ? null : (T.route(userText, sysText) || (T.needsSource(userText, sysText) ? { kind: 'idk_no_source', text: T.IDK_Q() } : null));
+    const RS = RECENT[isMama ? 'mama' : 'pub'], nrm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const vary = (gen) => { let t = gen(); for (let k = 0; k < 6 && RS.includes(nrm(t)); k++) t = gen(); return t; };   // same question again -> a different wording
     if (forget) { const f = forgetLastMamaFact(); text = f ? `okay mama, forgot it: ${f.private ? f.you : f.mama}.` : "there's nothing you taught me to forget, mama."; rec.routed = 'mama_forget'; rec.private = !!f?.private; }
-    else if (corr && corr.instruction) { const q = queueForDesk(corr, 'chat'); text = corr.kind === 'stop' ? 'ok mama, stopping.' : `ok mama, switching: ${T.toYou(corr.right)}.`; rec.routed = 'mama_instruction'; rec.queued = q.queued; }
+    else if (corr && corr.instruction) { const q = queueForDesk(corr, 'chat'); text = vary(() => corr.kind === 'stop' ? T.pickOne(['ok mama, stopping.', 'stopping, mama.', 'okay okay, hands off. stopped.']) : T.pickOne(['ok mama, switching: ', 'on it mama, switching: ', 'got it, doing this instead: ']) + `${T.toYou(corr.right)}.`); rec.routed = 'mama_instruction'; rec.queued = q.queued; }
     else if (corr) { const f = addMamaFact(corr, prevQ, lastJena, 'chat'); text = f.ack; rec.routed = 'mama_correction'; rec.fact = { mama: f.mama, private: f.private, ts: f.ts }; rec.private = f.private; }
-    else if (refuse) { text = T.pickOne(["nice try, but only mama can change what i know. keeping my answer.", "hmm, only mama gets to correct my facts. i'll stick with what i've got.", "can't take that one from chat, only mama can update my facts."]); rec.routed = 'correction_refused'; }
-    else if (known && !rawEval) { text = known.q ? `${known.right}. ${isMama ? 'you told me that, mama' : 'mama told me that, verified'}.` : (isMama ? `you told me: ${known.you}.` : `mama told me: ${known.mama}.`); rec.routed = 'mama_fact'; rec.private = !!known.private; }
+    else if (refuse) { text = vary(() => T.pickOne(["nice try, but only mama can change what i know. keeping my answer.", "hmm, only mama gets to correct my facts. i'll stick with what i've got.", "can't take that one from chat, only mama can update my facts."])); rec.routed = 'correction_refused'; }
+    else if (known && !rawEval) { text = vary(() => known.q ? `${known.right}. ` + T.pickOne(isMama ? ['you told me that, mama.', 'you taught me that one.', 'mama-verified, you told me.', 'you corrected me on that, remember?'] : ['mama told me that, verified.', 'mama taught me that one.', 'verified by mama.']) : (isMama ? T.pickOne(['you told me: ', 'you taught me: ', 'mama-verified: ']) + `${known.you}.` : T.pickOne(['mama told me: ', 'mama taught me: ', 'verified by mama: ']) + `${known.mama}.`)); rec.routed = 'mama_fact'; rec.private = !!known.private; }
     else if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
     else if (routed && (routed.text || routed.kind === 'desktop')) {
-      text = routed.text || desktopSay(routed.ctx, box); rec.routed = routed.kind;   // answered from facts, the model never guesses here
+      text = routed.text || desktopSay(routed.ctx, box); rec.routed = routed.kind;
+      if (routed.text && RS.includes(nrm(text))) text = vary(() => (T.route(userText, sysText) || {}).text || (routed.kind === 'idk_no_source' ? T.IDK_Q() : text));   // answered from facts, the model never guesses here
     }
     else {
       // her persona prompt from the site + the facts block (her small brain only sees true things)
@@ -249,7 +253,7 @@ async function brain(req, res, url, base, modelName) {
   const lastText = text, lastUserText = userText;
   if (rec.private) Object.assign(rec, { user: '(private, mama only)', reply: '(private)', raw: '', fact: rec.fact ? { private: true, ts: rec.fact.ts } : undefined });   // /brain/log is readable by the public site
   logBrain(rec);
-  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {}
+  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {} { const R2 = RECENT[rec.mama ? 'mama' : 'pub']; R2.push(String(lastText).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()); if (R2.length > 6) R2.shift(); }
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
   const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {
