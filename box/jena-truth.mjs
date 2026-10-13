@@ -29,6 +29,7 @@ export function factsBlock(box = {}) {
     `- Right now for mama it is ${c.time} on ${c.date}.`];
   if (box.desktop) L.push(`- On my desktop right now: ${box.desktop}.`);
   if (box.skills?.length) L.push(`- My skills: ${box.skills.join(', ')}.`);
+  for (const f of (box.mamaFacts || []).slice(-15)) L.push(`- Mama told me (verified, ${new Date(f.ts).toISOString().slice(0, 10)}): ${f.mama}`);
   L.push('RULES: Never invent memories, events, people, places, numbers, dates or a body. If asked something not in FACTS or the chat, say "no clue" and offer to look it up. Pretend stuff only after "✨ imagination mode:". Short replies, at most one *action*, never repeat yourself.');
   return L.join('\n');
 }
@@ -199,4 +200,50 @@ export function demark(text, { keepCode = false } = {}) {
 }
 export function codeLabel(text) {
   return /```|\bfunction\s*\w*\(|=>|<\/?[a-z]+[ >]|\bdef \w+\(/.test(text) && !/✅ tested|⚠️ untested/.test(text) ? text + '\n⚠️ untested (my small brain wrote this; nothing ran it)' : text;
+}
+
+// ---------------------------------------------------------------- mama corrections (only mama: passcode on the site)
+// fact forms right after a reply: "no, it's X" / "nope the answer is X" / "actually it's X" / "actually X is Y" / "that's wrong, X" / "correction: X"
+// action forms (her desktop agent picks these up at its next step): "stop" / "no, open X instead" / "do X instead"
+const ASKY = /^(can|could|would|will|please|pls|open|go|let'?s|show|play|search|tell|do|make|look|find|i want|i need|i meant?|never ?mind|lol|lmao|haha|thanks|thank|ok|okay|wait|why|how|what|hmm)\b/i;
+const COPULA = /\b(is|are|was|were|am|called|named|means|equals|lives?|likes?|loves?|hates?|has|have)\b|=/i;
+export const STOP_ONLY = /^\s*(?:(?:no+|nope|wait|hey|jena|ok|okay)[\s,.!-]+)*(?:stop|halt|freeze|hold on|cancel that|cancel it)(?:\s+(?:it|that|now|please|pls|jena))*[\s.!]*$/i;
+export function parseCorrection(userText, { afterReply = true } = {}) {
+  const u = String(userText || '').replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim();
+  if (!u || u.length > 240) return null;
+  if (STOP_ONLY.test(u)) return { kind: 'stop', instruction: true, right: 'stop', raw: u };
+  const inst = u.match(/^\s*(?:(?:no+|nope|nah|stop|wait|actually)[\s,.!-]+)+(?:jena[\s,]+)?(.{2,200}?)\s+instead[\s.!]*$/i) || u.match(/^\s*(?:jena[\s,]+)?((?:do|open|go to|use|click|search|type|play|close)\b.{1,200}?)\s+instead[\s.!]*$/i);
+  if (inst) return { kind: 'instead', instruction: true, right: inst[1].trim().replace(/^(?:please|pls)\s+/i, ''), raw: u };
+  if (!afterReply || /\?\s*$/.test(u)) return null;
+  let m, right = null;
+  if ((m = u.match(/^\s*(?:(?:no+|nope|nah|wrong|incorrect|not quite|wait no|actually|correction)[\s,.!:;-]*)+(?:that'?s (?:wrong|not right|not true|incorrect)[\s,.!:;-]*)?(?:it'?s|it is|the answer is|the right answer is)\s+(.{1,200})$/i))) right = m[1];
+  else if ((m = u.match(/^\s*(?:that'?s|that is) (?:wrong|not right|not true|incorrect)[\s,.!:;-]+(?:it'?s|it is|the answer is)?\s*(.{2,200})$/i))) right = m[1];
+  else if ((m = u.match(/^\s*correction\s*[:,-]\s*(.{2,200})$/i))) right = m[1];
+  else if ((m = u.match(/^\s*(?:(?:no+|nope|nah|actually|wrong)[\s,.!:;-]+)+(.{2,200})$/i)) && COPULA.test(m[1]) && !ASKY.test(m[1]) && !/^(that|this|it|you|i)\b/i.test(m[1]) && m[1].trim().split(/\s+/).length >= 3) right = m[1];
+  if (!right) return null;
+  right = right.trim().replace(/^[,.:;-]+\s*/, '').replace(/[\s.!]+$/, '');
+  if (right.length < 1 || /^(nothing|never ?mind|ok|okay|that|this|it|fine|all good|good|cool|alright|whatever|nothing like that)$/i.test(right)) return null;
+  return { kind: 'fact', instruction: false, right, raw: u };
+}
+// mama's words in first person -> how jena says it back to her / stores it
+export const toYou = (s) => String(s).replace(/\bI'm\b/gi, "you're").replace(/\bI am\b/gi, 'you are').replace(/\bmy\b/gi, 'your').replace(/\bmine\b/gi, 'yours').replace(/\bI\b/g, 'you').replace(/\bme\b/gi, 'you');
+export const toMama = (s) => String(s).replace(/\bI'm\b/gi, 'mama is').replace(/\bI am\b/gi, 'mama is').replace(/\bmy\b/gi, "mama's").replace(/\bmine\b/gi, "mama's").replace(/\bI\b/g, 'mama').replace(/\bme\b/gi, 'mama');
+export const isSentence = (s) => String(s).trim().split(/\s+/).length >= 3 && COPULA.test(s);
+export const pickOne = pick;
+export const ACK = (x) => pick(["ohh my bad mama, got it: ", "oop, you're right mama. noted: ", "my bad mama. locked in: ", "ahh wrong of me. got it mama: ", "okay okay, fixed it mama: "]) + String(x).replace(/[.!]+$/, '') + '.';
+export const plain = (s) => String(s || '').replace(/[*#`~_|>]+/g, '').replace(/\s{2,}/g, ' ').trim();   // training text: no markdown symbols
+const FSTOP = new Set('what whats which who whos where when does have your mama mamas that this with about tell know remember the you name named called again pls please jena hey'.split(' '));
+const cwords = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).map((w) => w.replace(/'s$/, '').replace(/'/g, '')).filter((w) => w.length >= 3 && !FSTOP.has(w));
+// a question answered by one of mama's verified facts: q-facts need the same question, sentence facts need most of its words
+export function factAnswer(userText, facts = []) {
+  const words = [...new Set(cwords(userText))];
+  if (!words.length || !/\?|^\s*(what|whats|what's|who|where|when|which|how|does|do|is|are|tell)\b/i.test(String(userText))) return null;
+  let best = null, score = 0;
+  for (const f of facts) {
+    let sc = 0;
+    if (f.q) { const qw = new Set(cwords(f.q)); const inter = words.filter((w) => qw.has(w)).length; sc = qw.size && inter >= Math.min(2, qw.size) && inter / new Set([...qw, ...words]).size >= 0.6 ? inter : 0; }
+    else { const fw = new Set(cwords(f.mama || f.fact)); const inter = words.filter((w) => fw.has(w)).length; sc = inter >= Math.min(2, words.length) && inter / words.length >= 0.67 ? inter : 0; }
+    if (sc > score || (sc && sc === score && f.ts > (best?.ts || 0))) { best = f; score = sc; }
+  }
+  return score ? best : null;
 }

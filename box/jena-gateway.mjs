@@ -71,6 +71,39 @@ function desktopSay(ctx, box) {
   const w = what.replace(/^I've got/i, "i've got").replace(/^I'm/i, "i'm").replace(/^my /i, 'my ');
   return `rn? ${w}. that's literally it.`;
 }
+
+// ---------------------------------------------------------------- mama corrections: verified facts (persist across restarts)
+const MAMA_FACTS = `${STATE}/mama_facts.jsonl`;
+const CORR_TRAIN = E('JENA_CORRECTIONS', '/home/user/tab/files/jenaxi/data/persona_corrections.jsonl');
+const MAMA_QUEUE = E('JENA_MAMA_QUEUE', '/home/jena/.jena/mama_queue.jsonl');   // her desktop agent reads this between steps
+// facts file: one JSON line per fact; a {"revoke": ts} line takes one back ("forget that")
+function mamaFacts() {
+  let L = []; try { L = fs.readFileSync(MAMA_FACTS, 'utf8').trim().split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch {}
+  const gone = new Set(L.filter((x) => x.revoke).map((x) => x.revoke));
+  return L.filter((f) => f.right && !f.revoked && !gone.has(f.ts)).slice(-200);
+}
+const LAST = { mama: null, pub: null };
+function forgetLastMamaFact() { const f = mamaFacts().at(-1); if (f) fs.appendFileSync(MAMA_FACTS, JSON.stringify({ revoke: f.ts, at: Date.now() }) + '\n'); return f || null; }
+function queueForDesk(c, via) {   // "stop" / "do X instead": her desktop agent reads this file between steps
+  const q = { ts: Date.now(), kind: c.kind, do: c.kind === 'stop' ? null : c.right, text: c.raw, from: 'mama', via };
+  try { fs.appendFileSync(MAMA_QUEUE, JSON.stringify(q) + '\n'); q.queued = true; } catch (e) { q.queued = false; q.err = e.code; }
+  try { fs.appendFileSync(ACTIVITY, JSON.stringify({ ts: q.ts, kind: 'mama_instruction', what: c.kind === 'stop' ? 'mama said stop' : `mama: ${c.right}`.slice(0, 200) }) + '\n'); } catch {}
+  return q;
+}
+function addMamaFact(c, prevQ, wrong, via) {
+  const right = T.plain(c.right).slice(0, 300), sentence = T.isSentence(right);
+  const f = { ts: Date.now(), source: 'mama', via, private: /\b(my|mine|i|i'm|me)\b/i.test(right),
+    q: sentence ? null : (prevQ ? T.plain(prevQ).slice(0, 400) : null), right,
+    mama: sentence ? T.toMama(right) : `the answer to "${T.plain(prevQ || '?').slice(0, 120)}" is ${right}`,
+    you: sentence ? T.toYou(right) : right, wrong: wrong ? T.plain(wrong).slice(0, 300) : null };
+  fs.appendFileSync(MAMA_FACTS, JSON.stringify(f) + '\n');
+  // training pair for her next fine-tune (no markdown symbols): the question with the right answer, or mama's correction with her ack
+  const ack = T.ACK(f.you);
+  const pair = prevQ ? { user: T.plain(prevQ).slice(0, 400), jena: sentence ? `${f.you}.` : `${right}.` } : { user: T.plain(c.raw || right).slice(0, 400), jena: ack };
+  try { fs.appendFileSync(CORR_TRAIN, JSON.stringify({ who: 'mama', turns: [pair], src: 'correction', wrong: f.wrong, ts: f.ts }) + '\n'); } catch {}
+  try { fs.appendFileSync(ACTIVITY, JSON.stringify({ ts: f.ts, kind: 'mama_correction', what: f.private ? 'mama corrected a private fact' : f.mama.slice(0, 300), why: wrong && !f.private ? `i had said: "${String(f.wrong).slice(0, 120)}"` : (via || '') }) + '\n'); } catch {}
+  return Object.assign(f, { ack });
+}
 function rawToMessages(prompt) {
   const msgs = []; let sys = null, m;
   const re = /<\|(system|mama|jena)\|>([\s\S]*?)(?=<\|(?:system|mama|jena)\|>|$)/g;
@@ -136,14 +169,32 @@ async function brain(req, res, url, base, modelName) {
   const rec = { ts: t0, model: modelName, origin: req.headers['x-jena-origin'] || null, user: userText.slice(0, 500) };
   let text = '', usage = null, rawReply = '';
   try {
-    const box = await boxFacts();
+    const isMama = req.headers['x-jena-mama'] === '1' && !String(req.url).startsWith('/japi') && (!req.headers['cf-ray'] || siteAuthOk(req.headers['x-jena-auth']));
+    const allFacts = mamaFacts(), seenFacts = isMama ? allFacts : allFacts.filter((f) => !f.private);
+    const box = { ...(await boxFacts()), mamaFacts: seenFacts };
     const facts = T.factsBlock(box);
+    const strip = (s) => String(s || '').replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim();
+    const last = LAST[isMama ? 'mama' : 'pub'], fresh = last && Date.now() - last.ts < 15 * 60000;   // the site sends no history: the gateway remembers the last exchange
+    const users = messages.filter((m) => m.role === 'user');
+    const prevQ = users.length > 1 ? strip(users[users.length - 2].content).slice(0, 400) : (fresh ? last.q : null);
+    const lastJena = [...messages].reverse().find((m) => m.role === 'assistant')?.content || (fresh ? last.a : null);
+    const parsed = T.parseCorrection(userText, { afterReply: !!lastJena });
+    const corr = isMama ? parsed : null;
+    const refuse = !isMama && parsed && !parsed.instruction && !String(req.url).startsWith('/japi');   // public "no, it's X": facts don't change
+    const forget = isMama && /^\s*(?:jena[\s,]+)?forget (?:that|the last (?:fact|correction|thing i (?:told|taught) you))[\s.!]*$/i.test(strip(userText));
+    const known = corr || refuse || forget ? null : T.factAnswer(strip(userText), seenFacts);
+    rec.mama = isMama;
     const sourceText = facts + '\n' + messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
     const creative = T.CREATIVE.test(userText);
     const rawEval = req.headers['x-jena-eval-raw'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '');   // baseline eval only: the old path, no truth code
     const sysText = facts + '\n' + messages.filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n');
     const routed = ROMANCE_IN.test(userText) || rawEval ? null : (T.route(userText, sysText) || (T.needsSource(userText, sysText) ? { kind: 'idk_no_source', text: T.IDK_Q() } : null));
-    if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
+    if (forget) { const f = forgetLastMamaFact(); text = f ? `okay mama, forgot it: ${f.private ? f.you : f.mama}.` : "there's nothing you taught me to forget, mama."; rec.routed = 'mama_forget'; rec.private = !!f?.private; }
+    else if (corr && corr.instruction) { const q = queueForDesk(corr, 'chat'); text = corr.kind === 'stop' ? 'ok mama, stopping.' : `ok mama, switching: ${T.toYou(corr.right)}.`; rec.routed = 'mama_instruction'; rec.queued = q.queued; }
+    else if (corr) { const f = addMamaFact(corr, prevQ, lastJena, 'chat'); text = f.ack; rec.routed = 'mama_correction'; rec.fact = { mama: f.mama, private: f.private, ts: f.ts }; rec.private = f.private; }
+    else if (refuse) { text = T.pickOne(["nice try, but only mama can change what i know. keeping my answer.", "hmm, only mama gets to correct my facts. i'll stick with what i've got.", "can't take that one from chat, only mama can update my facts."]); rec.routed = 'correction_refused'; }
+    else if (known && !rawEval) { text = known.q ? `${known.right}. ${isMama ? 'you told me that, mama' : 'mama told me that, verified'}.` : (isMama ? `you told me: ${known.you}.` : `mama told me: ${known.mama}.`); rec.routed = 'mama_fact'; rec.private = !!known.private; }
+    else if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
     else if (routed && (routed.text || routed.kind === 'desktop')) {
       text = routed.text || desktopSay(routed.ctx, box); rec.routed = routed.kind;   // answered from facts, the model never guesses here
     }
@@ -192,7 +243,11 @@ async function brain(req, res, url, base, modelName) {
     rec.error = e.message; rec.ms = Date.now() - t0; logBrain(rec);
     return sendJSON(res, e.status || (e.name === 'TimeoutError' ? 504 : 502), { error: { message: `${modelName}: ${e.message}` } });
   }
-  rec.ms = Date.now() - t0; rec.raw = rawReply; rec.reply = text; rec.usage = usage; logBrain(rec);
+  rec.ms = Date.now() - t0; rec.raw = rawReply; rec.reply = text; rec.usage = usage;
+  const lastText = text, lastUserText = userText;
+  if (rec.private) Object.assign(rec, { user: '(private, mama only)', reply: '(private)', raw: '', fact: rec.fact ? { private: true, ts: rec.fact.ts } : undefined });   // /brain/log is readable by the public site
+  logBrain(rec);
+  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() };
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
   const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {
@@ -328,6 +383,15 @@ const server = http.createServer(async (req, res) => {
       const open = path === '/health' || path.startsWith('/box/') || path.startsWith('/japi/');
       if (!open && !site) { authStats.refused++; return sendJSON(res, 401, { error: { message: 'Jena\'s brain only answers her own site. For apps, use her keyed API: /api/v1/chat/completions on her site.' } }); }
     }
+    // mama's ✎ correct (dev panel / chat button, passcode checked by her site; from outside only her signed site gets here)
+    if (req.method === 'POST' && path === '/truth/correct') {
+      let b = {}; try { b = JSON.parse((await readBody(req)).toString() || '{}'); } catch {}
+      const right = String(b.right || '').trim().slice(0, 300);
+      if (!right) return sendJSON(res, 400, { error: 'right answer needed' });
+      const f = addMamaFact({ right, raw: right, instruction: false }, b.q ? String(b.q).slice(0, 400) : null, b.wrong || null, 'correct_button');
+      return sendJSON(res, 200, { ok: true, fact: { mama: f.mama, private: f.private, ts: f.ts }, ack: f.ack });
+    }
+    if (path === '/truth/facts') return sendJSON(res, 200, { facts: mamaFacts().filter((f) => !f.private).map((f) => ({ ts: f.ts, fact: f.mama, via: f.via })) });
     if (req.method === 'POST' && /^\/(v1\/)?(chat\/)?completions?$/.test(path)) return await brain(req, res, path, CHAT, 'JenaXI-chat');
     // Jena's own OpenAI-compatible API for other apps: Bearer key checked against the sha256 her box stores
     // (the key itself is only ever shown to mama in the dev panel). /japi/v1/models and /japi/v1/chat/completions.
