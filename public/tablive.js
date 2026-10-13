@@ -164,6 +164,89 @@
     }
     timer = setTimeout(poll, document.hidden ? 10000 : 3000);
   }
+  // ---- Jena view + tracking + watch-mama (persistent: drawn once, updated in place, so the video and the live
+  // iframe don't restart every 3 s). Pictures come through /api/tablive?asset=… with the same mama key.
+  const jv = document.createElement('section'); jv.id = 'jv'; app.after(jv);
+  const blobs = {};
+  async function asset(name, at) {
+    const key = localStorage.getItem(KEY); if (!key || !at) return null;
+    const b = blobs[name];
+    if (b && b.at === at) return b.url;
+    const r = await fetch('/api/tablive?asset=' + encodeURIComponent(name), { headers: { 'X-Jena-Key': key }, cache: 'no-store' }).catch(() => null);
+    if (!r || !r.ok) return b?.url || null;
+    const url = URL.createObjectURL(await r.blob());
+    if (b) setTimeout(() => URL.revokeObjectURL(b.url), 5000);
+    blobs[name] = { at, url }; return url;
+  }
+  let jvBuilt = false, jvWide = localStorage.getItem('tablive.jv390') !== '1';
+  function buildJV() {
+    jv.innerHTML = `
+    <h2>👀 Jena view <span class="sub" id="jv-sub"></span></h2>
+    <div class="card">
+      <div class="row" style="margin:0 0 6px"><button class="btn" id="jv-w">laptop</button><button class="btn" id="jv-p">phone</button>
+        <button class="btn" id="jv-live">▶ open her live site here</button><a class="sub" href="/" target="_blank" rel="noopener" style="margin-left:auto">open in a tab ↗</a></div>
+      <div id="jv-box" style="position:relative;background:#05070a;border-radius:10px;overflow:hidden;min-height:120px">
+        <img id="jv-img" alt="her main site, as mama sees it" style="display:block;max-width:100%;margin:0 auto">
+      </div>
+      <div class="sub" id="jv-note" style="margin-top:4px">her main site exactly as you'd see it (mama view), refreshed every few seconds from the browser that watches it on her box</div>
+    </div>
+    <h2>🦴 Tracking <span class="sub" id="tr-sub"></span></h2>
+    <div class="two">
+      <div class="card"><video id="tr-vid" muted loop playsinline autoplay style="width:100%;border-radius:8px;background:#000"></video>
+        <div class="sub" style="margin-top:4px">what her tracker saw: body skeleton, coloured body-part boxes (head, shoulders, chest, hips, upper/lower arms, hands, thighs, shins, feet), both hands' 21 points each (green = her left, orange = her right), face points, and objects tagged in red</div></div>
+      <div class="card" id="tr-info"></div>
+    </div>
+    <h2>👩‍🏫 Learned from mama <span class="sub">(only you see this)</span></h2>
+    <div class="two"><div class="card" id="mw"></div><div class="card"><img id="mw-img" alt="latest frame of your session" style="width:100%;border-radius:8px;display:none"><div class="sub" id="mw-note">latest frame from her recording of your session</div></div></div>`;
+    jv.querySelector('#jv-w').onclick = () => { jvWide = true; localStorage.setItem('tablive.jv390', '0'); updateJV(last, true); };
+    jv.querySelector('#jv-p').onclick = () => { jvWide = false; localStorage.setItem('tablive.jv390', '1'); updateJV(last, true); };
+    jv.querySelector('#jv-live').onclick = () => {
+      const box = jv.querySelector('#jv-box'), on = box.querySelector('iframe');
+      if (on) { on.remove(); jv.querySelector('#jv-img').style.display = 'block'; jv.querySelector('#jv-live').textContent = '▶ open her live site here'; return; }
+      const f = document.createElement('iframe');
+      f.src = '/?from=tablive'; f.title = 'Jena, live'; f.allow = 'autoplay; microphone';
+      f.style.cssText = `display:block;border:0;margin:0 auto;width:${jvWide ? '100%' : '390px'};max-width:100%;height:${jvWide ? '62vh' : '760px'};background:#000`;
+      jv.querySelector('#jv-img').style.display = 'none'; box.appendChild(f); jv.querySelector('#jv-live').textContent = '■ close live site';
+    };
+    jvBuilt = true;
+  }
+  async function updateJV(d, force) {
+    if (!d) return;
+    if (!jvBuilt) buildJV();
+    const v = d.jena_view || {}, t = d.tracking, m = d.mama_watch;
+    const shotAt = jvWide ? v.shot_at : v.shot390_at;
+    jv.querySelector('#jv-sub').textContent = shotAt ? `· picture ${dur((Date.now() - skew - shotAt) / 1000)} old` : '· no picture yet';
+    const img = jv.querySelector('#jv-img');
+    img.style.maxWidth = jvWide ? '100%' : '390px';
+    const u = await asset(jvWide ? 'jena-view.jpg' : 'jena-view-390.jpg', shotAt);
+    if (u && img.src !== u) img.src = u;
+    // tracking
+    const info = jv.querySelector('#tr-info');
+    if (!t) { info.innerHTML = '<span class="sub">tracker not running yet</span>'; }
+    else {
+      const cur = t.current, l = t.last;
+      jv.querySelector('#tr-sub').textContent = `· ${t.state}${cur ? ': ' + (cur.label || cur.id) + ' — ' + cur.step : ''}${t.why ? ' (' + t.why + ')' : ''}`;
+      const pc = (x) => (x == null ? '–' : Math.round(x * 100) + '%');
+      const row = (h) => `<div style="margin:3px 0"><b>${esc(h.label || h.id)}</b> ${h.ok ? '' : '<span class="pill r">failed</span>'}<br><span class="sub">${h.ok ? `light: <b>${esc(h.lighting)}</b>${h.luma != null ? ` (luma ${h.luma})` : ''} · ${h.mirrored_source ? '<b>mirrored video, un-mirrored</b>' : 'not mirrored'} · body ${pc(h.detected?.body)} · L hand ${pc(h.detected?.left_hand)} · R hand ${pc(h.detected?.right_hand)} · face ${pc(h.detected?.face)}` : esc(h.error || '')}</span></div>`;
+      info.innerHTML = `${l ? row(l) : ''}
+        <div class="sub" style="margin-top:6px">${t.done} moves tracked with fingers + face · ${t.pending_upload} waiting to upload to ANIMATIONS/ · ${t.last_sync?.sha ? `last upload <span class="sha">${esc(t.last_sync.sha.slice(0, 7))}</span> ${ago(new Date(t.last_sync.at).toISOString())}` : 'no upload yet'}${t.sync_error ? ` · <span style="color:var(--r)">upload error: ${esc(t.sync_error.error)}</span>` : ''}</div>
+        <a class="sub" href="https://github.com/pfn000/jena-magic-screen/tree/main/ANIMATIONS" target="_blank" rel="noopener">ANIMATIONS/ on GitHub ↗</a>
+        ${(t.history || []).slice(1, 6).map(row).join('')}`;
+      const vid = jv.querySelector('#tr-vid');
+      const vu = await asset('tracking.mp4', t.video_at);
+      if (vu && vid.src !== vu) { vid.src = vu; vid.play().catch(() => {}); }
+    }
+    // watch mama
+    const mw = jv.querySelector('#mw');
+    if (m?.frame_at) { const fu = await asset('mama-frame.jpg', m.frame_at); const im = jv.querySelector('#mw-img'); if (fu && im.src !== fu) { im.src = fu; im.style.display = 'block'; } }
+    if (!m) mw.innerHTML = '<span class="sub">nothing yet: whenever you use her desktop she watches and learns by herself (window titles, clicks, what you type with passwords left out, and a 3 fps video), then writes down how you did it</span>';
+    else {
+      mw.innerHTML = `<div class="row" style="margin:0"><span class="pill ${m.watching ? 'm' : ''}">${m.watching ? '● watching you now' : 'not watching'}</span><span class="sub">${m.watching ? `${m.events || 0} actions so far${m.recording ? ' · recording video' : ''}` : m.last_at ? 'last session ' + ago(new Date(m.last_at).toISOString()) : ''}</span></div>
+        ${(m.recent || []).slice(0, 4).map((x) => `<div style="margin-top:8px"><b>${esc(x.title)}</b> <span class="sub">${esc(x.when || '')}</span><ol style="margin:4px 0 0 18px;padding:0">${(x.steps || []).slice(0, 12).map((s) => `<li class="sub" style="color:var(--fg)">${esc(s)}</li>`).join('')}</ol></div>`).join('')}`;
+    }
+  }
+  const _render = render;
+  render = function (d) { _render(d); updateJV(d).catch(() => {}); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   poll();
 })();

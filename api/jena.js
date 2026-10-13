@@ -10,6 +10,8 @@
 //   GET  /api/dm                (passcode) the private mama <-> Jena log
 //   POST /api/hear?user=&learn=0|1&private=0|1  raw audio clip -> {text} (local speech-to-text on her box)
 //   POST /api/dm                (passcode) {text} -> Jena answers privately; never shown on stream
+import { bodyAnswer } from './_lib/body.js';
+import { mamaLearned } from './_lib/mamalearn.js';
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
@@ -314,7 +316,11 @@ async function think(req) {
       if (mem?.length) input.memories = mem;
       memSave = () => observe(bx, input.message, input.user, input.source);
       if (sk?.name) input.skill = sk;
-      else toDesk = fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) }).catch(() => null);
+      const ba = bodyAnswer(input.message, b.body);   // body questions are answered from her real, measured body
+      if (ba) input.skill = { name: 'my_body', ok: true, summary: ba.summary, say: ba.say, facts: ba.facts };
+      const ml = ba ? null : await mamaLearned(bx, input.message, input.mama, req.headers.get('x-jena-key'), broadcast);   // mama hears her watch-mama notes
+      if (ml) input.skill = ml;
+      if (!sk?.name && !ba && !ml) toDesk = fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) }).catch(() => null);
     }
   }
   const enc = new TextEncoder();

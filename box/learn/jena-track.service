@@ -1,0 +1,18 @@
+[Unit]
+Description=Jena track: whole-body tracking (fingers + face, true left/right, low-light retry) for every move she learned + ANIMATIONS/ on GitHub (one clip at a time, low priority)
+After=network.target jena-learn.service
+[Service]
+User=user
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+Environment=MPLBACKEND=Agg
+Environment=OMP_NUM_THREADS=2
+Environment=TAB_TASK_ID=674daac5-8657-4a93-a0b7-17232c67c598
+ExecStart=/home/user/moves-venv/bin/python -u /home/user/tab/files/jena-learn/track/track_service.py
+MemoryHigh=750M
+MemoryMax=900M
+Restart=always
+RestartSec=20
+[Install]
+WantedBy=multi-user.target

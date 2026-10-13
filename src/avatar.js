@@ -592,6 +592,8 @@ export class Avatar {
         // elbows: a softly bent elbow is never frozen; a little extra flex comes and goes, more while talking
         if (!this.handOnHip || this.handOnHip.side !== s) add(`${s}LowerArm`, 0, sg * (talking && relaxed ? (0.5 + 0.5 * this.FN[s + 'Middle'](t * 0.5 + 3)) * 0.35 : 0), 0);
       }
+      // learned moves with tracked fingers take over her fingers while they play (moves.js applyHands)
+      for (const f of this.handHooks || []) { try { f(vrm, dt); } catch (e) { console.warn('hand hook', e); } }
       // her own body's shape keeps her arms and hands outside her clothes/hips/skirt (mesh-fitted collider)
       if (this.collision) { try { this.collision.apply(); } catch (e) { console.warn('collision', e); } }
       // her room (floor, wall behind her, stage edges) as colliders too
@@ -627,6 +629,7 @@ export class Avatar {
       } else { this._hy = damp(this._hy || 0, 0, 3, dt); this._hp = damp(this._hp || 0, 0, 3, dt); }
       add('head', this._hp, this._hy, 0);
       this.updateFace(dt, t, now);
+      for (const f of this.faceHooks || []) { try { f(vrm, dt); } catch (e) { console.warn('face hook', e); } }
       vrm.update(dt);
     }
     this.frameHooksLight?.(t);

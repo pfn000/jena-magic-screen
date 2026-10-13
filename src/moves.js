@@ -7,6 +7,7 @@
 // idle so her breathing and drift never stop. Left/right always mean HER left/right.
 import * as THREE from 'three';
 import { WatchVideo } from './watchvideo.js';
+import { SelfCheck } from './selfcheck.js';
 
 // Her clips were tracked from video at 15 fps, and a pose tracker shakes a little on every frame. Played
 // back with plain frame-to-frame slerp, that shows as tiny kinks 15 times a second. On load each clip is
@@ -88,7 +89,11 @@ export class Moves {
     this.playing = null;
     this.learnedLogged = false;
     (avatar.poseHooks ||= []).push((vrm, dt) => this.apply(vrm, dt));
+    // fingers + face from clips tracked with hands and face (they run after her own finger/face life, so they win while the move plays)
+    (avatar.handHooks ||= []).push((vrm) => this.applyHands(vrm));
+    (avatar.faceHooks ||= []).push((vrm) => this.applyFace(vrm));
     this.ready = this.load();
+    this.selfCheck = new SelfCheck(this, { log }); // she checks her own pose against the move and corrects it
   }
 
   async load() {
@@ -119,6 +124,13 @@ export class Moves {
     for (const [b, arr] of Object.entries(j.bones)) tracks[b] = Float32Array.from(arr, (v) => v * s);
     const smooth = resampleClip({ fps: j.fps, frames: j.frames, tracks, hips: j.hips_offset ? Float32Array.from(j.hips_offset, (v) => v * s) : null });
     const clip = { ...meta, ...smooth };
+    // whole-body clips (moves-pipeline/holistic.py): finger bends per hand + face expression weights, at the source fps
+    if (j.fingers) clip.fingers = Object.fromEntries(Object.entries(j.fingers).map(([side, h]) => [side, { bend: Float32Array.from(h.bend, (v) => v / 1000), conf: Float32Array.from(h.conf, (v) => v / 100), dim: (j.finger_layout?.order || []).length || 17 }]));
+    if (j.face) clip.face = { names: j.face.names, w: j.face.w.map((a) => Float32Array.from(a, (v) => v / 1000)), conf: Float32Array.from(j.face.conf, (v) => v / 100) };
+    clip.srcFps = j.fps; clip.srcFrames = j.frames;
+    if (j.sides === 'performer') clip.sides = 'performer';
+    clip.tracking = j.tracking || null;
+    if (j.metrics) clip.metrics = j.metrics; // the performer's body measurements per frame (her self-check targets)
     this.cache.set(meta.id, clip);
     return clip;
   }
@@ -178,7 +190,8 @@ export class Moves {
     const len = Math.min(dur, Math.max(Math.min(6, dur), (meta.minSlice || 6) + Math.random() * 7));
     const start = Math.random() * Math.max(0, dur - len);
     const rate = 0.86 + Math.random() * 0.24;
-    const mirror = meta.mirror !== false && Math.random() < 0.4;
+    // a clip tracked with true sides (the performer's own left/right) plays left->left on her, never mirrored
+    const mirror = c.sides !== 'performer' && meta.sides !== 'performer' && meta.mirror !== false && Math.random() < 0.4;
     this.guard = { left: 1, right: 1 };
     this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
     this.remember(meta.id);
@@ -284,6 +297,65 @@ export class Moves {
   }
 
   stop() { if (this.playing) this.playing.stopAt = this.playing.t; }
+
+  // source-frame sampling for the 15 fps finger/face tracks (linear between frames)
+  _src(p) {
+    const c = p.c, f = Math.max(0, Math.min((c.srcFrames || 1) - 1.001, (p.start + p.t) * (c.srcFps || 15)));
+    const i = Math.floor(f); return { i, a: f - i };
+  }
+
+  // her fingers copy the performer's: 15 joint bends per hand (+ spread, thumb across the palm). Left = HER left.
+  applyHands(vrm) {
+    const p = this.playing;
+    if (!p || !p.c.fingers || !(p.w > 0)) return;
+    const H = vrm.humanoid, { i, a } = this._src(p);
+    const A = this.avatar;
+    for (const side of ['left', 'right']) {
+      const h = p.c.fingers[side];
+      if (!h) continue;
+      if ((side === 'left' && A.wave?.side === 'left') || (side === 'right' && A.wave?.side === 'right')) continue;
+      const d = h.dim, at = (k) => h.bend[i * d + k] * (1 - a) + h.bend[Math.min(h.bend.length / d - 1, i + 1) * d + k] * a;
+      const conf = (h.conf[i] ?? 0) * (1 - a) + (h.conf[i + 1] ?? h.conf[i] ?? 0) * a;
+      const w = Math.min(1, p.w * conf * 1.1);
+      if (w < 0.02) continue;
+      const sg = side === 'left' ? -1 : 1; // her left fingers point +x, so they curl with -z (same as her own finger code)
+      const spread = at(15), opp = at(16);
+      const sp = { Index: 1.0, Middle: 0.25, Ring: -0.45, Little: -1.0 };
+      const set = (bone, x, y, z) => {
+        const n = H.getNormalizedBoneNode(bone); if (!n) return;
+        n.rotation.set(n.rotation.x + (x - n.rotation.x) * w, n.rotation.y + (y - n.rotation.y) * w, n.rotation.z + (z - n.rotation.z) * w);
+      };
+      // thumb: base swings across the palm (opposition), joints curl toward the palm
+      set(`${side}ThumbMetacarpal`, 0, -sg * (at(0) * 0.55 + opp * 0.35), sg * (at(0) * 0.2 + opp * 0.15));
+      set(`${side}ThumbProximal`, 0, -sg * at(1) * 0.85, sg * at(1) * 0.2);
+      set(`${side}ThumbDistal`, 0, -sg * at(2) * 0.9, 0);
+      let k = 3;
+      for (const f of ['Index', 'Middle', 'Ring', 'Little']) {
+        set(`${side}${f}Proximal`, 0, -sg * spread * sp[f] * 0.35, sg * at(k));
+        set(`${side}${f}Intermediate`, 0, 0, sg * at(k + 1));
+        set(`${side}${f}Distal`, 0, 0, sg * at(k + 2));
+        k += 3;
+      }
+    }
+  }
+
+  // her face copies the performer's: mouth shapes, brows, cheeks, winks, gaze (MediaPipe's 52 face blendshapes
+  // mapped onto her VRM expressions). Her own blinking keeps going; a tracked wink adds to it.
+  applyFace(vrm) {
+    const p = this.playing, em = vrm.expressionManager;
+    if (!p || !p.c.face || !em || !(p.w > 0)) return;
+    const F = p.c.face, { i, a } = this._src(p);
+    const conf = (F.conf[i] ?? 0) * (1 - a) + (F.conf[i + 1] ?? F.conf[i] ?? 0) * a;
+    const w = Math.min(1, p.w * conf);
+    if (w < 0.02) return;
+    const talking = this.avatar.talk && performance.now() < this.avatar.talk.until;
+    F.names.forEach((name, j) => {
+      if (talking && ['aa', 'ih', 'ou', 'ee', 'oh'].includes(name)) return; // her own voice drives her mouth while she talks
+      const arr = F.w[j], v = arr[i] * (1 - a) + (arr[i + 1] ?? arr[i]) * a;
+      const cur = em.getValue(name) || 0;
+      em.setValue(name, name.startsWith('blink') ? Math.max(cur, v * w) : cur + (v - cur) * w * 0.9);
+    });
+  }
 
   // runs every frame after her procedural idle has set her bones and before the leg IK plants her feet
   apply(vrm, dt) {

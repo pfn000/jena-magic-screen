@@ -1,0 +1,18 @@
+{
+ "name": "my_body",
+ "description": "Her own body map: every bone, finger joint and face shape she has, what each does, how left/right work for her (her left = right of your screen), and the body measurements her self-check scores. Live questions (what's your left hand doing, how close was your pose) are answered by the site from her real measured body; this answers from her body map when the live body isn't sent.",
+ "triggers": [
+  "\\b(what|which) (body )?parts (do )?(you|u) (have|got)\\b",
+  "\\bhow many (bones|body parts|fingers)\\b",
+  "\\bwhat (does|do) (your|ur) (left |right )?([a-z]+ ){0,2}(bone|joint|knuckle|finger|thumb|elbow|wrist|shoulder|hip|knee|ankle)s? do\\b",
+  "\\b(your|ur) (left|right) (from|vs|versus|and) (your|ur|my) (left|right)\\b",
+  "\\bwhich (side|way) is (your|ur) (left|right)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 10,
+ "needs": [],
+ "example": {
+  "text": "what body parts do you have?"
+ }
+}

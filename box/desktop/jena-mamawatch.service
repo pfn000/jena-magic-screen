@@ -1,0 +1,13 @@
+[Unit]
+Description=Jena watches mama: during mama's takeover, always on: a low-rate log of window titles, clicks, typed text (passwords never) and a 3 fps video of the session; at the end she writes how mama did it (~/.jena/memory/learned_from_mama.md, mama only)
+After=jena-xvfb.service
+[Service]
+User=jena
+Nice=19
+Environment=DISPLAY=:99
+ExecStart=/usr/bin/python3 -u /home/jena/jena_mamawatch.py
+MemoryMax=350M
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

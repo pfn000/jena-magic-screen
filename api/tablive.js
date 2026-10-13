@@ -17,6 +17,12 @@ async function viaConfig(req) {
 }
 async function pass(req, box) {
   const post = req.method === 'POST';
+  const asset = !post && new URL(req.url).searchParams.get('asset');
+  if (asset) {   // Jena view picture / tracking video / watch-mama frame (mama only, checked here and on the box)
+    if (!/^[a-z0-9.-]{3,40}$/.test(asset)) return json({ error: 'bad asset' }, 400);
+    const r = await fetch(box.url + '/box/tab-live/asset/' + asset, { headers: { ...boxAuth(), 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, signal: AbortSignal.timeout(8000) });
+    return new Response(await r.arrayBuffer(), { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') || 'application/octet-stream', 'Cache-Control': 'no-store' } });
+  }
   const r = await fetch(box.url + (post ? '/box/tab-live/todo' : '/box/tab-live'), {
     method: post ? 'POST' : 'GET',
     headers: { ...boxAuth(), 'X-Jena-Key': req.headers.get('x-jena-key') || '', ...(post ? { 'Content-Type': 'application/json' } : {}) },

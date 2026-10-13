@@ -1,0 +1,537 @@
+{
+ "version": 1,
+ "who": "Jena (one n). This is her own body map: every bone and face shape her avatar has, what each one does, and which tracked point drives it when she copies a move from a video.",
+ "left_right": "Left and right always mean HER OWN left and right. She faces the camera, so her left hand is on the RIGHT of your screen. When she learns from a video she uses the performer's own left/right (a mirrored video is un-mirrored first), and plays it left->left on herself, never mirrored.",
+ "groups": {
+  "torso": [
+   "hips",
+   "spine",
+   "chest",
+   "upperChest"
+  ],
+  "head": [
+   "neck",
+   "head",
+   "leftEye",
+   "rightEye"
+  ],
+  "left arm": [
+   "leftShoulder",
+   "leftUpperArm",
+   "leftLowerArm",
+   "leftHand"
+  ],
+  "right arm": [
+   "rightShoulder",
+   "rightUpperArm",
+   "rightLowerArm",
+   "rightHand"
+  ],
+  "left hand fingers": [
+   "leftThumbMetacarpal",
+   "leftThumbProximal",
+   "leftThumbDistal",
+   "leftIndexProximal",
+   "leftIndexIntermediate",
+   "leftIndexDistal",
+   "leftMiddleProximal",
+   "leftMiddleIntermediate",
+   "leftMiddleDistal",
+   "leftRingProximal",
+   "leftRingIntermediate",
+   "leftRingDistal",
+   "leftLittleProximal",
+   "leftLittleIntermediate",
+   "leftLittleDistal"
+  ],
+  "right hand fingers": [
+   "rightThumbMetacarpal",
+   "rightThumbProximal",
+   "rightThumbDistal",
+   "rightIndexProximal",
+   "rightIndexIntermediate",
+   "rightIndexDistal",
+   "rightMiddleProximal",
+   "rightMiddleIntermediate",
+   "rightMiddleDistal",
+   "rightRingProximal",
+   "rightRingIntermediate",
+   "rightRingDistal",
+   "rightLittleProximal",
+   "rightLittleIntermediate",
+   "rightLittleDistal"
+  ],
+  "left leg": [
+   "leftUpperLeg",
+   "leftLowerLeg",
+   "leftFoot",
+   "leftToes"
+  ],
+  "right leg": [
+   "rightUpperLeg",
+   "rightLowerLeg",
+   "rightFoot",
+   "rightToes"
+  ]
+ },
+ "bones": {
+  "hips": {
+   "part": "hips / pelvis",
+   "does": "the root of her whole body: moves her up/down and sways her weight from foot to foot; everything else hangs off it",
+   "tracked_from": "pose 23+24 (hip points)"
+  },
+  "spine": {
+   "part": "lower back",
+   "side": "",
+   "does": "bends and twists her lower back",
+   "parent": "hips",
+   "tracked_from": "pose shoulders vs hips"
+  },
+  "chest": {
+   "part": "chest / rib cage",
+   "does": "leans and turns her upper body",
+   "parent": "spine",
+   "tracked_from": "pose 11+12 vs 23+24"
+  },
+  "upperChest": {
+   "part": "upper chest",
+   "does": "the top of her torso, where her shoulders and neck attach; small extra twist and lean",
+   "parent": "chest",
+   "tracked_from": "pose 11+12"
+  },
+  "neck": {
+   "part": "neck",
+   "does": "tilts and turns her head a little (shared with the head)",
+   "parent": "upperChest",
+   "tracked_from": "pose ears + nose"
+  },
+  "head": {
+   "part": "head",
+   "does": "nods (yes), shakes (no), tilts toward a shoulder",
+   "parent": "neck",
+   "tracked_from": "pose 0,7,8 (nose, ears) + face mesh"
+  },
+  "leftEye": {
+   "part": "left eye",
+   "side": "left",
+   "does": "looks around; her left eye (on the right of the screen when she faces you). Blinks with blinkLeft",
+   "parent": "head",
+   "tracked_from": "face mesh + blendshapes eyeBlinkLeft, eyeLook*Left"
+  },
+  "leftShoulder": {
+   "part": "left shoulder (collarbone)",
+   "side": "left",
+   "does": "shrugs her left shoulder up / rolls it forward",
+   "parent": "upperChest",
+   "tracked_from": "pose 11"
+  },
+  "leftUpperArm": {
+   "part": "left upper arm",
+   "side": "left",
+   "does": "raises her left arm out to the side, forward, up over her head, or down by her side",
+   "parent": "leftShoulder",
+   "tracked_from": "pose 11->13"
+  },
+  "leftLowerArm": {
+   "part": "left forearm (elbow)",
+   "side": "left",
+   "does": "bends her left elbow and twists her left forearm (palm up / palm down)",
+   "parent": "leftUpperArm",
+   "tracked_from": "pose 13->15"
+  },
+  "leftHand": {
+   "part": "left hand (wrist)",
+   "side": "left",
+   "does": "tilts and turns her left hand at the wrist: waving, pointing, palm facing you",
+   "parent": "leftLowerArm",
+   "tracked_from": "pose 15 + hand 0,5,17"
+  },
+  "leftThumbMetacarpal": {
+   "part": "left thumb, thumb base (at the palm)",
+   "side": "left",
+   "does": "curls her left thumb at the thumb base (at the palm) and swings the thumb across the palm",
+   "parent": "leftHand",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "leftThumbProximal": {
+   "part": "left thumb, thumb middle joint",
+   "side": "left",
+   "does": "curls her left thumb at the thumb middle joint",
+   "parent": "leftThumbMetacarpal",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "leftThumbDistal": {
+   "part": "left thumb, thumb tip joint",
+   "side": "left",
+   "does": "curls her left thumb at the thumb tip joint",
+   "parent": "leftThumbProximal",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "leftIndexProximal": {
+   "part": "left index (pointer) finger, knuckle",
+   "side": "left",
+   "does": "curls her left index (pointer) finger at the knuckle (and spreads it sideways)",
+   "parent": "leftHand",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "leftIndexIntermediate": {
+   "part": "left index (pointer) finger, middle joint",
+   "side": "left",
+   "does": "curls her left index (pointer) finger at the middle joint",
+   "parent": "leftIndexProximal",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "leftIndexDistal": {
+   "part": "left index (pointer) finger, tip joint",
+   "side": "left",
+   "does": "curls her left index (pointer) finger at the tip joint",
+   "parent": "leftIndexIntermediate",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "leftMiddleProximal": {
+   "part": "left middle finger, knuckle",
+   "side": "left",
+   "does": "curls her left middle finger at the knuckle (and spreads it sideways)",
+   "parent": "leftHand",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "leftMiddleIntermediate": {
+   "part": "left middle finger, middle joint",
+   "side": "left",
+   "does": "curls her left middle finger at the middle joint",
+   "parent": "leftMiddleProximal",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "leftMiddleDistal": {
+   "part": "left middle finger, tip joint",
+   "side": "left",
+   "does": "curls her left middle finger at the tip joint",
+   "parent": "leftMiddleIntermediate",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "leftRingProximal": {
+   "part": "left ring finger, knuckle",
+   "side": "left",
+   "does": "curls her left ring finger at the knuckle (and spreads it sideways)",
+   "parent": "leftHand",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "leftRingIntermediate": {
+   "part": "left ring finger, middle joint",
+   "side": "left",
+   "does": "curls her left ring finger at the middle joint",
+   "parent": "leftRingProximal",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "leftRingDistal": {
+   "part": "left ring finger, tip joint",
+   "side": "left",
+   "does": "curls her left ring finger at the tip joint",
+   "parent": "leftRingIntermediate",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "leftLittleProximal": {
+   "part": "left little finger (pinky), knuckle",
+   "side": "left",
+   "does": "curls her left little finger (pinky) at the knuckle (and spreads it sideways)",
+   "parent": "leftHand",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "leftLittleIntermediate": {
+   "part": "left little finger (pinky), middle joint",
+   "side": "left",
+   "does": "curls her left little finger (pinky) at the middle joint",
+   "parent": "leftLittleProximal",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "leftLittleDistal": {
+   "part": "left little finger (pinky), tip joint",
+   "side": "left",
+   "does": "curls her left little finger (pinky) at the tip joint",
+   "parent": "leftLittleIntermediate",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "leftUpperLeg": {
+   "part": "left thigh (hip joint)",
+   "side": "left",
+   "does": "swings her left leg forward/back/out to the side and lifts her left knee",
+   "parent": "hips",
+   "tracked_from": "pose 23->25"
+  },
+  "leftLowerLeg": {
+   "part": "left shin (knee)",
+   "side": "left",
+   "does": "bends her left knee",
+   "parent": "leftUpperLeg",
+   "tracked_from": "pose 25->27"
+  },
+  "leftFoot": {
+   "part": "left foot (ankle)",
+   "side": "left",
+   "does": "points / flexes her left foot and lifts her left heel",
+   "parent": "leftLowerLeg",
+   "tracked_from": "pose 27,29,31"
+  },
+  "leftToes": {
+   "part": "left toes",
+   "side": "left",
+   "does": "bends her left toes when she rises onto the ball of her foot",
+   "parent": "leftFoot",
+   "tracked_from": "pose 31"
+  },
+  "rightEye": {
+   "part": "right eye",
+   "side": "right",
+   "does": "looks around; her right eye (on the left of the screen when she faces you). Blinks with blinkRight",
+   "parent": "head",
+   "tracked_from": "face mesh + blendshapes eyeBlinkRight, eyeLook*Right"
+  },
+  "rightShoulder": {
+   "part": "right shoulder (collarbone)",
+   "side": "right",
+   "does": "shrugs her right shoulder up / rolls it forward",
+   "parent": "upperChest",
+   "tracked_from": "pose 12"
+  },
+  "rightUpperArm": {
+   "part": "right upper arm",
+   "side": "right",
+   "does": "raises her right arm out to the side, forward, up over her head, or down by her side",
+   "parent": "rightShoulder",
+   "tracked_from": "pose 12->14"
+  },
+  "rightLowerArm": {
+   "part": "right forearm (elbow)",
+   "side": "right",
+   "does": "bends her right elbow and twists her right forearm (palm up / palm down)",
+   "parent": "rightUpperArm",
+   "tracked_from": "pose 14->16"
+  },
+  "rightHand": {
+   "part": "right hand (wrist)",
+   "side": "right",
+   "does": "tilts and turns her right hand at the wrist: waving, pointing, palm facing you",
+   "parent": "rightLowerArm",
+   "tracked_from": "pose 16 + hand 0,5,17"
+  },
+  "rightThumbMetacarpal": {
+   "part": "right thumb, thumb base (at the palm)",
+   "side": "right",
+   "does": "curls her right thumb at the thumb base (at the palm) and swings the thumb across the palm",
+   "parent": "rightHand",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "rightThumbProximal": {
+   "part": "right thumb, thumb middle joint",
+   "side": "right",
+   "does": "curls her right thumb at the thumb middle joint",
+   "parent": "rightThumbMetacarpal",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "rightThumbDistal": {
+   "part": "right thumb, thumb tip joint",
+   "side": "right",
+   "does": "curls her right thumb at the thumb tip joint",
+   "parent": "rightThumbProximal",
+   "tracked_from": "hand landmarks 1-4"
+  },
+  "rightIndexProximal": {
+   "part": "right index (pointer) finger, knuckle",
+   "side": "right",
+   "does": "curls her right index (pointer) finger at the knuckle (and spreads it sideways)",
+   "parent": "rightHand",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "rightIndexIntermediate": {
+   "part": "right index (pointer) finger, middle joint",
+   "side": "right",
+   "does": "curls her right index (pointer) finger at the middle joint",
+   "parent": "rightIndexProximal",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "rightIndexDistal": {
+   "part": "right index (pointer) finger, tip joint",
+   "side": "right",
+   "does": "curls her right index (pointer) finger at the tip joint",
+   "parent": "rightIndexIntermediate",
+   "tracked_from": "hand landmarks 5-8"
+  },
+  "rightMiddleProximal": {
+   "part": "right middle finger, knuckle",
+   "side": "right",
+   "does": "curls her right middle finger at the knuckle (and spreads it sideways)",
+   "parent": "rightHand",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "rightMiddleIntermediate": {
+   "part": "right middle finger, middle joint",
+   "side": "right",
+   "does": "curls her right middle finger at the middle joint",
+   "parent": "rightMiddleProximal",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "rightMiddleDistal": {
+   "part": "right middle finger, tip joint",
+   "side": "right",
+   "does": "curls her right middle finger at the tip joint",
+   "parent": "rightMiddleIntermediate",
+   "tracked_from": "hand landmarks 9-12"
+  },
+  "rightRingProximal": {
+   "part": "right ring finger, knuckle",
+   "side": "right",
+   "does": "curls her right ring finger at the knuckle (and spreads it sideways)",
+   "parent": "rightHand",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "rightRingIntermediate": {
+   "part": "right ring finger, middle joint",
+   "side": "right",
+   "does": "curls her right ring finger at the middle joint",
+   "parent": "rightRingProximal",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "rightRingDistal": {
+   "part": "right ring finger, tip joint",
+   "side": "right",
+   "does": "curls her right ring finger at the tip joint",
+   "parent": "rightRingIntermediate",
+   "tracked_from": "hand landmarks 13-16"
+  },
+  "rightLittleProximal": {
+   "part": "right little finger (pinky), knuckle",
+   "side": "right",
+   "does": "curls her right little finger (pinky) at the knuckle (and spreads it sideways)",
+   "parent": "rightHand",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "rightLittleIntermediate": {
+   "part": "right little finger (pinky), middle joint",
+   "side": "right",
+   "does": "curls her right little finger (pinky) at the middle joint",
+   "parent": "rightLittleProximal",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "rightLittleDistal": {
+   "part": "right little finger (pinky), tip joint",
+   "side": "right",
+   "does": "curls her right little finger (pinky) at the tip joint",
+   "parent": "rightLittleIntermediate",
+   "tracked_from": "hand landmarks 17-20"
+  },
+  "rightUpperLeg": {
+   "part": "right thigh (hip joint)",
+   "side": "right",
+   "does": "swings her right leg forward/back/out to the side and lifts her right knee",
+   "parent": "hips",
+   "tracked_from": "pose 24->26"
+  },
+  "rightLowerLeg": {
+   "part": "right shin (knee)",
+   "side": "right",
+   "does": "bends her right knee",
+   "parent": "rightUpperLeg",
+   "tracked_from": "pose 26->28"
+  },
+  "rightFoot": {
+   "part": "right foot (ankle)",
+   "side": "right",
+   "does": "points / flexes her right foot and lifts her right heel",
+   "parent": "rightLowerLeg",
+   "tracked_from": "pose 28,30,32"
+  },
+  "rightToes": {
+   "part": "right toes",
+   "side": "right",
+   "does": "bends her right toes when she rises onto the ball of her foot",
+   "parent": "rightFoot",
+   "tracked_from": "pose 32"
+  }
+ },
+ "face": {
+  "aa": {
+   "does": "mouth open wide \"ah\" (jaw open)",
+   "tracked_from": "jawOpen"
+  },
+  "ih": {
+   "does": "mouth \"ih\", upper lip lifted a little",
+   "tracked_from": "mouthUpperUp L/R"
+  },
+  "ou": {
+   "does": "lips pushed forward in a small round \"oo\" (pucker)",
+   "tracked_from": "mouthPucker"
+  },
+  "ee": {
+   "does": "lips stretched wide \"ee\"",
+   "tracked_from": "mouthStretch L/R + mouthSmile"
+  },
+  "oh": {
+   "does": "round open mouth \"oh\" (funnel)",
+   "tracked_from": "mouthFunnel"
+  },
+  "happy": {
+   "does": "smile, cheeks up",
+   "tracked_from": "mouthSmile L/R + cheekSquint L/R"
+  },
+  "angry": {
+   "does": "brows pulled down and together",
+   "tracked_from": "browDown L/R"
+  },
+  "sad": {
+   "does": "mouth corners down, inner brows up",
+   "tracked_from": "mouthFrown L/R + browInnerUp"
+  },
+  "surprised": {
+   "does": "brows up, eyes wide, mouth a little open",
+   "tracked_from": "browOuterUp L/R + eyeWide L/R + jawOpen"
+  },
+  "relaxed": {
+   "does": "soft, calm half-smile",
+   "tracked_from": "mouthSmile - jawOpen"
+  },
+  "neutral": {
+   "does": "resting face",
+   "tracked_from": null
+  },
+  "blink": {
+   "does": "both eyes closed",
+   "tracked_from": null
+  },
+  "blinkLeft": {
+   "does": "her LEFT eye closed (wink)",
+   "tracked_from": "eyeBlinkLeft"
+  },
+  "blinkRight": {
+   "does": "her RIGHT eye closed (wink)",
+   "tracked_from": "eyeBlinkRight"
+  },
+  "lookUp": {
+   "does": "eyes look up",
+   "tracked_from": "eyeLookUp L/R"
+  },
+  "lookDown": {
+   "does": "eyes look down",
+   "tracked_from": "eyeLookDown L/R"
+  },
+  "lookLeft": {
+   "does": "eyes look to HER left (your right)",
+   "tracked_from": "eyeLookOutLeft + eyeLookInRight"
+  },
+  "lookRight": {
+   "does": "eyes look to HER right (your left)",
+   "tracked_from": "eyeLookOutRight + eyeLookInLeft"
+  }
+ },
+ "not_on_this_body": [
+  "jaw bone (her mouth opens with the aa/oh shapes instead)",
+  "tongue",
+  "cheek puff shape",
+  "separate eyebrow bones (brows move inside the angry/sad/surprised shapes)"
+ ],
+ "tracking": {
+  "body": "MediaPipe Pose: 33 points (0 nose, 1-6 eyes, 7-8 ears, 9-10 mouth, 11-12 shoulders, 13-14 elbows, 15-16 wrists, 17-22 hand edges, 23-24 hips, 25-26 knees, 27-28 ankles, 29-30 heels, 31-32 toes); odd = performer's left, even = right",
+  "hands": "MediaPipe Hands: 21 points per hand (0 wrist, 1-4 thumb, 5-8 index, 9-12 middle, 13-16 ring, 17-20 pinky) -> 15 finger joint bends + spread per hand",
+  "face": "MediaPipe Face: 478 points + 52 blendshapes (jaw, mouth, lips, cheeks, brows, eyes, gaze) -> her VRM face shapes",
+  "low_light": "dark or low-confidence video is retried with CLAHE+gamma, then inverted colours; the best pass is kept and logged"
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "name": "learned_from_mama",
+ "description": "What she learned today from watching mama use her desktop. She always watches whenever mama's on her desktop (takeover, the 1-hour pause, phone mode), records the session as video + an action log, then writes the steps down so she can repeat them. The step-by-step notes are private to mama: the site answers mama in full; anyone else only hears that she watched.",
+ "triggers": [
+  "\\b(what|anything|stuff|things?)\\b.{0,20}\\b(you|u|ya)\\b.{0,12}\\blearn(ed|t|ing)?\\b.{0,12}\\bfrom (mama|mom|mommy|me|watching (me|mama))\\b",
+  "\\bwhat did (you|u) (see|watch) (mama|me|mom) do\\b",
+  "\\blearned from mama\\b",
+  "\\bwatch(ed|ing)? (mama|me) (use|on|do)\\b.{0,20}\\b(desktop|computer|screen)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 10,
+ "needs": [],
+ "example": {
+  "text": "what did you learn from mama today?"
+ }
+}

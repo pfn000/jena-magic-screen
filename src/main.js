@@ -9,6 +9,7 @@ import { ThoughtChain } from './thoughts.js';
 import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { Moves, rememberMove } from './moves.js';
+import { bodyBrief } from './selfcheck.js';
 import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
@@ -272,7 +273,7 @@ function thinkAbout(input, { broadcast = true, thumb } = {}) {
   runs.push(run._dev); if (runs.length > 30) runs.shift();
   busy = busy.then(async () => {
     const key = localStorage.getItem(KEY_STORE);
-    const src = think(cfg.brainUrl, { ...input, origin: ORIGIN, broadcast }, broadcast ? key : null);
+    const src = think(cfg.brainUrl, { ...input, origin: ORIGIN, broadcast, body: bodyBrief(selfSense, autonomy.moves) }, broadcast ? key : null);   // her real body, for body questions
     for await (const e of src) runEvent(e, run);
     run.done();
   }).catch((e) => console.warn('think failed', e));
