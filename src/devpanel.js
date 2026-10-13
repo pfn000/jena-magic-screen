@@ -165,7 +165,7 @@ export class DevPanel {
     }
     if (this.tab === 'memory') {
       const mm = this.data.mem?.data;
-      h += mm ? `<h3>Persistent memories on her box (${mm.count}) · ${esc(mm.file)}</h3><ol>${mm.memories.map((x) => `<li><small>${ago(x.ts)} · ${esc(x.kind)} · ${esc(x.source || '')}</small> ${esc(x.fact)}</li>`).join('') || '<li>nothing saved yet: she saves when someone says "remember …", tells her their name, or a favorite</li>'}</ol>` : notOn;
+      h += mm ? `<h3>Persistent memories on her box (${mm.count}) · ${esc(mm.file)}</h3><ol>${mm.memories.map((x) => `<li><small>${ago(x.ts)} · ${esc(x.kind)} · ${esc(x.source || '')}</small> ${esc(x.fact)}</li>`).join('') || '<li>nothing saved yet: she saves when someone says "remember …", tells her their name, a favorite, or something they like</li>'}</ol>` : notOn;
       if (live) {
         h += `<h3>Her notes file (her memory on her desktop)</h3><pre>${esc(box.memories?.notesTail || '(could not read her notes)')}</pre>`;
         h += `<h3>Conversations (last brain exchanges on her box)</h3><div class="dp-log" data-src="log">loading…</div>`;
