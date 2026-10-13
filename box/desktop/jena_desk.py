@@ -817,6 +817,11 @@ def mem_learned():
         for l in open(os.path.join(HOME, 'learned', 'grok_notes.jsonl')):
             r = json.loads(l); out.append({'ts': r['ts'], 'who': 'Grok', 'kind': 'learned', 'fact': f"Grok told me: {r['question']} -> {r['answer'][:200]}", 'source': 'ask_grok'})
     except Exception: pass
+    # how people talk to her (🎤 voice messages whose speaker opted in to "help her learn how people talk")
+    try:
+        for l in open(os.path.join(HOME, 'learned', 'speech_notes.jsonl')):
+            r = json.loads(l); out.append({'ts': r['ts'], 'who': r.get('user', 'guest'), 'kind': 'how people talk', 'fact': f"{r.get('user', 'someone')} said to me (voice): {r['text'][:200]}", 'source': 'voice'})
+    except Exception: pass
     return out
 
 def mem_recall(q, user=None, k=5):
@@ -1022,7 +1027,7 @@ async def client(reader, writer):
         out = json.dumps({'memories': mem_recall(qs_.get('q', [''])[0][:300], qs_.get('user', [None])[0])}).encode()
     elif p == '/box/memory':
         allm = mem_all() + mem_learned()
-        out = json.dumps({'count': len(allm), 'file': '~/memory/memories.jsonl (+ ~/learned/grok_notes.jsonl)', 'memories': sorted(allm, key=lambda r: -r['ts'])[:200]}).encode()
+        out = json.dumps({'count': len(allm), 'file': '~/memory/memories.jsonl (+ ~/learned/grok_notes.jsonl, ~/learned/speech_notes.jsonl)', 'memories': sorted(allm, key=lambda r: -r['ts'])[:200]}).encode()
     elif p == '/box/skills/auto' and method == 'POST':
         # the site asks first: does this message need one of her skills? script skills run now so her brain
         # answers from real results; desktop skills (ask_grok, explore_my_box) are queued for her hands

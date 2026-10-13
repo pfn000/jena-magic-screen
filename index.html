@@ -47,8 +47,11 @@
       <form id="talk" autocomplete="off">
         <label class="sr" for="talk-input">Talk to Jena</label>
         <input id="talk-input" maxlength="300" placeholder="talk to Jena…">
+        <button type="button" id="mic" class="mic-btn" aria-label="talk to Jena with your voice" aria-pressed="false" title="talk with your voice (tap to start, tap to send, or hold)">🎤</button>
         <button type="submit" aria-label="send">➤</button>
       </form>
+      <p id="mic-status" class="mic-status" role="status" hidden></p>
+      <p class="mic-note" id="mic-note" hidden><span>🎤 voice → text on her own computer, audio deleted</span> · <button type="button" id="mic-learn-toggle">learning: off</button></p>
     </section>
 
     <section id="thoughts" class="panel" aria-label="Thought process chain">
@@ -70,10 +73,22 @@
     <ul id="dm-log"></ul>
     <form id="dm-form" class="unlocked" autocomplete="off">
       <input id="dm-input" maxlength="2000" placeholder="message Jena privately…" aria-label="private message">
+      <button type="button" id="dm-mic" class="mic-btn" aria-label="private voice message to Jena" aria-pressed="false" title="private voice message (never saved, never on stream)">🎤</button>
       <button type="submit">send</button>
     </form>
+    <p id="dm-mic-status" class="mic-status unlocked" role="status" hidden></p>
     <footer class="unlocked"><span id="dm-store"></span><button id="dm-lock" type="button">lock</button></footer>
   </aside>
+
+  <div id="mic-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="mic-sheet-title" hidden>
+    <div class="sheet-card">
+      <h3 id="mic-sheet-title">🎤 Talk to Jena</h3>
+      <p>Tap 🎤, talk, tap again to send (or hold it while you talk). Up to 30 seconds.</p>
+      <p>Your voice is turned into text on <b>Jena's own computer</b> with free, local speech-to-text. The audio is deleted right after. The text goes into the chat like a typed message, and she answers out loud.</p>
+      <label class="sheet-opt"><input type="checkbox" id="mic-learn"> <span><b>Help her learn how people talk.</b> Saves the <i>text</i> of what you said (never the audio) to her training notes. Her next training run learns phrasing and slang from it. You can turn this off any time.</span></label>
+      <div class="sheet-actions"><button type="button" id="mic-sheet-cancel" class="ghost">not now</button><button type="button" id="mic-sheet-ok">start talking</button></div>
+    </div>
+  </div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

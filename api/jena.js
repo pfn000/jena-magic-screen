@@ -8,6 +8,7 @@
 //   POST /api/upload            (passcode) raw file body, X-File-Name header -> stored, logged, announced
 //   GET  /api/upload?id=        a file from the temporary store
 //   GET  /api/dm                (passcode) the private mama <-> Jena log
+//   POST /api/hear?user=&learn=0|1&private=0|1  raw audio clip -> {text} (local speech-to-text on her box)
 //   POST /api/dm                (passcode) {text} -> Jena answers privately; never shown on stream
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
@@ -111,6 +112,38 @@ async function jenaApi(req) {
     const r = await fetch(`${box.url}/japi/v1/${sub}`, { method: req.method, headers: { 'Content-Type': 'application/json', Authorization: req.headers.get('authorization') || '' }, body: req.method === 'POST' ? await req.text() : undefined, signal: AbortSignal.timeout(25000) });
     return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') || 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
   } catch (e) { return json({ error: { message: `her box did not answer: ${e.message}` } }, 502); }
+}
+
+// Her ears: 🎤 talk button. The browser records a short clip, this forwards it (signed, like every box call) to her box,
+// where free local speech-to-text (whisper "small", CPU) turns it into text. The audio is never stored anywhere.
+// Limits: 2 MB / 30 s per clip, 6 clips a minute per visitor here, one at a time on her box.
+const hearHits = new Map();
+async function hear(req) {
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
+  const now = Date.now();
+  const hits = (hearHits.get(ip) || []).filter((t) => now - t < 60000);
+  if (hits.length >= 6) return json({ error: "that's a lot of voice messages, give her a minute" }, 429);
+  hits.push(now); hearHits.set(ip, hits);
+  if (hearHits.size > 2000) hearHits.clear();
+  const ctype = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!/^audio\/(webm|ogg|mp4|mpeg|wav|x-wav|aac|x-m4a|flac)$|^video\/(webm|mp4)$/.test(ctype)) return json({ error: `not an audio clip (${ctype || 'no type'})` }, 415);
+  const n = +(req.headers.get('content-length') || 0);
+  if (n > 2 * 1024 * 1024) return json({ error: 'that recording is too big (2 MB max, about 30 s)' }, 413);
+  const buf = Buffer.from(await req.arrayBuffer());
+  if (!buf.length) return json({ error: 'no audio arrived' }, 400);
+  if (buf.length > 2 * 1024 * 1024) return json({ error: 'that recording is too big (2 MB max, about 30 s)' }, 413);
+  const u = new URL(req.url);
+  const isPrivate = u.searchParams.get('private') === '1';
+  if (isPrivate && !checkKey(req).ok) return json({ error: "private voice messages are mama-only (unlock the private drawer first)" }, 401);
+  const learn = !isPrivate && u.searchParams.get('learn') === '1';
+  const user = clip(u.searchParams.get('user') || 'guest', 40);
+  const box = await boxLink();
+  if (!box) return json({ error: "her box is offline, so she can't hear right now" }, 503);
+  try {
+    const r = await fetch(`${box.url}/hear?user=${encodeURIComponent(user)}&learn=${learn ? 1 : 0}&private=${isPrivate ? 1 : 0}`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': ctype }, body: buf, signal: AbortSignal.timeout(25000) });
+    const d = await r.json().catch(() => ({ error: `her ears answered ${r.status}` }));
+    return json({ ...d, bytes: buf.length, learn, private: isPrivate }, r.status);
+  } catch (e) { return json({ error: `her ears did not answer: ${e.message}` }, 502); }
 }
 
 // Her voice (Piper TTS on her box). Only for lines she really said (token signed by thinkEvents).
@@ -314,6 +347,7 @@ async function handle(req) {
     if (route === 'skills') return await publicSkills();
     if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
     if (route === 'tts') return await tts(req);
+    if (route === 'hear' && req.method === 'POST') return await hear(req);
     if (route === 'v1') return await jenaApi(req);
     if (route === 'asset') return await assetFile(req);
     if (route === 'hot') { try { return json({ list: await hotUrls(), source: 'Hot URLS/URLS.md in her repo (read live)' }); } catch (e) { return json({ error: e.message }, 502); } }

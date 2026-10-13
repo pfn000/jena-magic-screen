@@ -1,0 +1,15 @@
+[Unit]
+Description=Jena's ears: local speech-to-text (faster-whisper small, CPU) kept loaded (127.0.0.1:8096)
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+User=jena
+Environment=HOME=/home/jena PYTHONUNBUFFERED=1 JENA_STT_MODEL=small OMP_NUM_THREADS=2
+WorkingDirectory=/home/jena
+ExecStart=/usr/local/bin/python3 /home/jena/.jena_stt.py
+Nice=5
+MemoryMax=1500M
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

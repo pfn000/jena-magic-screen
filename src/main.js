@@ -13,6 +13,7 @@ import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
 import { softRefresh } from './refresh.js';
 import { Voice } from './voice.js';
+import { Mic } from './mic.js';
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -338,6 +339,60 @@ $('#talk').addEventListener('submit', (e) => {
   if (twitchLive) { chain.self('status', `${who} (off-Twitch): ${text.slice(0, 120)}`); thinkAbout({ message: text, source: 'stage', user: who }); return; }
   send(text, who, el);
 });
+
+// ---------------- 🎤 talk with your voice ----------------
+// First tap explains what happens and asks (opt-in) whether the text may be saved to help her learn how people talk.
+const MIC_SEEN = 'jena.micSeen', MIC_LEARN = 'jena.micLearn';
+const micLearn = () => localStorage.getItem(MIC_LEARN) === '1';
+function renderMicNote() {
+  const note = $('#mic-note'), t = $('#mic-learn-toggle');
+  if (!note) return;
+  note.hidden = !localStorage.getItem(MIC_SEEN);
+  t.textContent = micLearn() ? 'learning: on ✓' : 'learning: off';
+  t.title = micLearn() ? 'the text of what you say is saved to her training notes (never the audio). tap to turn off' : 'tap to let her learn how people talk from the text of what you say';
+}
+let micAfterSheet = null;
+function micSheet(after) {
+  const sh = $('#mic-sheet');
+  $('#mic-learn').checked = micLearn();
+  sh.hidden = false;
+  micAfterSheet = after;
+  $('#mic-sheet-ok').focus();
+}
+$('#mic-sheet-ok')?.addEventListener('click', () => {
+  localStorage.setItem(MIC_SEEN, '1');
+  localStorage.setItem(MIC_LEARN, $('#mic-learn').checked ? '1' : '0');
+  $('#mic-sheet').hidden = true; renderMicNote();
+  const f = micAfterSheet; micAfterSheet = null; f?.();
+});
+$('#mic-sheet-cancel')?.addEventListener('click', () => { $('#mic-sheet').hidden = true; micAfterSheet = null; });
+$('#mic-learn-toggle')?.addEventListener('click', () => micSheet(null));
+if (cfg.obs) { $('#mic')?.remove(); $('#dm-mic')?.remove(); }
+else {
+  renderMicNote();
+  const micBtn = $('#mic');
+  const pubMic = micBtn && new Mic({
+    button: micBtn,
+    status: $('#mic-status'),
+    gate: () => { if (localStorage.getItem(MIC_SEEN)) return true; micSheet(() => pubMic.start()); return false; },
+    onStart: () => voice.unlock(),
+    params: () => ({ user: localStorage.getItem(KEY_STORE) ? 'mama' : 'guest', learn: micLearn() }),
+    onText: (text) => {
+      const input = $('#talk-input');
+      input.value = text.slice(0, 300);
+      $('#talk').requestSubmit();
+      chatList.lastElementChild?.classList.add('via-voice');
+    },
+  });
+  // mama's private voice messages: transcribed on her box, never saved for learning, never on stream
+  const dmMicBtn = $('#dm-mic');
+  if (dmMicBtn) new Mic({
+    button: dmMicBtn,
+    status: $('#dm-mic-status'),
+    params: () => ({ user: 'mama', private: true, learn: false, key: localStorage.getItem(KEY_STORE) || '' }),
+    onText: (text) => { $('#dm-input').value = text.slice(0, 2000); $('#dm-form').requestSubmit(); },
+  });
+}
 
 // ---------------- private DM drawer (never on stream) ----------------
 const drawer = $('#dm');
