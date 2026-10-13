@@ -144,25 +144,10 @@ export class Desktop {
   // the "🔑 mama view" key. A trusted device never gets a passcode box here: the cookie hands its key back first.
   // Only a device that was never trusted (or was locked on purpose) sees the shared passcode card (trust.js).
   async unlockMama() {
-<<<<<<< HEAD
-    const { restoreTrust } = await import('./takeover.js');
-    if (await restoreTrust()) { clearTimeout(this.watchRetry); this.startMama(); return; }
-    const T = window.jenaTrust;
-    const k = T?.askPasscode ? await T.askPasscode("Mama's desktop", 'Type it once on this device. After that it stays trusted, with no more prompts.')
-      : (window.prompt("mama's passcode (only on your own device)") || '');
-    if (!k || !String(k).trim()) return;
-    const r = T?.trustWithPasscode ? await T.trustWithPasscode(String(k).trim()) : null;
-    if (!r || !r.ok) {
-      const c = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': String(k).trim() }, body: JSON.stringify({ action: 'watch' }) }).then((x) => x.json()).catch(() => null);
-      if (!c || !c.ok) { window.alert(c && c.error === 'wrong key' ? 'wrong passcode' : `couldn't check it: ${(c && (c.error || c.summary)) || 'no answer'}`); return; }
-      localStorage.setItem('jena.dmKey', String(k).trim());   // same key the private DM drawer + dev panel use
-    }
-=======
     // the ONE trusted check (src/trust.js): a trusted device (token or the HttpOnly cookie) goes straight to mama view,
     // nothing asked; only a never-trusted device sees Face ID / the passcode, once. No prompt of its own here.
     const k = window.jenaTrust?.ensureMama ? await window.jenaTrust.ensureMama('Mama view of her desktop') : '';
     if (!k) return;
->>>>>>> bdad62d (passcode fix (local))
     clearTimeout(this.watchRetry);
     this.startMama();
   }
