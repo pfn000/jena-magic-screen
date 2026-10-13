@@ -166,16 +166,20 @@ def _changed_files(marker, limit=25):
     files = []
     for l in out.splitlines():
         rel = os.path.relpath(l, HOME)
-        if rel.startswith(SKIP) or rel.startswith('.') or '/.' in rel or rel.startswith(('jenaos/', 'jena_', 'snap/')):
+        if rel.startswith(SKIP) or rel.startswith('.') or '/.' in rel or rel.startswith(('jenaos/', 'jena_', 'jena-', 'snap/')):
             continue   # hidden dirs (browser profiles, caches), her own programs: not "what mama changed"
         files.append(rel)
     return sorted(files)[:limit]
 
+SHELL_TITLES = ('N•OS', 'tint2', 'xfce4-panel', 'Desktop', 'plank')
+def _mine(t):   # her own shell / panel windows come and go with phone mode: not something mama opened or closed
+    return bool(t) and not str(t).startswith(SHELL_TITLES)
+
 def _summarize():
     before = S.get('before') or {'windows': [], 'ts': S['since'] or time.time()}
     now_titles = [w['title'] for w in _windows()]
-    opened = [t for t in now_titles if t not in before['windows']]
-    closed = [t for t in before['windows'] if t not in now_titles]
+    opened = [t for t in now_titles if t not in before['windows'] and _mine(t)]
+    closed = [t for t in before['windows'] if t not in now_titles and _mine(t)]
     files = _changed_files(S.get('marker'))
     mins = max(1, int(round((time.time() - (S['since'] or time.time())) / 60)))
     parts = [f'mama had my desktop for {mins} min']
@@ -221,7 +225,27 @@ def params(b):
     if isinstance(ph, dict):
         sz = phone_size(ph)
         if sz: out['phone'] = sz
+    # a sign-in takeover brings the site up in her own browser, so mama lands on the login page, not on whatever was on top
+    u = str(b.get('url') or '')
+    if out['source'].startswith('signin') and u.startswith('https://') and len(u) < 400 and not any(c in u for c in ' \n\r\t"\'<>'):
+        out['url'] = u
     return out
+
+def _open_site(url):
+    try:
+        subprocess.Popen(['firefox-esr', '--profile', os.path.join(HOME, '.ffprofile'), url], env=ENV,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        for _ in range(20):
+            time.sleep(0.5)
+            rc, out = _run('xdotool', 'search', '--onlyvisible', '--classname', 'Navigator')
+            wids = [w for w in out.split() if w.isdigit()]
+            if wids: break
+        if wids:
+            w = wids[-1]
+            if S['mode'] == 'phone': _run('wmctrl', '-i', '-r', hex(int(w)), '-b', 'add,maximized_vert,maximized_horz')
+            _run('xdotool', 'windowactivate', w)
+        _log('signin site', url, 'window', wids[-1] if wids else None)
+    except Exception as e: _log('signin site', e)
 
 def begin(p):
     """a takeover websocket opened. -> {'phone': bool} (phone mode = the public view holds its last frame)"""
@@ -241,6 +265,7 @@ def begin(p):
         elif S['mode'] == 'phone' and S['sessions'] == 1:
             exit_phone('desktop-size takeover')
         _write_flag()
+        if p.get('url') and S['sessions'] == 1: threading.Thread(target=_open_site, args=(p['url'],), daemon=True).start()
         _log('begin', p, 'sessions', S['sessions'], 'mode', S['mode'])
         return {'phone': S['mode'] == 'phone'}
 

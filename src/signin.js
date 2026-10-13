@@ -179,12 +179,12 @@ export async function handleAskClick(e, rerender) {
 }
 
 // mama's sign-in = a takeover of Jena's real desktop (:99): one-time token from her box, passcode checked there
-async function takeoverFor(pass) {
+async function takeoverFor(pass, url) {
   // her tunnel can be mid-restart (the answer is then an HTML error page, not JSON): try 3 times over ~8 s
   let last = null;
   for (let i = 0; i < 3; i++) {
     const vv = window.visualViewport, phone = isPhoneView() ? { w: Math.round(vv?.width || innerWidth), h: Math.round((vv?.height || innerHeight) - 96) } : null;
-    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover', source: 'signin', phone }) })
+    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover', source: 'signin', phone, url: /^https:\/\//.test(url || '') ? url : undefined }) })
       .then(async (x) => { const t = await x.text(); try { return JSON.parse(t); } catch { return { ok: false, retry: true, summary: 'her box is reconnecting' }; } })
       .catch(() => ({ ok: false, retry: true, summary: 'her box is reconnecting' }));
     if (r.ok && r.ws) { if (pass) localStorage.setItem(KEY, pass); return { ok: true, ws: r.ws, until: Date.now() + 60 * 60000 }; }
@@ -227,7 +227,7 @@ export function openSignin(req) {
     form.querySelector('button').disabled = true; st.textContent = 'opening…';
     // mama (passcode on this device): sign in right on Jena's own desktop through a takeover. She sees it raw;
     // Jena's hands pause; only the public/OBS view gets the lock card meanwhile. The one-use link keeps the old window.
-    let d = useLink ? await call('start', pass) : await takeoverFor(pass || key());
+    let d = useLink ? await call('start', pass) : await takeoverFor(pass || key(), req.url);
     // her desktop isn't answering: open her own Firefox (same profile) on a free screen instead, raw for mama
     if (!d.ok && !useLink && req.id && d.summary !== 'wrong passcode') { st.textContent = 'her desktop is busy, opening her browser by itself…'; const s2 = await mamaSignin('start', { id: req.id }, pass || key()); if (s2.ok) { d = s2; ownWindow = true; } }
     if (!d.ok) {
