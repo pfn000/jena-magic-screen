@@ -11,6 +11,7 @@ import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
+import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -90,6 +91,19 @@ if (params.get('selfview') !== '0') {
     felt: () => ({ left: selfSense.feel.leftArm === 'up' ? 'up' : 'down', right: selfSense.feel.rightArm === 'up' ? 'up' : 'down' }),
   })).start();
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
+  // BODY panel angles: front (her self-vision) / back / side / top / below; mama can pick, and so can she
+  const bodyViews = new BodyViews(avatar, $('#self-view'), $('#self-view-label'));
+  const bar = document.createElement('div'); bar.id = 'body-views';
+  bar.innerHTML = VIEWS.map((v) => `<button type="button" data-v="${v}" class="${v === 'front' ? 'on' : ''}">${v}</button>`).join('');
+  bar.onclick = (e) => { const v = e.target.dataset?.v; if (v) bodyViews.set(v, 'mama'); };
+  $('#self-view')?.after(bar);
+  setInterval(() => {
+    if (document.hidden || Math.random() > 0.25) return;
+    const v = bodyViews.view === 'front' ? VIEWS[1 + Math.floor(Math.random() * 4)] : 'front';
+    bodyViews.set(v, 'jena');
+    if (v !== 'front') chain.self('sense', `checking myself from the ${v}`);
+  }, 20000);
+  window.__jenaBodyViews = bodyViews;
   // collapse her POV panels so they don't clutter the page (she keeps seeing herself either way)
   const eye = $('#self-eye');
   if (eye) {

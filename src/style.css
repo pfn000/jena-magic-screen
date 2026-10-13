@@ -282,3 +282,8 @@ body.obs #self-toggle { display: none; }
   body:not(.obs) #stage { padding: 8px 8px 80px; gap: 10px; }
   body:not(.obs) #stage { grid-template-rows: 58vh auto minmax(300px, 54vh) minmax(260px, 50vh) !important; }
 }
+
+#body-views { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
+#body-views button { font: 800 8.5px system-ui, sans-serif; padding: 1px 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,.9); background: var(--glass-strong); color: var(--ink-soft); cursor: pointer; }
+#body-views button.on { background: #7a4fd6; color: #fff; }
+body.obs #body-views { display: none; }

@@ -167,7 +167,8 @@ export class SelfVision {
 
   draw(lm) {
     const v = this.view;
-    if (!v) return;
+    if (!v || (window.__jenaBodyView && window.__jenaBodyView !== 'front')) return; // another angle is being shown
+
     const w = this.work.width, h = this.work.height;
     if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
     const c = v.getContext('2d');

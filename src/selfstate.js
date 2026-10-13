@@ -1,3 +1,4 @@
+const THREE_DEG = 180 / Math.PI;
 import { Matrix4, Vector3, Quaternion } from 'three';
 // Jena's self-sense (proprioception): every frame she reads her REAL body off the live VRM — every
 // humanoid bone the model has (hips, spine, chest, neck, head, eyes, jaw, shoulders, arms, hands, all
@@ -215,12 +216,23 @@ export class SelfSense {
       `hand L ${hand(F.leftHand)} R ${hand(F.rightHand)}`,
       `weight ${F.lean === 'none' ? 'even' : F.lean === 'left' ? 'L' : 'R'}${F.leftFoot === 'tapping' ? ' · tap L' : F.rightFoot === 'tapping' ? ' · tap R' : ''}`,
       `knee L${Math.round(sm('kl', knee('left')))} R${Math.round(sm('kr', knee('right')))}`,
+      ...(() => { const b = this.avatar.balance?.(); return b ? [`balance ${b.ok ? 'ok' : 'OFF'} · over ${b.over === 'left' ? 'L' : 'R'} foot (${b.marginCm}cm)`, `facing ${b.facing >= 0 ? '+' : ''}${b.facing}° (0 = you)`] : []; })(),
+      ...(this.avatar.collision ? [`arms clear of body ${this.avatar.collision.stats.minClearCm ?? '?'}cm · pushes ${this.avatar.collision.stats.corrections}`] : []),
+      `looking at ${this.avatar.gazeNow || 'you'}`,
       `${S.counts.bones} bones`,
     ];
     const E = (n) => Math.round((S.expressions[n] || 0) * 100);
     const moods = MOODS.filter((m) => E(m) > 8).sort((a, b) => E(b) - E(a)).map((m) => `${m} ${E(m)}`).join(' ') || 'neutral';
     const extra = (S.custom || []).filter((n) => E(n) > 8).map((n) => `${n} ${E(n)}`).join(' ');
+    const Hm = this.avatar.vrm?.humanoid, exprs = new Set(this.avatar.expressions?.() || []);
+    const jaw = Hm?.getNormalizedBoneNode('jaw');
+    const has = (re) => [...exprs].find((n) => re.test(n));
+    const cheek = has(/cheek/i), tongue = has(/tongue/i);
     const face = [
+      `head tilt ${lr(sm('hr', S.head.roll))} turn ${lr(sm('hy', S.head.yaw))} nod ${ud(sm('hp', S.head.pitch))}`,
+      jaw ? `jaw ${Math.round(THREE_DEG * jaw.rotation.x)}°` : `jaw (mouth) aa${E('aa')} · no jaw bone on this body`,
+      cheek ? `cheek ${E(cheek)}` : 'cheek: no cheek shape on this body',
+      tongue ? `tongue ${E(tongue)}` : 'tongue: no tongue shape on this body',
       `gaze ${lr(sm('ey', S.lookAt.yaw))} ${ud(sm('ep', S.lookAt.pitch))}`,
       `blink L${E('blinkLeft') || E('blink')} R${E('blinkRight') || E('blink')}${F.eyesClosed ? ' shut' : ''}`,
       `aa${E('aa')} ih${E('ih')} ou${E('ou')}`,

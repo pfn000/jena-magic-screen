@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { fitBodyCollider, BodyCollision } from './body.js';
 
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'];
 const ALIASES = { joy: 'happy', fun: 'relaxed', sorrow: 'sad', mad: 'angry', shock: 'surprised', calm: 'relaxed', smug: 'relaxed' };
@@ -107,6 +108,14 @@ export class Avatar {
     this.height = hp.y + 0.13;
     this.headY = hp.y;
     this.frameCamera();
+    // her real mesh (body + clothes + skirt) becomes the collider her arms and hands stay outside of
+    try {
+      const t0 = performance.now();
+      this.collider = fitBodyCollider(vrm);
+      if (this.collider) { this.collision = new BodyCollision(this, this.collider); this.collision.stats.fitMs = Math.round(performance.now() - t0); }
+    } catch (e) { console.warn('body collider', e); this.colliderError = String(e.message || e); }
+    this.springs = { joints: vrm.springBoneManager?.joints?.size ?? 0, colliders: vrm.springBoneManager?.colliders?.size ?? 0 };
+    this.randomStart();
     this.ready = true;
     this.onStatus('ready', 1);
     return vrm;
@@ -236,6 +245,55 @@ export class Avatar {
     this.camera.lookAt(0, cy, 0);
   }
 
+  // A different body every time the page loads: random seed, mid-breath, a random weight side, head
+  // already somewhere, fingers at a random curl. (The idle noise tables are random per load as well.)
+  randomStart() {
+    const r = crypto.getRandomValues(new Uint32Array(1))[0];
+    this.seed = r.toString(16);
+    let x = r || 1; const rnd = () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296);
+    this.breath = rnd() * Math.PI * 2;
+    this.timeOffset = rnd() * 1000; // starts her never-repeating drift at a random point
+    this.act.lean.v = this.act.lean.t = rnd() < 0.5 ? -0.8 : 0.8;
+    this.act.tilt.v = (rnd() - 0.5) * 0.15;
+    for (const s of ['left', 'right']) this.act.curl[s].v = this.act.curl[s].t = 0.15 + rnd() * 0.35;
+    this.look.y = (rnd() - 0.5) * 0.3;
+    this.blink.next = rnd() * 3;
+    this.nextGaze = 0;
+  }
+
+  // Balance + orientation from her real bones: center of mass (segment-mass weighted) projected on the
+  // floor, whether it sits over her support area (between/over her feet), and which way she faces.
+  balance() {
+    if (!this.vrm) return null;
+    const H = this.vrm.humanoid, M = { hips: 0.14, spine: 0.12, chest: 0.12, upperChest: 0.04, neck: 0.02, head: 0.08 };
+    for (const s of ['left', 'right']) Object.assign(M, { [s + 'UpperArm']: 0.028, [s + 'LowerArm']: 0.016, [s + 'Hand']: 0.006, [s + 'UpperLeg']: 0.1, [s + 'LowerLeg']: 0.046, [s + 'Foot']: 0.014 });
+    let x = 0, z = 0, m = 0;
+    for (const [b, w] of Object.entries(M)) { const n = H.getNormalizedBoneNode(b); if (!n) continue; n.getWorldPosition(_v[3]); x += _v[3].x * w; z += _v[3].z * w; m += w; }
+    x /= m; z /= m;
+    const fl = H.getNormalizedBoneNode('leftFoot').getWorldPosition(_v[0]), fr = H.getNormalizedBoneNode('rightFoot').getWorldPosition(_v[1]);
+    const x0 = Math.min(fl.x, fr.x) - 0.05, x1 = Math.max(fl.x, fr.x) + 0.05, z0 = Math.min(fl.z, fr.z) - 0.06, z1 = Math.max(fl.z, fr.z) + 0.14;
+    const ok = x >= x0 && x <= x1 && z >= z0 && z <= z1;
+    const hips = H.getNormalizedBoneNode('hips').getWorldQuaternion(_q[0]);
+    const fwd = _v[2].set(0, 0, 1).applyQuaternion(hips);
+    const facing = Math.round(THREE.MathUtils.radToDeg(Math.atan2(fwd.x, fwd.z)));
+    const over = Math.abs(x - fl.x) < Math.abs(x - fr.x) ? 'left' : 'right';
+    return { x, z, ok, facing, over, marginCm: Math.round(Math.min(x - x0, x1 - x, z - z0, z1 - z) * 100) };
+  }
+
+  // what her eyes are on: 'camera' (you), 'desktop' (her screen panel, to HER left), 'chat', 'hand', 'floor'
+  gazeAt(what, ms = 2500) { this.gazeGoal = { what, until: performance.now() + ms }; }
+  gazePoint(what) {
+    const c = this.camera.position, H = this.vrm.humanoid;
+    if (what === 'desktop') return _v[4].set(c.x + 1.6, c.y + 0.55, c.z * 0.6);
+    if (what === 'chat') return _v[4].set(c.x + 1.2, c.y - 0.35, c.z * 0.6);
+    if (what === 'floor') return _v[4].set(c.x * 0.2, 0, 0.9);
+    if (what === 'hand') {
+      const s = this.wave?.side || (this.target.leftUpperArm[2] > 0.5 ? 'left' : this.target.rightUpperArm[2] < -0.5 ? 'right' : (this.handOnHip?.side || 'right'));
+      const n = H.getNormalizedBoneNode(s + 'Hand'); if (n) return n.getWorldPosition(_v[4]);
+    }
+    return _v[4].copy(c);
+  }
+
   // ---------- public API ----------
   setExpression(name, weight = 1, holdMs = 0) {
     name = ALIASES[name] || name;
@@ -335,7 +393,8 @@ export class Avatar {
     hips.updateMatrixWorld(true);
     const sg = h.side === 'left' ? 1 : -1;
     // her hip: a bit out to her side, just above the hip joint, slightly behind the front
-    _hip.set(sg * 0.15, 0.06, -0.01).applyMatrix4(hips.matrixWorld);
+    const surf = this.collision?.hipSurface(h.side, 0.028);
+    if (surf) _hip.copy(surf); else _hip.set(sg * 0.15, 0.06, -0.01).applyMatrix4(hips.matrixWorld);
     U.updateMatrixWorld(true);
     const pu = U.getWorldPosition(_v[0]), pk = K.getWorldPosition(_v[1]), pw = W.getWorldPosition(_v[2]);
     const a = pk.distanceTo(pu), b = pw.distanceTo(pk);
@@ -375,7 +434,7 @@ export class Avatar {
   frame() {
     this.clock.update();
     const dt = Math.min(this.clock.getDelta(), 0.1);
-    const t = this.clock.getElapsed();
+    const t = this.clock.getElapsed() + (this.timeOffset || 0);
     const now = performance.now();
     const vrm = this.vrm;
     if (vrm) {
@@ -451,30 +510,69 @@ export class Avatar {
       this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));
       this.plantFoot('right', A.tap?.side === 'right' ? tap : 0, Math.max(0, L));
       if (this.handOnHip) this.placeHandOnHip(this.handOnHip, now);
-      // fingers: relaxed cascade at rest (little finger curls most), drifting a bit; fist / open when she chooses
+      // fingers: every finger has its own slow drift and the hand its own spread, so they never move as one
+      // block; they gesture while she talks; fist / open when she chooses. Thumb opposes as the hand closes.
+      this.FN ||= Object.fromEntries(['left', 'right'].flatMap((s) => ['Thumb', 'Index', 'Middle', 'Ring', 'Little', 'Spread'].map((f) => [s + f, noise()])));
+      const talking = now < this.talk.until;
       for (const s of ['left', 'right']) {
         const c = A.curl[s];
         if (c.until && now > c.until) { c.t = 0.3; c.until = 0; }
         c.v = damp(c.v, c.t, 8, dt);
-        const v = c.v + (c.t > 0.2 && c.t < 0.5 ? (s === 'left' ? N.fl : N.fr)(t * 0.2) * 0.07 : 0);
+        const relaxed = c.t > 0.15 && c.t < 0.55;
+        const g = talking && relaxed ? 0.18 : 0.07; // talking hands move more
         const sg = s === 'left' ? -1 : 1; // her left fingers point +x in bone space, so they curl with -z
-        const k = { Index: 0.85, Middle: 1, Ring: 1.08, Little: 1.18 };
+        const k = { Index: 0.8, Middle: 0.95, Ring: 1.06, Little: 1.18 };
+        const spread = relaxed ? 0.06 + this.FN[s + 'Spread'](t * 0.31) * 0.06 : c.v > 0.7 ? 0 : 0.03;
+        const sp = { Index: 1.4, Middle: 0.3, Ring: -0.6, Little: -1.4 };
+        let fi = 0;
         for (const f of ['Index', 'Middle', 'Ring', 'Little']) {
-          const w = v * (v > 0.7 ? 1 : k[f]);
-          set(`${s}${f}Proximal`, 0, 0, sg * w * 1.25);
-          set(`${s}${f}Intermediate`, 0, 0, sg * w * 1.4);
-          set(`${s}${f}Distal`, 0, 0, sg * w * 0.9);
+          const own = relaxed ? this.FN[s + f](t * (0.23 + fi * 0.04) + fi * 13) * g : 0;
+          const w = Math.max(0, Math.min(1.05, c.v * (c.v > 0.7 ? 1 : k[f]) + own));
+          set(`${s}${f}Proximal`, 0, sg * -spread * sp[f], sg * w * 1.2);
+          set(`${s}${f}Intermediate`, 0, 0, sg * w * 1.45);
+          set(`${s}${f}Distal`, 0, 0, sg * w * 0.95);
+          fi++;
         }
-        set(`${s}ThumbProximal`, 0, -sg * v * 0.55, sg * v * 0.25);
-        set(`${s}ThumbDistal`, 0, -sg * v * 0.6, 0);
+        const th = Math.max(0, Math.min(1, c.v + (relaxed ? this.FN[s + 'Thumb'](t * 0.27) * g : 0)));
+        set(`${s}ThumbMetacarpal`, 0, -sg * th * 0.35, sg * th * 0.12);
+        set(`${s}ThumbProximal`, 0, -sg * th * 0.5, sg * th * 0.28);
+        set(`${s}ThumbDistal`, 0, -sg * th * 0.65, 0);
+        // wrists stay alive too (a little flex + twist), more while talking
+        add(`${s}Hand`, (this.FN[s + 'Index'](t * 0.11 + 50)) * g * 0.6, 0, sg * this.FN[s + 'Spread'](t * 0.13 + 9) * g * 0.8);
+        // elbows: a softly bent elbow is never frozen; a little extra flex comes and goes, more while talking
+        if (!this.handOnHip || this.handOnHip.side !== s) add(`${s}LowerArm`, 0, sg * (talking && relaxed ? (0.5 + 0.5 * this.FN[s + 'Middle'](t * 0.5 + 3)) * 0.35 : 0), 0);
       }
-      // eyes: follow camera with little saccades
+      // her own body's shape keeps her arms and hands outside her clothes/hips/skirt (mesh-fitted collider)
+      if (this.collision) { try { this.collision.apply(); } catch (e) { console.warn('collision', e); } }
+      // eyes: she looks at things (you, her desktop panel, chat, her own hand when it's doing something,
+      // sometimes the floor), with little saccades on top and the head following big eye turns a bit
+      if (this.gazeGoal && now > this.gazeGoal.until) this.gazeGoal = null;
+      if (!this.gazeGoal && now > (this.nextGaze || 0)) {
+        const busyHand = this.wave || this.handOnHip || this.target.leftUpperArm[2] > 0.5 || this.target.rightUpperArm[2] < -0.5;
+        const r = Math.random();
+        const what = busyHand && r < 0.35 ? 'hand' : r < 0.6 ? 'camera' : r < 0.78 ? 'desktop' : r < 0.92 ? 'chat' : 'floor';
+        this.gazeGoal = { what, until: now + (what === 'camera' ? 2500 + Math.random() * 4000 : 900 + Math.random() * 1800) };
+        this.nextGaze = this.gazeGoal.until + 200;
+      }
+      this.gazeNow = this.gazeGoal?.what || 'camera';
       if (now > this.nextSaccade) {
-        this.gazeOffset.set((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.12, 0);
-        this.nextSaccade = now + 800 + Math.random() * 2600;
+        this.gazeOffset.set((Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 0.09, 0);
+        this.nextSaccade = now + 350 + Math.random() * 1800;
       }
-      this.gaze.position.copy(this.camera.position).add(this.gazeOffset);
+      this._gz ||= this.camera.position.clone();
+      const goal = this.gazePoint(this.gazeNow);
+      this._gz.lerp(goal, 1 - Math.exp(-dt * 14)); // eyes move fast but not instantly
+      this.gaze.position.copy(this._gz).add(this.gazeOffset);
       this.gaze.position.x += this.look.y * 2.2; this.gaze.position.y -= this.look.x * 2.2;
+      if (this.gazeNow !== 'camera') {
+        const head = H.getNormalizedBoneNode('head');
+        const hp = head.getWorldPosition(_v[3]);
+        const dir = _v[2].subVectors(this._gz, hp);
+        const yaw = Math.atan2(dir.x, dir.z), pitch = Math.atan2(-(dir.y), Math.hypot(dir.x, dir.z));
+        this._hy = damp(this._hy || 0, THREE.MathUtils.clamp(yaw, -0.6, 0.6) * 0.35, 3, dt);
+        this._hp = damp(this._hp || 0, THREE.MathUtils.clamp(pitch, -0.4, 0.5) * 0.3, 3, dt);
+      } else { this._hy = damp(this._hy || 0, 0, 3, dt); this._hp = damp(this._hp || 0, 0, 3, dt); }
+      add('head', this._hp, this._hy, 0);
       this.updateFace(dt, t, now);
       vrm.update(dt);
     }
