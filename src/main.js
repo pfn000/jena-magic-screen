@@ -45,7 +45,8 @@ const avatar = new Avatar($('#avatar-canvas'), {
 })();
 
 // her voice (Piper on her box) + lip-sync from the real audio
-const voice = new Voice(avatar, { obs: cfg.obs, button: $('#voice-btn') });
+if (cfg.obs) $('#voice-btn')?.remove();
+const voice = new Voice(avatar, { obs: cfg.obs, button: cfg.obs ? null : $('#voice-btn') });
 $('#talk')?.addEventListener('submit', () => voice.unlock()); // sending a message counts as the click browsers need
 
 // speech bubble
