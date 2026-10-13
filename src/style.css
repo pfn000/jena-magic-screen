@@ -245,7 +245,7 @@ body.obs #build-stamp { display: none; }
 #deploy-bar[hidden]{display:none}
 #deploy-bar span{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(20,16,34,.85);color:#fff;font:12px system-ui;padding:3px 10px;border-radius:10px;pointer-events:auto;white-space:nowrap}
 #deploy-bar.done .bar{animation:none;background:#3ddc84}
-@media (max-width:700px){#devpanel{inset:0;border-radius:0;font-size:12px}}
+@media (max-width:700px){#devpanel{inset:0;border-radius:0;font-size:12px}#devpanel header{flex-wrap:wrap;gap:4px 10px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top))}#devpanel .dp-sub{flex:1 1 100%;order:3;white-space:normal;min-width:0}/* phone: tab chips are one swipeable row, so the panel body (vault, devices, passkeys) stays on screen */#devpanel nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:6px 10px}#devpanel nav::-webkit-scrollbar{display:none}#devpanel nav button{flex:0 0 auto;white-space:nowrap}#devpanel .dp-body{padding:8px 10px 14px}#devpanel input{font-size:16px;max-width:100%}}
 
 /* desktop fills its panel edge to edge: desktop.js cover-scales the noVNC canvas */
 #desktop .desk-screen { overflow: hidden; }

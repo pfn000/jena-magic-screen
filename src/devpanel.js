@@ -179,7 +179,7 @@ export class DevPanel {
           <h3>MCP servers on her box ${s.mcp_checked_at ? '(checked ' + ago(s.mcp_checked_at) + ')' : '(not checked yet)'}</h3><ul>${Object.entries(s.mcp || {}).map(([n, m]) => `<li>${okDot(m.connected)}<b>${esc(n)}</b> — ${esc(m.what || '')}${m.tools ? `<br><small>tools: ${m.tools.map((t) => (t.allowed === false ? `<s title="blocked for Jena">${esc(t.name)}</s>` : esc(t.name))).join(', ')}${m.allow ? ' <i>(struck out = blocked for her)</i>' : ''}</small>` : `<br><small>${esc(m.error || '')}</small>`}</li>`).join('') || '<li>no MCP check yet</li>'}</ul>`;
       }
     }
-    if (this.tab === 'security') h += renderSecurity();
+    if (this.tab === 'security') h += renderSecurity(() => this.render());   // the cards' first loads re-render on their own (before: 'loading…' until a tap inside)
     if (this.tab === 'mama') {
       const a = this.data.activity?.data;
       if (this.data.activity?.locked) h += `<p class="dp-warn">${esc(this.data.activity.error)}</p>`;

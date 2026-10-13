@@ -14,7 +14,8 @@ async function api(path, b) {
 }
 sec.api = api;
 
-export function renderSecurity() {
+export function renderSecurity(rerender) {
+  if (rerender) sec.rerender = rerender;
   const t = trust.state;
   let h = '<div class="dp-card" id="sec-device"><h3>This device</h3>';
   if (!key()) {
@@ -135,7 +136,7 @@ sec.sections.push({
       if (!f.site.trim()) { V.out = 'the site is needed'; rerender(); return true; }
       const d = await api('/api/vault', { op: V.editing ? 'edit' : 'add', id: V.editing || undefined, site: f.site.trim(), username: f.username, password: f.password, notes: f.notes });
       V.out = d.ok ? (V.editing ? '✅ saved' : '✅ added') : d.error || d.summary;
-      if (d.ok) { V.form = { site: '', username: '', password: '', notes: '' }; V.editing = null; V.list = null; V.shown = {}; }
+      if (d.ok) { V.form = { site: '', username: '', password: '', notes: '' }; V.editing = null; V.list = null; V.shown = {}; ['sec-v-site', 'sec-v-user', 'sec-v-pass', 'sec-v-notes'].forEach((id) => { if (vf(id)) vf(id).value = ''; }); }   // clear the boxes too, or snapForm() puts the old values (and the password) back
       rerender(); return true;
     }
     return false;
