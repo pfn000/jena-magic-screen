@@ -336,6 +336,6 @@ body.obs #voice-btn{display:none}
 
 /* what she's watching while she does a learned move: the real video + her tracking on it (same box as the thumbnail) */
 .run .thumb.watch { position: relative; width: 160px; height: 90px; max-height: 90px; overflow: hidden; background: #1b1530; }
-.run .thumb.watch .watch-video, .run .thumb.watch iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.run .thumb.watch .watch-video, .run .thumb.watch iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; object-fit: contain; background: #000; }
 .run .thumb.watch .watch-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .run .thumb.watch .watch-tag { position: absolute; left: 4px; bottom: 3px; font: 700 9px/1.2 system-ui, sans-serif; color: #fff; background: rgba(20, 12, 40, 0.65); padding: 1px 5px; border-radius: 6px; }
