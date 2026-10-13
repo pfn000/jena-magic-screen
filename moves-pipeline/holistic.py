@@ -162,9 +162,11 @@ SEGMENTS = {
 SEG_SHORT = {'head': 'head', 'neck': 'neck', 'shoulders': 'shldr', 'chest': 'chest', 'hips': 'hips', 'left upper arm': 'L up arm', 'left lower arm': 'L forearm',
              'left hand': 'L hand', 'right upper arm': 'R up arm', 'right lower arm': 'R forearm', 'right hand': 'R hand', 'left upper leg': 'L thigh',
              'left lower leg': 'L shin', 'left foot': 'L foot', 'right upper leg': 'R thigh', 'right lower leg': 'R shin', 'right foot': 'R foot'}
-# objects in the scene: a tiny COCO detector (EfficientDet-Lite0 int8, 4.6 MB), 1 frame per second, only while training
+# objects in the scene: a tiny COCO detector (EfficientDet-Lite0 int8, 4.6 MB), 1 frame per second. ON DEMAND only
+# (TRACK_OBJECTS=1, or ask her: tag_objects.py tags one frame); off by default so a tracking pass stays light
 objdet = None
 try:
+    if os.environ.get('TRACK_OBJECTS') != '1': raise SystemExit
     objdet = vision.ObjectDetector.create_from_options(vision.ObjectDetectorOptions(
         base_options=BaseOptions(model_asset_path=task('efficientdet_lite0.tflite')), running_mode=vision.RunningMode.IMAGE, max_results=6, score_threshold=0.35))
 except SystemExit: objdet = None
@@ -260,7 +262,10 @@ for ts, fr in frames():
             x0, y0 = pts_.min(0) - pad; x1, y1 = pts_.max(0) + pad
             ov_ = im.copy(); cv2.rectangle(ov_, (int(x0), int(y0)), (int(x1), int(y1)), col, -1); cv2.addWeighted(ov_, 0.12, im, 0.88, 0, im)
             cv2.rectangle(im, (int(x0), int(y0)), (int(x1), int(y1)), col, 1)
-            cv2.putText(im, SEG_SHORT[name], (int(x0) + 1, int(y0) + 9), cv2.FONT_HERSHEY_SIMPLEX, 0.3, col, 1, cv2.LINE_AA)
+            lab = SEG_SHORT[name]; (tw, th), _ = cv2.getTextSize(lab, cv2.FONT_HERSHEY_SIMPLEX, 0.36, 1)
+            lx, ly = int(max(0, x0)), int(max(th + 3, y0))
+            cv2.rectangle(im, (lx, ly - th - 3), (lx + tw + 4, ly), (20, 20, 20), -1)
+            cv2.putText(im, lab, (lx + 2, ly - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.36, col, 1, cv2.LINE_AA)
         for a, b in BONES:
             if Wv[-1][a] > 0.3 and Wv[-1][b] > 0.3: cv2.line(im, tuple(Pp[a].astype(int)), tuple(Pp[b].astype(int)), (0, 220, 255), 2, cv2.LINE_AA)
         for k, col in ((0, (80, 255, 120)), (1, (255, 140, 60))):

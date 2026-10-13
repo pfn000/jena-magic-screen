@@ -10,13 +10,13 @@ import * as THREE from 'three';
 
 const DEG = 180 / Math.PI;
 const PARTS = {
-  'left arm': [['leftShoulder', 20], ['leftElbow', 28], ['leftWristUp', 0.35]],
-  'right arm': [['rightShoulder', 20], ['rightElbow', 28], ['rightWristUp', 0.35]],
+  'left arm': [['leftShoulder', 20], ['leftElbow', 28], ['leftHandUp', 0.25]],
+  'right arm': [['rightShoulder', 20], ['rightElbow', 28], ['rightHandUp', 0.25]],
   torso: [['torsoLean', 12], ['torsoLeanSide', 10]],
   head: [['headTilt', 12]],
 };
 const LEGS = ['leftHip', 'rightHip', 'leftKnee', 'rightKnee']; // measured and reported, not scored: her feet stay planted by her own leg IK
-const MAX_TRIES = 3;
+const MAX_TRIES = 4;
 const _v = Array.from({ length: 12 }, () => new THREE.Vector3());
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const angv = (a, b) => a.angleTo(b) * DEG;
@@ -55,6 +55,8 @@ export class SelfCheck {
       m[s + 'WristHead'] = wr[s].distanceTo(head) / sw;
       m[s + 'WristHip'] = wr[s].distanceTo(hp[s]) / sw;
       m[s + 'WristUp'] = t1.subVectors(wr[s], head).dot(upn) / sw;
+      // hand height above HER shoulder over HER arm length: free of body proportions (her head and shoulders are not the performer's)
+      m[s + 'HandUp'] = t1.subVectors(wr[s], sh[s]).dot(upn) / ((el[s].distanceTo(sh[s]) + wr[s].distanceTo(el[s])) || 1e-6);
     }
     m.torsoLean = angv(up, t1.set(0, 1, 0));
     m.torsoLeanSide = Math.asin(Math.max(-1, Math.min(1, upn.dot(t1.set(1, 0, 0))))) * DEG; // her rig faces the camera: +x = HER left
@@ -76,12 +78,15 @@ export class SelfCheck {
     const parts = {}; let worst = null, sum = 0, n = 0;
     for (const [part, list] of Object.entries(PARTS)) {
       let s = 0;
+      let cnt = 0;
       for (const [k, tol] of list) {
+        if (!Number.isFinite(tgt[k]) || !Number.isFinite(mine[k])) continue;   // an older clip without this measurement
+        cnt++;
         const err = tgt[k] - mine[k], e = Math.abs(err) / tol;
         s += Math.exp(-0.5 * e * e);
         if (!worst || e > worst.e) worst = { part, k, err, e };
       }
-      parts[part] = Math.round((s / list.length) * 100);
+      parts[part] = Math.round((s / Math.max(1, cnt)) * 100);
       sum += parts[part]; n++;
     }
     return { parts, overall: Math.round(sum / n), worst };
@@ -94,6 +99,7 @@ export class SelfCheck {
     let what;
     if (/Shoulder$/.test(w.k)) what = `${side} arm ${d}° too ${w.err > 0 ? 'low' : 'high'}`;
     else if (/Elbow$/.test(w.k)) what = `${side} elbow ${d}° too ${w.err > 0 ? 'bent' : 'straight'}`;
+    else if (/HandUp$/.test(w.k)) what = tgt[w.k] > 0.75 && mine[w.k] < 0.5 ? `${side} hand should be up above my head` : `${side} hand ${Math.abs(Math.round(w.err * 90))}° too ${w.err > 0 ? 'low' : 'high'}`;
     else if (/WristUp$/.test(w.k)) what = tgt[w.k] > 0 && mine[w.k] < 0 ? (tgt.leftWristUp > 0 && tgt.rightWristUp > 0 ? 'wrists should be above my head' : `${side} wrist should be above my head`) : `${side} hand too ${w.err > 0 ? 'low' : 'high'}`;
     else if (w.k === 'torsoLean') what = `${w.err > 0 ? 'lean more' : 'stand up straighter'} (${d}°)`;
     else if (w.k === 'torsoLeanSide') what = `lean ${d}° more to my ${w.err > 0 ? 'left' : 'right'}`;
@@ -108,10 +114,10 @@ export class SelfCheck {
   hook(vrm, dt) {
     const p = this.moves.playing;
     if (!p || !p.c.metrics || !(p.w > 0.5)) { if (!p && this.clipId) this.finish(); return; }
-    if (this.clipId !== p.c.id) { this.finish(); this.clipId = p.c.id; this.tries = 0; this.gain = {}; this.first = null; }
+    if (this.clipId !== p.c.id) { this.finish(); this.clipId = p.c.id; this.tries = 0; this.gain = {}; this.first = null; this.passed = null; }
     const H = vrm.humanoid;
-    if (this.offtest) { // induced off pose for testing (?selfcheck=offtest): a steady pull of her left arm ~35° down toward her side, which the correction has to beat
-      const up = H.getNormalizedBoneNode('leftUpperArm'); if (up) up.rotateZ(-0.6);
+    if (this.offtest) { // induced off pose for testing (?selfcheck=offtest): a steady pull of her left arm ~45° down toward her side, which the correction has to beat
+      const up = H.getNormalizedBoneNode('leftUpperArm'); if (up) up.rotateZ(-0.8);
     }
     const tgt = this.target(p);
     if (tgt && Object.values(this.gain).some((g) => g > 0)) {
@@ -132,11 +138,11 @@ export class SelfCheck {
         const errE = (tgt[side + 'Elbow'] - m[side + 'Elbow']) / DEG;
         if (lo && bend.lengthSq() > 1e-4) this.turn(lo, bend.normalize(), -errE * g);
       }
-      if (this.gain.torso) { const sp = H.getNormalizedBoneNode('spine'); const m2 = m; if (sp && m2) sp.rotateZ(((tgt.torsoLeanSide - m2.torsoLeanSide) / DEG) * this.gain.torso * 0.5); }
+      if (this.gain.torso) { const sp = H.getNormalizedBoneNode('spine'); const m2 = m; if (sp && m2) sp.rotateZ(-((tgt.torsoLeanSide - m2.torsoLeanSide) / DEG) * this.gain.torso * 0.5); }
       if (this.gain.head) { const hd = H.getNormalizedBoneNode('head'); if (hd && m) hd.rotateZ(((tgt.headTilt - m.headTilt) / DEG) * this.gain.head * 0.6); }
     }
     this.t += dt;
-    if (this.t < this.every) return;
+    if (this.t < this.every || !(p.w > 0.9)) return;   // score only while the move is fully on (not while it fades in/out)
     this.t = 0;
     const mine = this.measure(vrm); if (!mine || !tgt) return;
     const sc = this.score(mine, tgt), say = this.words(sc, mine, tgt);
@@ -147,11 +153,11 @@ export class SelfCheck {
     if (sc.overall < 85 && this.tries < MAX_TRIES) {
       // fix what's off: each part under 70% gets a stronger pull toward the target, then she checks again
       const fix = Object.entries(sc.parts).filter(([, v]) => v < 70).map(([k]) => k);
-      for (const k of fix) this.gain[k] = Math.min(1, (this.gain[k] || 0) + 0.35);
-      if (fix.length) { this.tries++; this.log(`self-check: ${say} → correcting my ${fix.join(' + ')} (try ${this.tries}/${MAX_TRIES})`); }
-    } else if (this.tries > 0 && !row.reported) {
-      row.reported = true;
-      if (sc.overall >= 85) { this.log(`self-check: ${say} after ${this.tries} correction${this.tries > 1 ? 's' : ''} (was ${this.first.overall}%)`); this.tries = MAX_TRIES + 1; }
+      for (const k of fix) this.gain[k] = Math.min(1, (this.gain[k] || 0) + 0.5);
+      if (fix.length) { this.tries++; this.passed = null; this.log(`self-check: ${say} → correcting my ${fix.join(' + ')} (try ${this.tries}/${MAX_TRIES})`); }
+    } else if (this.tries > 0 && !this.passed && sc.overall >= 85) {
+      this.passed = row;   // report the pass once per move
+      this.log(`self-check: ${say} after ${this.tries} correction${this.tries > 1 ? 's' : ''} (was ${this.first.overall}%)`);
     }
   }
 

@@ -74,7 +74,7 @@ def face_track(B, names):
 # shoulder width so a small and a tall body compare. Angles in degrees.
 METRICS = ['leftShoulder', 'rightShoulder', 'leftElbow', 'rightElbow', 'leftHip', 'rightHip', 'leftKnee', 'rightKnee',
            'leftWristHead', 'rightWristHead', 'leftWristHip', 'rightWristHip', 'leftWristUp', 'rightWristUp',
-           'torsoLean', 'torsoLeanSide', 'headTilt', 'armSymmetry']
+           'leftHandUp', 'rightHandUp', 'torsoLean', 'torsoLeanSide', 'headTilt', 'armSymmetry']
 METRIC_INFO = {
     'leftShoulder': 'left arm raise: angle between upper arm and the line down her side (0 = arm hanging, 90 = straight out, 180 = straight up)',
     'rightShoulder': 'right arm raise (same scale)', 'leftElbow': 'left elbow angle (180 = straight arm, 90 = bent at a right angle)',
@@ -83,6 +83,7 @@ METRIC_INFO = {
     'leftWristHead': 'distance from left wrist to head / shoulder width', 'rightWristHead': 'distance from right wrist to head / shoulder width',
     'leftWristHip': 'distance from left wrist to left hip / shoulder width', 'rightWristHip': 'distance from right wrist to right hip / shoulder width',
     'leftWristUp': 'height of the left wrist above the head / shoulder width (+ = above the head)', 'rightWristUp': 'same for the right wrist',
+    'leftHandUp': 'left hand height above the left shoulder / arm length (-1 = hanging straight down, 0 = level with the shoulder, +1 = straight up); body-proportion free, so it is what her self-check scores', 'rightHandUp': 'same for the right hand',
     'torsoLean': 'how far the torso leans off vertical, degrees', 'torsoLeanSide': 'sideways lean, degrees (+ = toward her left)',
     'headTilt': 'head tilt vs the shoulder line, degrees (+ = toward her left shoulder)', 'armSymmetry': 'left vs right arm match, 0..1 (1 = mirror-equal)'}
 def _ang(a, b, c):
@@ -110,6 +111,7 @@ def metrics(W):
         out[s + 'WristHead'] = np.linalg.norm(wr[s] - head, axis=-1) / sw
         out[s + 'WristHip'] = np.linalg.norm(wr[s] - hp[s], axis=-1) / sw
         out[s + 'WristUp'] = ((wr[s] - head) * upn).sum(-1) / sw
+        out[s + 'HandUp'] = ((wr[s] - sh[s]) * upn).sum(-1) / (np.linalg.norm(el[s] - sh[s], axis=-1) + np.linalg.norm(wr[s] - el[s], axis=-1) + 1e-6)
     out['torsoLean'] = _angv(up, np.array([0, 1.0, 0]))
     out['torsoLeanSide'] = np.degrees(np.arcsin(np.clip((upn * np.array([1.0, 0, 0])).sum(-1), -1, 1)))
     ear = P[:, 7] - P[:, 8]
@@ -148,7 +150,7 @@ def build(path, a=None, b=None):
     clip['finger_layout'] = {'order': [f + j for f in FINGERS for j in (['Metacarpal', 'Proximal', 'Distal'] if f == 'Thumb' else JOINTS)] + ['spread', 'thumbOpposition'], 'scale': 1000, 'unit': 'radians of bend (0 = straight)'}
     clip['face'] = face
     M = metrics(z['world'][i0:i1][:n].astype(float))
-    scale = {k: (100 if ('Wrist' in k or k == 'armSymmetry') else 10) for k in METRICS}
+    scale = {k: (100 if ('Wrist' in k or 'HandUp' in k or k == 'armSymmetry') else 10) for k in METRICS}
     clip['metrics'] = {'names': METRICS, 'scale': [scale[k] for k in METRICS], 'info': METRIC_INFO,
                        'data': [[int(round(float(v) * scale[k])) for v in M[:, j]] for j, k in enumerate(METRICS)]}
     clip['segments'] = meta.get('segments')

@@ -1,0 +1,107 @@
+{
+ "version": 1,
+ "updated": "2026-10-13T20:04:17Z",
+ "about": "Moves Jena learned from videos: whole body + 21-point fingers per hand + face expressions, with true performer left/right (mirrored videos un-mirrored), a low-light retry, normalised body metrics, and her own self-check scores. Each move: <id>.json (her VRM clip) + <id>.gif (tracking preview, <1 MB). Written by her tracking pipeline (moves-pipeline/holistic.py, retarget_full.py).",
+ "moves": [
+  {
+   "id": "macarena",
+   "file": "macarena.json",
+   "gif": "macarena.gif",
+   "kind": "dance",
+   "title": "The Macarena Dance 2022",
+   "source": null,
+   "duration_s": 15.0,
+   "fps": 15.0,
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true,
+    "metrics": true
+   },
+   "sides": "performer",
+   "lighting": "normal",
+   "mirrored": false,
+   "self_check": {
+    "normal": "78% -> 92%",
+    "offtest": "82% -> 94%"
+   },
+   "json_bytes": 156877,
+   "gif_bytes": 163456
+  },
+  {
+   "id": "hip_hop_warmup",
+   "file": "hip_hop_warmup.json",
+   "gif": "hip_hop_warmup.gif",
+   "kind": "dance",
+   "title": "hip_hop_warmup",
+   "source": null,
+   "duration_s": 15.0,
+   "fps": 15.0,
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true,
+    "metrics": true
+   },
+   "sides": "performer",
+   "lighting": "normal",
+   "mirrored": false,
+   "self_check": {
+    "normal": "81% -> 77%",
+    "offtest": "82% -> 86%"
+   },
+   "json_bytes": 155069,
+   "gif_bytes": 166416
+  },
+  {
+   "id": "casual_standing_talk_donna",
+   "file": "casual_standing_talk_donna.json",
+   "gif": "casual_standing_talk_donna.gif",
+   "kind": "talk",
+   "title": "casual_standing_talk_donna",
+   "source": null,
+   "duration_s": 16.47,
+   "fps": 15.0,
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true,
+    "metrics": true
+   },
+   "sides": "performer",
+   "lighting": "normal",
+   "mirrored": false,
+   "self_check": {
+    "normal": "94% -> 97%",
+    "offtest": "95% -> 92%"
+   },
+   "json_bytes": 164427,
+   "gif_bytes": 102815
+  },
+  {
+   "id": "casual_standing_talk_sharon",
+   "file": "casual_standing_talk_sharon.json",
+   "gif": "casual_standing_talk_sharon.gif",
+   "kind": "talk",
+   "title": "casual_standing_talk_sharon",
+   "source": null,
+   "duration_s": 16.47,
+   "fps": 15.0,
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": true,
+    "metrics": true
+   },
+   "sides": "performer",
+   "lighting": "normal",
+   "mirrored": false,
+   "self_check": {
+    "normal": "78% -> 99%",
+    "offtest": "80% -> 99%"
+   },
+   "json_bytes": 129965,
+   "gif_bytes": 88771
+  }
+ ]
+}

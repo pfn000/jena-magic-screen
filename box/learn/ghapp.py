@@ -44,7 +44,7 @@ def commit_files(files, message, branch='main', delete=()):
         if not isinstance(r, dict) or not r.get('sha'): raise RuntimeError(f'blob failed for {path}: {str(r)[:300]}')
         blobs[path] = r['sha']
     for attempt in range(5):
-        ref = data(req('GET', f'/repos/{REPO}/git/ref/heads/{branch}'))
+        ref = data(req('GET', f'/repos/{REPO}/git/refs/heads/{branch}?nocache={time.time_ns()}'))   # the plain ref URL can come back cached (stale head)
         head = ref['object']['sha']
         c = data(req('GET', f'/repos/{REPO}/git/commits/{head}'))
         tree = [{'path': p, 'mode': '100644', 'type': 'blob', 'sha': s} for p, s in blobs.items()] + [{'path': p, 'mode': '100644', 'type': 'blob', 'sha': None} for p in delete]
