@@ -23,5 +23,6 @@
       "box-state": false,
       "jena-memory": false
     }
-  }
+  },
+  "ignoreCommand": "bash ops/vercel-ignore.sh"
 }

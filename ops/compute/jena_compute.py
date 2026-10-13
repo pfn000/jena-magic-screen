@@ -2,7 +2,8 @@
 """One compute-offload job for Jena on a GitHub runner (jena-compute.yml). Writes out/<request_id>.tar.gz and
 out/<request_id>.manifest.json. Jobs:
   move_extract  input: a video URL or blob:<sha> (a clip Tab uploaded); params: start,end,model (e.g. "0,15,full")
-                -> raw/<id>.npz (MediaPipe Pose world landmarks), <id>.json (her VRM move, same retarget as the box), <id>.gif
+                -> raw/<id>.npz (whole body: pose + 21 points per hand + face blendshapes, moves-pipeline/holistic.py),
+                   <id>.json (her VRM move WITH fingers + face, retarget_full.py, true performer left/right), <id>.gif
   mama_session  input: blob:<sha> or URL of a watch-mama session video; params: actions blob sha (optional)
                 -> 320p clips of 10 s + train.jsonl (one row per clip, with the actions that fall inside it)
   model_job     input: URL of a small .onnx; params: "onnx_quantize" -> dynamic int8 .onnx + size/latency check
@@ -41,26 +42,30 @@ if JOB == 'move_extract':
     assert model in ('lite', 'full', 'heavy')
     mp_dir = os.path.join(WORK, 'moves'); os.makedirs(mp_dir + '/tmp'); os.makedirs(mp_dir + '/raw')
     cid = REQ
-    urllib.request.urlretrieve(f'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_{model}/float16/latest/pose_landmarker_{model}.task', f'{mp_dir}/pose_{model}.task')
+    G = 'https://storage.googleapis.com/mediapipe-models'
+    urllib.request.urlretrieve(f'{G}/pose_landmarker/pose_landmarker_{model}/float16/latest/pose_landmarker_{model}.task', f'{mp_dir}/pose_{model}.task')
+    # fingers + face: every move she learns carries them (extract.py was body only, so moves came out with no hands/face)
+    urllib.request.urlretrieve(f'{G}/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task', f'{mp_dir}/hand_landmarker.task')
+    urllib.request.urlretrieve(f'{G}/face_landmarker/face_landmarker/float16/latest/face_landmarker.task', f'{mp_dir}/face_landmarker.task')
     path, src = get_input(f'{mp_dir}/tmp/{cid}.mp4')
     url = src if path is None else 'file:' + src
     if path and start != '-':   # the clip is already cut on the box: start/end are informational
         start = end = '-'
     t1 = time.time()
-    r = sh([sys.executable, 'moves-pipeline/extract.py', cid, url, start, end, model], env={**os.environ, 'MOVES_DIR': mp_dir}, capture_output=True, text=True)
+    vid_arg = path if path else url
+    r = sh([sys.executable, 'moves-pipeline/holistic.py', cid, vid_arg, start, end, model], env={**os.environ, 'MOVES_DIR': mp_dir, 'TRACK_MODELS': mp_dir}, capture_output=True, text=True)
     print(r.stdout[-2000:]); stat = json.loads([l for l in r.stdout.splitlines() if l.startswith('{')][-1])
     extract_s = round(time.time() - t1, 1)
-    sys.path.insert(0, os.path.join(ROOT, 'moves-pipeline')); import retarget, numpy as np
+    sys.path.insert(0, os.path.join(ROOT, 'moves-pipeline')); import retarget, retarget_full, numpy as np
     npz = f'{mp_dir}/raw/{cid}.npz'
     n = len(np.load(npz)['t']); a, b = 0.4, n / retarget.FPS - 0.4
-    out, off, q, info = retarget.analyse(npz, a, b)
-    mv = retarget.to_json(out, off, len(off))
+    mv, q, info, meta = retarget_full.build(npz, a, b)
     json.dump(mv, open(os.path.join(STAGE, cid + '.json'), 'w'), separators=(',', ':'))
     shutil.copy(npz, os.path.join(STAGE, cid + '.npz'))
     try: sh([sys.executable, 'moves-pipeline/preview_gif.py', npz, os.path.join(STAGE, cid + '.gif')], capture_output=True)
     except Exception as e: print('gif failed', e)
     q.pop('ok', None)
-    result = {'extract': stat, 'quality': q, 'title': info.get('title'), 'move_file': cid + '.json', 'frames': mv['frames'], 'duration': mv['duration'],
+    result = {'extract': stat, 'fingers': sorted((mv.get('fingers') or {}).keys()), 'face': bool(mv.get('face')), 'quality': q, 'title': info.get('title'), 'move_file': cid + '.json', 'frames': mv['frames'], 'duration': mv['duration'],
               'extract_cpu_seconds': extract_s, 'runner_cpus': os.cpu_count()}
 elif JOB == 'mama_session':
     vid = os.path.join(WORK, 'session.mp4')
