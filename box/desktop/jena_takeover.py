@@ -20,6 +20,7 @@ FLAG = os.path.join(STATE, 'mama_takeover.json')
 MEMDIR = os.path.join(STATE, 'memory')
 MODE_SH = os.path.join(HOME, 'jenaos', 'mode.sh')
 GRACE_S = 20            # a dropped phone connection keeps portrait this long, so a quick reconnect doesn't flip twice
+PAUSE_GRACE_S = 60      # ...and a dropped timed takeover keeps Jena paused this long; after that the flag clears by itself
 ENV = {**os.environ, 'DISPLAY': DISPLAY}
 
 _lock = threading.RLock()
@@ -288,8 +289,11 @@ def _watch():
                 idle = S['sessions'] == 0
                 if idle and S['drop_at'] and time.time() - S['drop_at'] > GRACE_S:
                     if S['mode'] == 'phone': exit_phone('connection closed')
-                    if time.time() >= S['until'] and S['since']: _finish('closed')
-                    S['drop_at'] = 0 if S['mode'] != 'phone' else S['drop_at']
+                    # no mama connected any more: the pause ends too (a test or a closed tab never leaves her paused);
+                    # a timed (double-click) session gets PAUSE_GRACE_S so a phone that slept can reconnect into it
+                    if S['since'] and (time.time() >= S['until'] or time.time() - S['drop_at'] > PAUSE_GRACE_S):
+                        S['until'] = 0; _finish('closed')
+                    if not S['since']: S['drop_at'] = 0
                 elif idle and S['since'] and S['until'] and time.time() >= S['until']:
                     _finish('time up')
                 elif idle and not S['since'] and S['mode'] == 'phone':
