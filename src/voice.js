@@ -39,6 +39,7 @@ export class Voice {
     const td = new Float32Array(an.fftSize), fd = new Uint8Array(an.frequencyBinCount);
     const binHz = this.ctx.sampleRate / an.fftSize;
     let live = true;
+    const trace = [];
     const tick = () => {
       if (!live) return;
       an.getFloatTimeDomainData(td); an.getByteFrequencyData(fd);
@@ -47,11 +48,15 @@ export class Voice {
       let lo = 0, hi = 0;
       for (let i = 0; i < fd.length; i++) { const f = i * binHz; if (f > 200 && f < 900) lo += fd[i]; else if (f >= 900 && f < 3500) hi += fd[i]; }
       this.avatar.voice = { level: Math.min(1, rms * 5.5), round: lo / (lo + hi + 1) };
+      trace.push(this.avatar.voice.level);
       requestAnimationFrame(tick);
     };
     this.status = 'speaking';
     this.avatar.talk.until = performance.now() + buf.duration * 1000;
     await new Promise((res) => { src.onended = res; src.start(); tick(); });
     live = false; this.avatar.voice = null; this.status = 'idle';
+    // what the lip-sync actually did (dev panel + tests read this): mouth-open level per frame from the audio
+    const open = trace.filter((x) => x > 0.08).length;
+    this.last.lipsync = { frames: trace.length, mouthOpenFrames: open, peak: +Math.max(0, ...trace).toFixed(2), mean: +(trace.reduce((a, b) => a + b, 0) / (trace.length || 1)).toFixed(2), sample: trace.filter((_, i) => i % Math.max(1, Math.floor(trace.length / 24)) === 0).map((x) => +x.toFixed(2)) };
   }
 }

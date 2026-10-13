@@ -115,6 +115,8 @@ export class DevPanel {
     if (this.tab === 'brain') {
       const b = d.health?.brain || {};
       h += `<h3>Brain</h3><p>${okDot(b.online)} <b>${esc(b.name)}</b> — ${esc(b.detail)} · checked ${ago(b.checkedAt)}${b.box ? ` · box ${esc(b.box.url)} announced ${ago(b.box.announcedAt)} via ${esc(b.box.via)}` : ''}</p>`;
+      const vo = window.__jenaVoice;
+      h += `<h3>Voice</h3><p>${vo ? `${vo.on ? '🔊 on' : '🔇 off on this page'} · ${esc(vo.status)} · engine: Piper on her box${vo.last ? ` · last line \u201c${esc(vo.last.text)}\u201d ${vo.last.seconds}s audio, fetched in ${vo.last.fetchMs} ms${vo.last.lipsync ? ` · lip-sync: ${vo.last.lipsync.mouthOpenFrames}/${vo.last.lipsync.frames} frames mouth open, peak ${vo.last.lipsync.peak}` : ''}` : ' · nothing spoken on this page yet'}` : 'voice not loaded'}</p>`;
       if (live) {
         const br = box.brain, last = br.last;
         h += `<p>chain: ${esc(br.primary)} → fallback ${esc(br.fallback)} · ${br.requests} requests since the gateway started · avg ${br.avgMs} ms · errors ${br.errors} · safety-guard replaced ${br.guarded}</p>`;
