@@ -209,16 +209,17 @@ export function openSignin(req) {
   let rfb = null, timer = null, until = 0;
   const close = () => { clearInterval(timer); try { rfb?.disconnect(); } catch {} w.remove(); };
   w.querySelector('.si-x').onclick = close;   // the window on her box keeps running until Done or 10 min; reopen from the card
-  const call = (op, pass) => (req.link ? linkSignin(op, req.link) : mamaSignin(op, { id: req.id }, pass || key()));
+  const useLink = !!req.link && !key();   // mama with her passcode on this device always takes over her real desktop
+  const call = (op, pass) => (useLink ? linkSignin(op, req.link) : mamaSignin(op, { id: req.id }, pass || key()));
   const go = async (pass) => {
     form.querySelector('button').disabled = true; st.textContent = 'opening…';
     // mama (passcode on this device): sign in right on Jena's own desktop through a takeover. She sees it raw;
     // Jena's hands pause; only the public/OBS view gets the lock card meanwhile. The one-use link keeps the old window.
-    const d = req.link ? await call('start', pass) : await takeoverFor(pass || key());
+    const d = useLink ? await call('start', pass) : await takeoverFor(pass || key());
     if (!d.ok) {
       form.querySelector('button').disabled = false; st.textContent = '';
       form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open';
-      if (req.link) { form.querySelector('input').remove(); form.querySelector('button').remove(); }
+      if (useLink) { form.querySelector('input').remove(); form.querySelector('button').remove(); }
       else { form.querySelector('input').hidden = false; form.querySelector('button').hidden = false; form.querySelector('input').focus(); }
       return;
     }
@@ -232,7 +233,7 @@ export function openSignin(req) {
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
   form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
-  if (req.link || key()) { form.querySelector('p').textContent = req.link ? 'Opening Jena\'s browser on a private screen only you can see…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
+  if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser on a private screen only you can see…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
   else form.querySelector('input').focus();
   // phone keyboard: a hidden input forwards what mama types as key presses (never stored anywhere)
   kbBtn.onclick = () => { kbIn.focus(); };
@@ -248,8 +249,8 @@ export function openSignin(req) {
   doneBtn.onclick = async () => {
     doneBtn.disabled = true; st.textContent = 'saving her session (closing Firefox)…';
     try { rfb?.disconnect(); } catch {}
-    const r = req.link ? await call('done') : { ok: true, request: { note: 'her own browser keeps the session (same Firefox profile)' } };
-    if (!req.link) mamaSignin('cancel', { id: req.id }).catch(() => {});   // the ask is handled: clear its card
+    const r = useLink ? await call('done') : { ok: true, request: { note: 'her own browser keeps the session (same Firefox profile)' } };
+    if (!useLink) mamaSignin('cancel', { id: req.id }).catch(() => {});   // the ask is handled: clear its card
     st.textContent = r.ok ? 'done ✓' : (r.summary || r.error || 'failed');
     screen.innerHTML = `<p style="padding:20px;color:#fff">${r.ok ? '✓ Closed. Her browser saved the session and went back to her desktop.<br><small>' + esc(r.request?.note || '') + '</small>' : esc(r.summary || r.error || 'failed')}</p>`;
     clearInterval(timer); setTimeout(close, 6000);
