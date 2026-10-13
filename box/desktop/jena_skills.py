@@ -106,7 +106,7 @@ def listing():
     skills = []
     for n, s in load().items():
         skills.append({'name': n, 'description': s.get('description'), 'source': s.get('source'), 'kind': s.get('kind', 'script'), 'status': s.get('status'),
-                       'needs': s.get('needs', []), 'triggers': s.get('triggers', []), **st.get(n, {'runs': 0, 'ok': 0, 'fail': 0})})
+                       'needs': s.get('needs', []), 'triggers': s.get('triggers', []), 'validation': s.get('validation'), 'made_by': s.get('made_by'), **st.get(n, {'runs': 0, 'ok': 0, 'fail': 0})})
     return {'skills': skills, 'mcp': mcp_cache['servers'] or None, 'mcp_checked_at': int(mcp_cache['at'] * 1000) or None}
 
 TEMPLATE = """import os, sys, json, re, urllib.request, urllib.parse
