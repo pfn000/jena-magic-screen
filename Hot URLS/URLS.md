@@ -12,3 +12,4 @@
 - https://colab.research.google.com/
 - https://gitlab.com/evlaV/holo-PKGBUILD [ yes for installing and running SteamOS on this system ]
 - https://open-design.ai/ [ for coding ]
+- https://x.com/ [ yes this is social media please dont make me regret giving you this ]
