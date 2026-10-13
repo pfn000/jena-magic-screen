@@ -27,6 +27,13 @@ def learn(r):
     import numpy as np, retarget
     cid = re.sub(r'[^\w-]', '_', r['id'])[:40]
     start, end = float(r.get('start', 0)), float(r.get('end', 15))
+    if r['url'].startswith('ytsearch'):
+        # a search: find the real video first, so the clip always names the exact video it came from
+        status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='searching YouTube')
+        s = subprocess.run(['yt-dlp', '--no-warnings', '--flat-playlist', '--print', '%(id)s\t%(title)s', r['url']], capture_output=True, text=True, timeout=90)
+        line = (s.stdout.strip().splitlines() or [''])[0].split('\t')
+        if len(line[0]) != 11: return {'ok': False, 'id': cid, 'reasons': ['YouTube search found nothing usable'], 'url': r['url']}
+        r = {**r, 'url': f'https://www.youtube.com/watch?v={line[0]}', 'search': r['url'], 'found_title': line[1] if len(line) > 1 else None}
     status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='downloading + tracking')
     os.makedirs(os.path.join(WORK, 'raw'), exist_ok=True)
     task = os.path.join(WORK, 'pose_full.task')
@@ -52,7 +59,7 @@ def learn(r):
     os.chmod(os.path.join(LEARNED, cid + '.json'), 0o664)
     return {'ok': True, 'clip': dict(id=cid, file=cid + '.json', label=r.get('label') or cid, what=r.get('what') or 'someone moving', kind=r.get('kind') or 'dance',
             moods=r.get('moods') or ['happy', 'neutral'], duration=j['duration'], mirror=True, learned_on_box=True, learned_at=int(time.time() * 1000),
-            source=dict(url=info.get('webpage_url') or r['url'], title=info.get('title'), channel=info.get('channel') or info.get('uploader'), start=start, end=end),
+            source=dict(url=info.get('webpage_url') or r['url'], title=info.get('title') or r.get('found_title'), channel=info.get('channel') or info.get('uploader'), start=start, end=end, search=r.get('search')),
             quality=dict(jitter=q['jitter'], legs_visible=q['vis_legs'], limb_stability=round(1 - q['bone_cv'], 3)))}
 
 def main():
