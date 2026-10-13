@@ -85,10 +85,13 @@ for a, b in zip(ts, ts[1:]):
 if ts and time.time() * 1000 - ts[-1] > 20 * 60000: an.append(f'SILENT NOW: nothing from her since {hm(ts[-1])}')
 CLAIM = re.compile(r"\b(1[89]\d\d|20\d\d)\b|\b\d+\s?%|\$\s?\d|\b\d+-\d+\b(?! ?min)|\byou (told|said)\b|\bi remember\b|\byour \w+'?s name is\b|\bborn in\b|\b(won|beat|scored)\b", re.I)
 HEDGE = re.compile(r"idk|not sure|search|look it up|don.?t know|no clue|can.?t know|mama (made|built) me in october 2026", re.I)
+claims = {}
 for r in replies:
     t = r.get('reply') or ''
-    if CLAIM.search(t) and not HEDGE.search(t) and (r.get('routed') not in ('search', 'web', 'grok')):
-        an.append(f"CHECK CLAIM {hm(r['ts'])} (no source in reach): \"{cut(t, 110)}\" ← \"{cut(r.get('user', ''), 50)}\"")
+    if CLAIM.search(t) and not HEDGE.search(t) and (r.get('routed') not in ('search', 'web', 'grok', 'mama_fact')):   # mama_fact = a fact mama taught her (sourced)
+        k = norm(t); claims.setdefault(k, [r, 0]); claims[k][1] += 1
+for r, n in claims.values():
+    an.append(f"CHECK CLAIM {hm(r['ts'])}{f' ×{n}' if n > 1 else ''} (routed {r.get('routed') or 'chat'}, no source in reach): \"{cut(r.get('reply', ''), 110)}\" ← \"{cut(r.get('user', ''), 50)}\"")
 odd = [r for r in replies if (r.get('user') or '').lower().startswith(('no,', 'no ', 'wrong')) ]
 for r in odd[-3:]: an.append(f"CORRECTION from someone {hm(r['ts'])}: \"{cut(r.get('user', ''), 60)}\" → she said \"{cut(r.get('reply', ''), 80)}\"")
 site = [r for r in inc if r['unit'] == 'site']
