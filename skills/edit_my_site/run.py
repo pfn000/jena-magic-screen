@@ -23,8 +23,14 @@ def lum(rgb):
 def contrast(a, b):
     la, lb = lum(a), lum(b); return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
+PAIRS = [('"', '"'), ('“', '”'), ("'", "'"), ('‘', '’'), ('`', '`'), ('“', '"'), ('"', '”')]
 def parse(t):
-    m = re.search(r'\b(?:change|replace|swap)\s+' + Q + r'(.{1,400}?)' + Q + r'\s+(?:to|with|into|for)\s+' + Q + r'(.{0,400}?)' + Q + r'(?=\s|$|[.,!;:)])', t, re.S | re.I)
+    best = None
+    for a, b in PAIRS:
+        for c, d in PAIRS:
+            m = re.search(r'\b(?:change|replace|swap)\s+' + re.escape(a) + r'(.{1,400}?)' + re.escape(b) + r'\s+(?:to|with|into|for)\s+' + re.escape(c) + r'(.{0,400}?)' + re.escape(d) + r'(?=\s|$|[.,!;:])', t, re.S | re.I)
+            if m and (best is None or m.start() < best.start() or (m.start() == best.start() and len(m.group(0)) > len(best.group(0)))): best = m
+    m = best
     if not m: return None
     f = re.search(r'\bin\s+((?:src/)?[\w-]+\.(?:js|css|html))\b', t[m.end():], re.I)
     why = re.search(r'\b(?:because|so that|since|why:)\s+(.{3,300})', t[m.end():], re.I | re.S)
