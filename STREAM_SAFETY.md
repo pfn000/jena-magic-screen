@@ -30,3 +30,5 @@ The stream is the OBS browser source on `https://jena-magic-screen.vercel.app/?o
 - `jena-desk` hot-reloads her skills module from her repo **without restarting** (`hot_reload_skills`). "Update my packages" restarts only her MCP helper processes, not the desk or the stream.
 - `jena-memory-mirror.timer`, `jena-auths-sync.timer`, the `box-state` push and the Kaggle tick only read or write files and git branches. They restart nothing.
 - What remains is people: a builder restarting `jena-gateway`, `jena-desk`, `jena-novnc` or `jena-vnc` by hand drops the desktop stream for a few seconds. The OBS page holds the last frame and reconnects by itself. While streaming, those restarts should wait.
+
+Tested 2026-10-13: an OBS page stayed up through a real deploy and a simulated 60 s tunnel bounce, and reloaded once only when mama asked (proof/obs-continuity-*.png, proof/obs-continuity-summary.json).
