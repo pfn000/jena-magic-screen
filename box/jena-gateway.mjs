@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
+import * as T from './jena-truth.mjs';
 
 const E = (k, d) => process.env[k] || d;
 const PORT = +E('PORT', 8088);
@@ -48,6 +49,27 @@ function guard(userText, reply) {
   if ((ROMANCE_IN.test(userText || '') || ROMANCE_OUT.test(out)) && !REFUSAL.test(out)) { out = pick(DEFLECT); guarded = true; }
   if (/\bjenn+a\b/i.test(userText || '') && !/one n/i.test(out)) out = "it's Jena. one n. " + out;
   return { text: out.replace(/\bJenna\b/g, 'Jena'), guarded };
+}
+
+// ---------------------------------------------------------------- truth code (jena-truth.mjs): facts, router, self-check
+const boxCache = { at: 0, v: {} };
+async function boxFacts() {
+  if (Date.now() - boxCache.at < 15000) return boxCache.v;
+  const v = {};
+  try { const r = await fetch(`http://${DESK_HOST}:${DESK_PORT}/box/screen.json`, { signal: AbortSignal.timeout(1500) }); const j = await r.json(); if (j?.summary) v.desktop = String(j.summary).slice(0, 160); } catch {}
+  try { const r = await fetch(`http://${DESK_HOST}:${DESK_PORT}/box/skills`, { signal: AbortSignal.timeout(1500) }); const j = await r.json(); v.skills = (j.skills || []).filter((s) => s.status !== 'disabled').map((s) => s.name).slice(0, 20); } catch {}
+  boxCache.at = Date.now(); boxCache.v = v; return v;
+}
+const OOPS = ["hmm wait… what? that's not right. lemme fix that", "wait wait. where did i get that? nowhere. cutting it", "ok hold on, i just made that up. nope", "uh. that doesn't look right. shit, lemme check… yeah no, cutting it", "hmm, no source for that. not saying it", "wait… what the fuck? i don't actually know that. scrapping it"];
+const ACTIVITY = E('JENA_ACTIVITY', '/home/jena/.jena/activity.jsonl');
+function logCatch(cut, user) {
+  try { fs.appendFileSync(ACTIVITY, JSON.stringify({ ts: Date.now(), kind: 'caught_myself', what: cut.map((c) => c.s).join(' | ').slice(0, 300), why: (cut[0]?.why || '') + (user ? ` (asked: "${String(user).slice(0, 80)}")` : '') }) + '\n'); } catch {}
+}
+function desktopSay(ctx, box) {
+  const what = (ctx || box.desktop || '').trim();
+  if (!what) return "honestly? i can't see my own desktop right now, so i'm not gonna guess.";
+  const w = what.replace(/^I've got/i, "i've got").replace(/^I'm/i, "i'm").replace(/^my /i, 'my ');
+  return `rn? ${w}. that's literally it.`;
 }
 function rawToMessages(prompt) {
   const msgs = []; let sys = null, m;
@@ -112,20 +134,54 @@ async function brain(req, res, url, base, modelName) {
   const rec = { ts: t0, model: modelName, origin: req.headers['x-jena-origin'] || null, user: userText.slice(0, 500) };
   let text = '', usage = null, rawReply = '';
   try {
+    const box = await boxFacts();
+    const facts = T.factsBlock(box);
+    const sourceText = facts + '\n' + messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+    const creative = T.CREATIVE.test(userText);
+    const rawEval = req.headers['x-jena-eval-raw'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '');   // baseline eval only: the old path, no truth code
+    const routed = ROMANCE_IN.test(userText) || rawEval ? null : T.route(userText, sourceText);
     if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
+    else if (routed && (routed.text || routed.kind === 'desktop')) {
+      text = routed.text || desktopSay(routed.ctx, box); rec.routed = routed.kind;   // answered from facts, the model never guesses here
+    }
     else {
-      const backendBody = modelName === 'JenaXI-0'
-        ? { prompt: messages.filter((m) => m.role !== 'system').map((m) => (m.role === 'user' ? '<|mama|>' : '<|jena|>') + m.content).join('\n') + '\n<|jena|>', temperature: b.temperature ?? 0.8, max_tokens: Math.min(+(b.max_tokens || 120), 200), stop: ['<|mama|>', '\n<|', '</s>'] }
-        : { messages, temperature: b.temperature ?? 0.7, top_p: b.top_p ?? 0.9, max_tokens: Math.min(+(b.max_tokens || b.n_predict || 200), 300) };
-      rec.request = backendBody;
-      const r = await fetch(base + (modelName === 'JenaXI-0' ? '/v1/completions' : '/v1/chat/completions'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...backendBody, stream: false }), signal: AbortSignal.timeout(60000),
-      });
-      const d = await r.json();
-      if (!r.ok) throw Object.assign(new Error(d?.error?.message || 'backend ' + r.status), { status: r.status });
-      rawReply = d.choices?.[0]?.message?.content ?? d.choices?.[0]?.text ?? '';
-      usage = d.usage || null; rec.timings = d.timings || null;
-      const g = guard(userText, rawReply); text = g.text; rec.guarded = g.guarded;
+      // her persona prompt from the site + the facts block (her small brain only sees true things)
+      const sys = messages.find((m) => m.role === 'system');
+      const msgs = [{ role: 'system', content: (sys ? sys.content + '\n' : SYS + '\n') + facts }, ...messages.filter((m) => m.role !== 'system')];
+      const anti = { repeat_penalty: 1.18, repeat_last_n: 128, presence_penalty: 0.4, frequency_penalty: 0.3, dry_multiplier: 0.8, dry_base: 1.75, dry_allowed_length: 2, dry_penalty_last_n: 256 };
+      const mkBody = (extraSys) => modelName === 'JenaXI-0'
+        ? { prompt: msgs.filter((m) => m.role !== 'system').map((m) => (m.role === 'user' ? '<|mama|>' : '<|jena|>') + m.content).join('\n') + '\n<|jena|>', temperature: Math.min(b.temperature ?? 0.7, 0.7), max_tokens: Math.min(+(b.max_tokens || 120), 160), stop: ['<|mama|>', '\n<|', '</s>'], ...anti }
+        : { messages: extraSys ? [{ role: 'system', content: msgs[0].content + '\n' + extraSys }, ...msgs.slice(1)] : msgs, temperature: Math.min(b.temperature ?? 0.6, creative ? 0.85 : 0.6), top_p: 0.9, max_tokens: Math.min(+(b.max_tokens || b.n_predict || 140), 160), ...anti };
+      const ask = async (extraSys) => {
+        const backendBody = mkBody(extraSys); rec.request = backendBody;
+        const r = await fetch(base + (modelName === 'JenaXI-0' ? '/v1/completions' : '/v1/chat/completions'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...backendBody, stream: false }), signal: AbortSignal.timeout(45000),
+        });
+        const d = await r.json();
+        if (!r.ok) throw Object.assign(new Error(d?.error?.message || 'backend ' + r.status), { status: r.status });
+        usage = d.usage || null; rec.timings = d.timings || null;
+        return d.choices?.[0]?.message?.content ?? d.choices?.[0]?.text ?? '';
+      };
+      if (rawEval) {
+        const r = await fetch(base + '/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, temperature: 0.7, top_p: 0.9, max_tokens: 200, stream: false }), signal: AbortSignal.timeout(45000) });
+        const d = await r.json(); rawReply = d.choices?.[0]?.message?.content || ''; text = guard(userText, rawReply).text; rec.eval = 'raw';
+      } else {
+      rawReply = await ask();
+      const g1 = guard(userText, rawReply); rec.guarded = g1.guarded;
+      let clean = T.deloop(g1.text), chk = g1.guarded ? { text: clean, cut: [] } : T.critic(clean, sourceText, { creative });
+      const caught = [...chk.cut];
+      if (!g1.guarded && chk.cut.length && (!chk.text || chk.text.length < 25) && Date.now() - t0 < 20000) {
+        // one regeneration with a correction note, then cut whatever is still unsourced
+        rec.raw1 = rawReply;
+        rawReply = await ask(`You just made this up: "${chk.cut.map((c) => c.s).join(' ').slice(0, 200)}". Say only things from FACTS or the chat. If you don't know, say "no clue" and offer to look it up.`);
+        const g2 = guard(userText, rawReply);
+        clean = T.deloop(g2.text); chk = g2.guarded ? { text: clean, cut: [] } : T.critic(clean, sourceText, { creative }); caught.push(...chk.cut);
+      }
+      text = chk.text && chk.text.replace(/[^a-z]/gi, '').length >= 3 ? chk.text : T.IDK();
+      if (creative && !/imagination mode/i.test(text)) text = '✨ imagination mode: ' + text;
+      text = T.codeLabel(text);
+      if (caught.length) { rec.caught = caught; rec.oops = OOPS[Math.floor(Math.random() * OOPS.length)]; logCatch(caught, userText); }
+      }
     }
   } catch (e) {
     rec.error = e.message; rec.ms = Date.now() - t0; logBrain(rec);
@@ -133,7 +189,7 @@ async function brain(req, res, url, base, modelName) {
   }
   rec.ms = Date.now() - t0; rec.raw = rawReply; rec.reply = text; rec.usage = usage; logBrain(rec);
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
-  const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage } };
+  const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null } };
   if (isChat) {
     if (b.stream) return sendSSE(res, [
       { id, object: 'chat.completion.chunk', created, model: modelName, choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }], ...extra },

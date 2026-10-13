@@ -39,9 +39,26 @@ def transcribe(data):
     dur = len(audio) / 16000.0
     if dur > MAX_SECS: return None, dur, None
     if dur < 0.3: return '', dur, None
-    segs, info = model.transcribe(audio, beam_size=1, vad_filter=True, condition_on_previous_text=False, language=None)
+    # bias whisper toward her name + "mama" (it heard "Hi Jena" as "AI Jena" without this)
+    segs, info = model.transcribe(audio, beam_size=1, vad_filter=True, condition_on_previous_text=False, language=None,
+                                  initial_prompt=PROMPT, hotwords=HOTWORDS)
     text = ' '.join(s.text.strip() for s in segs).strip()
-    return text, dur, info.language
+    if text.strip(' .,!?').lower() == PROMPT.strip(' .,!?').lower() and dur < 1.0: text = ''  # prompt echoed on silence
+    return fix_name(text), dur, info.language
+
+PROMPT = 'Hi Jena, this is mama.'
+HOTWORDS = 'Jena mama'
+# common mishears of her name; "AI"/"Hey I" -> "Hi" only right before her name
+_NAME = r"(?:Jena|Jenna|Jennah|Gena|Gina|Jeena|Jina|Gena|Jenah|Djena)"
+def fix_name(t):
+    if not t: return t
+    t = re.sub(r"\b(?:AI|A\.I\.|Ai|ai|Hey I|Hi I|I)[,]?\s+(?=" + _NAME + r"\b)", 'Hi ', t)
+    t = re.sub(r"\b(?:Hi|Hey|Hello|Bye|Thanks|Okay|OK|Yo),?\s+" + _NAME + r"\b", lambda m: m.group(0).rsplit(None, 1)[0] + ' Jena', t)
+    t = re.sub(r"^(?:Hi |Hey )?Ai[- ]?(?:chan|jan|gena|jena)\b", 'Hi Jena', t, flags=re.I)  # "Hi Jena" heard as "Ai-chan"
+    t = re.sub(r"^" + _NAME + r"\b", 'Jena', t)                 # start of phrase
+    t = re.sub(r"\b" + _NAME + r"(?=[,!?])", 'Jena', t)        # addressing her: "..., Jenna?"
+    t = re.sub(r"\b(?:Jenna|Jennah|Jeena|Jenah|Djena)\b", 'Jena', t)   # never anyone else's name here
+    return t
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
