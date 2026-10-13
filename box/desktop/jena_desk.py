@@ -561,7 +561,10 @@ def hands():
             with lock:
                 if events_in: ev = events_in.popleft()
             unstick()
-            if ev and ev.get('skill'):
+            if ev and ev.get('show_url'):
+                log_activity('open', ev['show_url'], ev.get('why', ''))
+                firefox(ev['show_url']); time.sleep(3); scroll_some()
+            elif ev and ev.get('skill'):
                 use_skill(ev['skill'], ev.get('text', ''))
             elif ev:
                 text = ev.get('text', '')
@@ -774,6 +777,31 @@ async def client(reader, writer):
                 out = json.dumps(res).encode()
         except Exception as e:
             out = json.dumps({'ok': False, 'summary': str(e)[:200]}).encode()
+    elif p == '/box/skills/auto' and method == 'POST':
+        # the site asks first: does this message need one of her skills? script skills run now so her brain
+        # answers from real results; desktop skills (ask_grok, explore_my_box) are queued for her hands
+        try:
+            b = json.loads(body or b'{}'); text = str(b.get('text', ''))[:500]
+            u = url_in(text); name = skills.match(text)
+            if name and u and name not in ('fetch_page', 'ask_grok'): name = None
+            spec = skills.load().get(name, {}) if name else {}
+            if not name: out = json.dumps({'name': None}).encode()
+            elif spec.get('kind') == 'desktop':
+                with lock: events_in.append({'text': text, 'user': b.get('user'), 'ts': time.time(), 'skill': name})
+                out = json.dumps({'name': name, 'queued': True, 'ok': True, 'summary': 'queued on her desktop'}).encode()
+            else:
+                did(f'using skill: {name}', 'skill')
+                res = await asyncio.get_running_loop().run_in_executor(None, skills.run, name, {'text': text, 'query': text, 'question': text, 'url': u or ''})
+                did(f'{name}: {res.get("summary", "")[:180]}{"" if res.get("ok") else " (failed)"}', 'skill')
+                items = (res.get('hits') or res.get('repos') or [])[:4]
+                facts = res.get('summary', '') + ''.join(f' | {x.get("title") or x.get("name") or ""} {x.get("url", "")} {str(x.get("about") or x.get("snippet") or "")[:100]}' for x in items)
+                if name == 'fetch_page': facts += ' | ' + str(res.get('text', ''))[:600]
+                url = items[0].get('url') if items else res.get('url') if name == 'fetch_page' else None
+                if res.get('ok') and url and safe(url):
+                    with lock: events_in.append({'show_url': url, 'why': f'{name}: {text[:80]}', 'ts': time.time()})
+                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'ms': res.get('ms')}).encode()
+        except Exception as e:
+            out = json.dumps({'name': None, 'error': str(e)[:200]}).encode()
     elif p == '/box/skills/create' and method == 'POST':
         try:
             b = json.loads(body or b'{}')

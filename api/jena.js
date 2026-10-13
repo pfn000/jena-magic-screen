@@ -120,7 +120,16 @@ async function think(req) {
   };
   const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
   // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
-  const toDesk = input.message ? boxLink().then((bx) => bx && fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) })).catch(() => null) : null;
+  // a message that matches one of her skills runs that skill on her box FIRST, and her brain answers from what it found
+  let toDesk = null;
+  if (input.message) {
+    const bx = await boxLink().catch(() => null);
+    if (bx) {
+      const sk = await fetch(bx.url + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null);
+      if (sk?.name) input.skill = sk;
+      else toDesk = fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) }).catch(() => null);
+    }
+  }
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {

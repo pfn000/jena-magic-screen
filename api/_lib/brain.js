@@ -136,8 +136,9 @@ function describe(input) {
     const a = input.attachment;
     return `${input.user || 'mama'} dropped a file on you: "${a.name}" (${a.type || 'unknown type'}, ${Math.round((a.size || 0) / 1024)} KB).${input.message ? ' Note: ' + input.message : ''}`;
   }
+  const found = input.skill?.ok && input.skill.facts ? `\n[your skill ${input.skill.name} really found this, use only these facts and links, say you found it with ${input.skill.name}, do not claim you made it: ${input.skill.facts}]` : '';
   const where = input.source === 'twitch' ? `Twitch chat (#${input.channel || '?'})` : input.source === 'dm' ? 'a PRIVATE message (not on stream)' : 'the stage chat box';
-  return `[${where}] ${input.user || 'someone'}: ${input.message}`;
+  return `[${where}] ${input.user || 'someone'}: ${input.message}${found}`;
 }
 
 // What JenaXI-0 was trained on: "<|mama|>hi jena\n<|jena|>HEY MAMA…"
@@ -179,6 +180,7 @@ export async function* thinkEvents(input) {
     yield { type: 'done' };
     return;
   }
+  if (input.skill) yield { type: 'step', kind: 'tool', text: input.skill.queued ? `using skill: ${input.skill.name} (on her desktop, results show there)` : `using skill: ${input.skill.name} → ${input.skill.ok ? input.skill.summary : 'failed: ' + input.skill.summary}` };
   const chatMode = p.format === 'chat';
   const ask = (base, model) => fetch(`${base}/${chatMode ? 'chat/completions' : 'completions'}`, {
     method: 'POST',
@@ -238,7 +240,16 @@ export async function* thinkEvents(input) {
       if (a) yield { type: 'action', name: a[1], args: a[2] ? [a[2]] : [] };
     } else said.push(v);
   }
-  const { text, events } = extractTags(said.join(' '));
+  // nothing fake: a link she "remembers" that no real source gave her is removed, and the chain says so
+  const real = `${input.message || ''} ${input.skill?.facts || ''}`;
+  let invented = 0;
+  const cleaned = said.join(' ').replace(/<?(https?:\/\/[^\s<>)\]]+)>?/g, (m, u) => {
+    const bare = u.replace(/[.,!?;:]+$/, '');
+    if (real.includes(bare) || real.includes(bare.replace(/\/$/, ''))) return bare;
+    invented++; return '[link removed]';
+  });
+  if (invented) yield { type: 'step', kind: 'status', text: `removed ${invented} link${invented > 1 ? 's' : ''} she made up (not from her search or your message)` };
+  const { text, events } = extractTags(cleaned);
   for (const e of events) yield e;
   if (text) yield { type: 'say', text: text.slice(0, 600) };
   else yield { type: 'status', text: 'JenaXI answered with nothing this time' };
