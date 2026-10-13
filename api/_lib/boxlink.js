@@ -9,7 +9,7 @@ MCowBQYDK2VwAyEAU/JpOGBM0RZu/cbdJ+5fzLNuHJJY9q9T0jtdFlahJLU=
 -----END PUBLIC KEY-----`;
 export const BOX_TOPIC = 'jena-magic-screen-box-ad4fcbe133af';
 const URL_OK = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
-const FRESH_MS = 30 * 60 * 1000; // the box re-announces every 2 min while it is reachable
+const FRESH_MS = 12 * 3600 * 1000; // the box POSTs every 2 min; the relay gets it on every URL change / 20 min, and keeps 12 h
 let latest = null, polledAt = 0, polling = null;
 const key = crypto.createPublicKey(BOX_PUBKEY);
 
@@ -31,7 +31,7 @@ export function accept(env) {
 
 async function poll() {
   try {
-    const r = await fetch(`https://ntfy.sh/${BOX_TOPIC}/json?poll=1&since=45m`, { signal: AbortSignal.timeout(4000) });
+    const r = await fetch(`https://ntfy.sh/${BOX_TOPIC}/json?poll=1&since=12h`, { signal: AbortSignal.timeout(4000) });
     const txt = await r.text();
     for (const line of txt.trim().split('\n')) {
       try { const m = JSON.parse(line); if (m.event === 'message') accept({ ...JSON.parse(m.message), via: 'relay' }); } catch {}

@@ -377,6 +377,7 @@ async function status() {
 
 // ---------------------------------------------------------------- tunnel announce (signed) + self-check
 const tunnel = { url: null, since: null, lastCheck: null, announced: null, fails: 0 };
+const RELAY_STATE = E('JENA_RELAY_STATE', '/tmp/jena-relay-state.json');
 let key = null; try { key = crypto.createPrivateKey(fs.readFileSync(KEYFILE)); } catch (e) { console.log('no box key, announcing disabled:', e.message); }
 function signed(payload) {
   const msg = JSON.stringify(payload);
@@ -387,7 +388,13 @@ async function announce() {
   const env = signed({ url: tunnel.url, ts: Date.now(), boot: BOOT });
   const out = {};
   try { const r = await fetch(`${SITE}/api/box`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(env), signal: AbortSignal.timeout(10000) }); out.site = r.status; } catch (e) { out.site = e.message; }
-  if (TOPIC) { try { const r = await fetch(`https://ntfy.sh/${TOPIC}`, { method: 'POST', body: JSON.stringify(env), signal: AbortSignal.timeout(10000) }); out.relay = r.status; } catch (e) { out.relay = e.message; } }
+  // the public relay (ntfy.sh) caps a free IP at ~250 messages/day: post only when the URL changed or every 20 min
+  // (a refused post, e.g. 429, is retried in ~6 min, not every 2)
+  // (state kept across gateway restarts), so cold site instances can always read it back (they poll the last 12 h)
+  const rs = (() => { try { return JSON.parse(fs.readFileSync(RELAY_STATE, 'utf8')); } catch { return {}; } })();
+  if (TOPIC && (rs.url !== tunnel.url || Date.now() - (rs.at || 0) > 20 * 60000)) {
+    try { const r = await fetch(`https://ntfy.sh/${TOPIC}`, { method: 'POST', body: JSON.stringify(env), signal: AbortSignal.timeout(10000) }); out.relay = r.status; try { fs.writeFileSync(RELAY_STATE, JSON.stringify(r.ok ? { url: tunnel.url, at: Date.now() } : { ...rs, at: Date.now() - 14 * 60000 })); } catch {} } catch (e) { out.relay = e.message; }
+  } else out.relay = `skipped (posted ${Math.round((Date.now() - (rs.at || 0)) / 60000)} min ago)`;
   tunnel.announced = { at: Date.now(), ...out };
 }
 function readTunnelUrl() {

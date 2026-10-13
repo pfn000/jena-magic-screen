@@ -87,7 +87,17 @@ export class Desktop {
   wantsMama() { return !OBS && qs.get('public') !== '1' && !!localStorage.getItem('jena.dmKey'); }
 
   setUrl(url, first = false) {
-    const base = boxBase(url);
+    // the site can briefly forget her box's address (a cold server instance): keep using the last one that worked
+    // and look again every 10 s, instead of sitting on "asleep" while she is busy on her desktop
+    let base = boxBase(url);
+    if (!base) {
+      base = boxBase(localStorage.getItem('jena.lastBox'));
+      clearTimeout(this.cfgTimer);
+      this.cfgTimer = setTimeout(async () => {
+        const c = await fetch('/api/config', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+        this.setUrl(c?.desktopUrl || null);
+      }, 10000);
+    }
     if (!first && base === this.base) return;
     this.base = base;
     this.url = url;
@@ -135,7 +145,7 @@ export class Desktop {
     rfb.viewOnly = true; rfb.scaleViewport = true; rfb.resizeSession = false; rfb.focusOnClick = false; rfb.showDotCursor = true;   // her cursor is drawn into the picture by the box too
     rfb.background = '#000';
     this.rfb = rfb;
-    rfb.addEventListener('connect', () => { this.mamaOk = Date.now(); this.awake(); });
+    rfb.addEventListener('connect', () => { this.mamaOk = Date.now(); try { localStorage.setItem('jena.lastBox', this.base); } catch {} this.awake(); });
     rfb.addEventListener('disconnect', () => {
       if (this.rfb !== rfb) return;
       this.rfb = null;
@@ -201,6 +211,7 @@ export class Desktop {
         this.front = 1 - this.front;
         this.frames++;
         this.lastShown = Date.now();
+        if (this.frames % 20 === 1) try { localStorage.setItem('jena.lastBox', this.base); } catch {}
         const now = performance.now();
         this.shown = this.shown.filter((t) => now - t < 10000); this.shown.push(now);
         const fw = back.naturalWidth, fh = back.naturalHeight;
