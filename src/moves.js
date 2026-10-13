@@ -335,7 +335,9 @@ export class Moves {
       const h = p.c.fingers[side];
       if (!h) continue;
       if ((side === 'left' && A.wave?.side === 'left') || (side === 'right' && A.wave?.side === 'right')) continue;
-      const d = h.dim, at = (k) => h.bend[i * d + k] * (1 - a) + h.bend[Math.min(h.bend.length / d - 1, i + 1) * d + k] * a;
+      // joint limits: a finger never bends backwards past -3° or curls past 100° per joint (tracking noise on a
+      // half-hidden hand otherwise flips a fingertip the wrong way)
+      const d = h.dim, at = (k) => { const v = h.bend[i * d + k] * (1 - a) + h.bend[Math.min(h.bend.length / d - 1, i + 1) * d + k] * a; return k < 15 ? Math.max(-0.05, Math.min(1.75, v)) : v; };
       const conf = (h.conf[i] ?? 0) * (1 - a) + (h.conf[i + 1] ?? h.conf[i] ?? 0) * a;
       const w = Math.min(1, p.w * conf * 1.1);
       if (w < 0.02) continue;
@@ -374,9 +376,18 @@ export class Moves {
     F.names.forEach((name, j) => {
       if (!have.has(name)) { (this._unmapped ||= new Set()).has(name) || (this._unmapped.add(name), console.warn('jena face: her model has no expression', name)); return; }
       if (talking && ['aa', 'ih', 'ou', 'ee', 'oh'].includes(name)) return; // her own voice drives her mouth while she talks
-      const arr = F.w[j], raw = arr[i] * (1 - a) + (arr[i + 1] ?? arr[i]) * a;
-      // performers' faces are subtle on camera; her anime face reads them a bit bigger (gaze stays as tracked)
-      const v = name.startsWith('look') || name.startsWith('blink') ? raw : Math.min(1, raw * 1.6);
+      const at = (jj) => F.w[jj][i] * (1 - a) + (F.w[jj][i + 1] ?? F.w[jj][i]) * a;
+      let raw = at(j);
+      // per-eye blinks: both eyes close together; only a little of one-eye-only stays (a tracked squint or camera
+      // angle otherwise reads as a wink, and she doesn't wink)
+      if (name === 'blinkLeft' || name === 'blinkRight') {
+        const o = F.names.indexOf(name === 'blinkLeft' ? 'blinkRight' : 'blinkLeft');
+        const both = o >= 0 ? Math.min(raw, at(o)) : raw;
+        raw = both + (raw - both) * 0.25;
+      }
+      // performers' faces are subtle on camera; her anime face reads smiles, mouth and surprise a bit bigger
+      // (gaze, blinks, frowns stay as tracked so she never looks cross)
+      const v = /^(happy|relaxed|surprised|aa|ih|ou|ee|oh)$/.test(name) ? Math.min(1, raw * 1.6) : raw;
       const cur = em.getValue(name) || 0;
       em.setValue(name, name.startsWith('blink') ? Math.max(cur, v * w) : cur + (v - cur) * w * 0.9);
     });

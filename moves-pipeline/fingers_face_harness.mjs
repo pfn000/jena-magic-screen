@@ -68,6 +68,9 @@ const p = moves.playing; if (p) { p.start = 2; p.len = 8; p.rate = 1; }
 fMin = {}; fMax = {}; const exMax = {};
 for (let i = 0; i < 240 && moves.playing; i++) { step(); const s = track(); for (const [k, v] of Object.entries(s.expressions)) exMax[k] = Math.max(exMax[k] || 0, v); if (i === 60 || i === 120 || i === 180) R.snaps.push(snap('move ' + id)); }
 R.move = { clip: id, hasFingers: !!p?.c?.fingers, hasFace: !!p?.c?.face, fingerRange: Object.fromEntries(Object.keys(fMin).map((k) => [k, +(fMax[k] - fMin[k]).toFixed(3)])), expressionPeaks: exMax, unmapped: [...(moves._unmapped || [])] };
+// after the move ends: nothing tracked may stay on her face (e.g. an eye left half-shut)
+moves.stop(); for (let i = 0; i < 90; i++) step();
+R.afterMove = { playing: moves.playing?.c?.id || null, eyes: Object.fromEntries(['blinkLeft', 'blinkRight', 'lookLeft', 'lookRight'].map((k) => [k, av.faceState().expressions[k]])) };
 // 4) no-repeat: 20 minutes of her choosing (a move every ~35-50 s, contexts as her autonomy uses them)
 moves.choose = Moves.prototype.choose.bind(moves);
 store['jena.moves.history'] = '[]'; moves._hist = [];
@@ -76,5 +79,5 @@ const seq = []; let clock = 0;
 while (clock < 20 * 60000) { const c = moves.choose(ctx[Math.floor(Math.random() * ctx.length)], Math.random() < 0.5 ? 'happy' : 'neutral'); moves.rememberPlay(c.id); seq.push(c.id); const gap = 35000 + Math.random() * 15000; clock += gap; DNOW += gap; }
 R.variety = { ...moves.variety(21 * 60000), sequence: seq };
 fs.writeFileSync(OUT, JSON.stringify(R, null, 1));
-console.log(JSON.stringify({ rig: R.rig, idle: R.idle, talking: R.talking, move: { ...R.move, fingerRange: undefined }, moveFingerRange: R.move.fingerRange, variety: { ...R.variety, sequence: R.variety.sequence.length } }));
+console.log(JSON.stringify({ afterMove: R.afterMove, rig: R.rig, idle: R.idle, talking: R.talking, move: { ...R.move, fingerRange: undefined }, moveFingerRange: R.move.fingerRange, variety: { ...R.variety, sequence: R.variety.sequence.length } }));
 process.exit(0);

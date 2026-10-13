@@ -54,12 +54,14 @@ export class Avatar {
       this.renderer = { noGL: true, domElement: canvas, setClearColor: nop, setPixelRatio: nop, getPixelRatio: () => 1, setSize: nop, setAnimationLoop: nop, render: nop, getRenderTarget: () => null, setRenderTarget: nop, readRenderTargetPixels: nop, dispose: nop, capabilities: { isWebGL2: false } };
     }
     this.renderer.setClearColor(0x000000, 0);
-    // sharpness vs speed: phones top out at 1.5x pixels (a 3x screen draws 4x fewer pixels than full res),
-    // computers at 2x; ?dpr=<n> pins it. If frames still run slow, frame() steps it down (never below 1x).
+    // sharpness vs speed: up to 2x pixels on phones and computers (a 3x iPhone at 1.5x looked soft and jaggy);
+    // ?dpr=<n> pins it. If frames run slow, frame() steps it down, never below 1.5x on a hi-dpi screen.
     const q = new URLSearchParams(location.search), pin = parseFloat(q.get('dpr'));
     const phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
     this.dprPinned = pin > 0;
-    this.renderer.setPixelRatio(pin > 0 ? pin : Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2));
+    this.renderer.setPixelRatio(pin > 0 ? pin : Math.min(window.devicePixelRatio || 1, 2));
+    this.minPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.phone = phone;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(22, 1, 0.1, 50);
     // lights matched to her room (bg-room.jpg): pink-lavender room bounce, the warm bedside lamp on the
@@ -133,6 +135,23 @@ export class Avatar {
     VRMUtils.combineSkeletons(gltf.scene);
     VRMUtils.rotateVRM0(vrm);
     vrm.scene.traverse((o) => (o.frustumCulled = false));
+    // her MToon outline is 0.8 mm wide in world space: thinner than a pixel at stage distance, so it broke up into
+    // a dotted, speckled edge around her body and hair. Off (her shading reads cleanly without it).
+    this.outlinesOff = 0;
+    // her face layers came out of the export all OPAQUE (VRoid exports brows/eyelines as cut-outs and the eye
+    // highlight as see-through): give them their cut-out / blend back and draw them after the face skin, so
+    // brows, eyelines and eye shine have clean edges on every GPU
+    this.faceLayers = [];
+    vrm.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      for (const m of [].concat(o.material)) {
+        if (!m || m.isOutline) continue;
+        const n = m.name || '';
+        if (/FaceBrow|FaceEyeline|FaceEyelash/.test(n) && !m.transparent && !(m.alphaTest > 0)) { m.alphaTest = 0.5; m.needsUpdate = true; o.renderOrder = Math.max(o.renderOrder, 20); this.faceLayers.push(n + ':mask'); }
+        else if (/EyeHighlight/.test(n) && !m.transparent) { m.transparent = true; m.depthWrite = false; m.needsUpdate = true; o.renderOrder = Math.max(o.renderOrder, 21); this.faceLayers.push(n + ':blend'); }
+      }
+    });
+    if (new URLSearchParams(location.search).get('outline') !== '1') vrm.scene.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m?.isOutline && m.visible !== false) { m.visible = false; this.outlinesOff++; } });
     if (this.vrm) { this.scene.remove(this.vrm.scene); VRMUtils.deepDispose(this.vrm.scene); }
     this.vrm = vrm;
     try { this.checkRig(vrm); } catch (e) { console.warn('rig check', e); }
@@ -268,8 +287,8 @@ export class Avatar {
     const now = performance.now(), P = (this.perf ||= { ms: 16.7, cool: now + 4000 });
     P.ms = P.ms * 0.96 + raw * 1000 * 0.04;
     const pr = this.renderer.getPixelRatio();
-    if (now > P.cool && P.ms > 24 && pr > 1) {
-      this.renderer.setPixelRatio(Math.max(1, Math.round((pr - 0.25) * 4) / 4));
+    if (now > P.cool && P.ms > 24 && pr > (this.minPixelRatio || 1)) {
+      this.renderer.setPixelRatio(Math.max(this.minPixelRatio || 1, Math.round((pr - 0.25) * 4) / 4));
       this.resize();
       P.cool = now + 3000; P.ms = 16.7;
       this.pixelSteps = (this.pixelSteps || 0) + 1;
@@ -285,18 +304,54 @@ export class Avatar {
     this.frameCamera();
   }
 
+  // Framing: 'full' (head to feet: dances, stretches), 'talk' (waist-up: face, mouth and both hands big enough
+  // to read on a phone; used while she talks/chats and as her resting view on phones), 'auto' picks per frame.
+  // The camera eases between them (no jumps). ?view=full|talk pins one.
+  frameGoal(mode) {
+    const fov = THREE.MathUtils.degToRad(this.camera.fov), tan = Math.tan(fov / 2), asp = this.camera.aspect || 1;
+    let top, bottom, wantW = 0.95, cx = 0;
+    if (mode === 'talk' && this.vrm) {
+      const H = this.vrm.humanoid, P = (b) => H.getNormalizedBoneNode(b)?.getWorldPosition(new THREE.Vector3());
+      const head = P('head'), hips = P('hips'), lh = P('leftHand'), rh = P('rightHand');
+      if (head && hips && lh && rh) {
+        top = Math.max(head.y + 0.17, lh.y + 0.1, rh.y + 0.1);
+        // waist-up: hands included when she lifts them, but resting hands never pull the frame below mid-thigh
+        bottom = Math.min(hips.y - 0.1, Math.max(Math.min(lh.y, rh.y) - 0.07, hips.y - 0.3));
+        wantW = Math.max(0.62, Math.abs(lh.x - rh.x) + 0.3);
+        cx = (lh.x + rh.x) / 2 * 0.5;
+      }
+    }
+    if (top === undefined) { bottom = -0.16; top = this.height + 0.36; } // feet a little above the bottom, headroom for a raised arm
+    const d = Math.max((top - bottom) / 2 / tan, wantW / 2 / (tan * asp));
+    return { x: cx, y: (top + bottom) / 2, d };
+  }
   frameCamera() {
-    // feet a little above the bottom (room for the name tag), headroom for a raised arm + speech bubble
-    const bottom = -0.16, top = this.height + 0.36;
-    const h = top - bottom;
-    const fov = THREE.MathUtils.degToRad(this.camera.fov);
-    const distH = (h / 2) / Math.tan(fov / 2);
-    const wantW = 0.95; // meters of width to keep in view
-    const distW = (wantW / 2) / (Math.tan(fov / 2) * this.camera.aspect);
-    const d = Math.max(distH, distW);
-    const cy = (top + bottom) / 2;
-    this.camera.position.set(0, cy, d);
-    this.camera.lookAt(0, cy, 0);
+    const pin = new URLSearchParams(location.search).get('view');
+    this.viewPin = pin === 'full' || pin === 'talk' ? pin : null;
+    const g = this.frameGoal(this.viewPin || 'full');
+    this.cam = { ...g };
+    this.camera.position.set(g.x, g.y, g.d);
+    this.camera.lookAt(g.x, g.y, 0);
+  }
+  viewMode(now) {
+    if (this.viewPin) return this.viewPin;
+    const mv = window.jenaMoves?.playing;
+    if (mv && ['dance', 'stretch', 'weight', 'happy'].includes(mv.c?.kind)) return 'full';
+    if (now < (this.talk.until || 0) + 4000) return 'talk';
+    if (mv) return 'full';
+    // resting: phones (small stage) keep her waist-up so her face and hands read; big screens show all of her
+    const w = this.canvas.parentElement?.clientWidth || 0;
+    return this.phone || w < 700 ? 'talk' : 'full';
+  }
+  updateCamera(dt, now) {
+    if (!this.cam) return;
+    const mode = this.viewMode(now);
+    this.viewNow = mode;
+    const g = this.frameGoal(mode), k = mode === this._lastMode ? 1.6 : 2.2;
+    this._lastMode = mode;
+    this.cam.x = damp(this.cam.x, g.x, k, dt); this.cam.y = damp(this.cam.y, g.y, k, dt); this.cam.d = damp(this.cam.d, g.d, k, dt);
+    this.camera.position.set(this.cam.x, this.cam.y, this.cam.d);
+    this.camera.lookAt(this.cam.x, this.cam.y, 0);
   }
 
   // A different body every time the page loads: random seed, mid-breath, a random weight side, head
@@ -664,6 +719,7 @@ export class Avatar {
       vrm.update(dt);
     }
     this.frameHooksLight?.(t);
+    if (vrm && !this.cameraHeld) this.updateCamera(Math.min(raw, 0.5), now); // real time, so slow devices still settle
     this.renderer.render(this.scene, this.camera);
     if (vrm) for (const f of this.frameHooks) { try { f(vrm, dt); } catch (e) { console.warn('frame hook', e); } }
   }
@@ -692,8 +748,11 @@ export class Avatar {
       }
     }
     // happy eyes already squint; keep blink from overshooting
-    em.setValue('blink', b * (1 - this.mood.weights.happy * 0.6));
+    em.setValue('blink', b * (1 - this.mood.weights.happy * 0.3));
     this.blinkNow = b;
+    // per-eye blinks and gaze shapes only come from a learned move's tracked face (moves.js applyFace runs after
+    // this); start them at 0 every frame so a move can never leave an eye stuck half-shut after it ends
+    for (const k of ['blinkLeft', 'blinkRight', 'lookUp', 'lookDown', 'lookLeft', 'lookRight']) em.setValue(k, 0);
     // face life between moods: a soft smile, a little brow lift or a relaxed squint now and then
     const M = this.micro;
     M.next -= dt;
