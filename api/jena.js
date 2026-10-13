@@ -497,6 +497,26 @@ async function passkey(req) {
   }
 }
 
+// mama's Accounts vault + "Sign Jena into GitHub" (her box: /box/mama/sec/vault + /gh, AES-GCM at rest there).
+// Values pass through here only on mama's explicit reveal; nothing is logged or broadcast.
+async function mamaSec(req, door) {
+  const a = req.mamaAuth || (await mamaAuth(req));
+  if (!a.via) return json({ ok: false, error: 'mama only' }, 401);
+  const b = await body(req);
+  const op = clip(b.op, 12) || (door === 'gh' ? 'status' : 'list');
+  const ok = door === 'gh' ? ['status', 'start', 'cancel'] : ['list', 'add', 'edit', 'delete', 'reveal'];
+  if (!ok.includes(op)) return json({ ok: false, error: 'unknown op' }, 400);
+  const bx = await boxLink().catch(() => null);
+  if (!bx) return json({ ok: false, error: 'her box is offline right now' }, 503);
+  const str = (v) => (typeof v === 'string' ? v.slice(0, 2000) : undefined);
+  const pick = door === 'gh' ? { op } : { op, id: clip(b.id, 24), site: clip(b.site, 200), username: str(b.username), password: str(b.password), notes: str(b.notes) };
+  try {
+    const r = await fetch(`${bx.url}/box/mama/sec/${door}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(pick), signal: AbortSignal.timeout(door === 'gh' ? 25000 : 10000) });
+    if (!(r.headers.get('content-type') || '').includes('json')) return json({ ok: false, error: 'her box did not answer' }, 502);
+    return json(await r.json(), r.status);
+  } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
+}
+
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
   const route = routeOf(req);
@@ -505,6 +525,8 @@ async function handle(req) {
     if (stepUp) return stepUp;
     if (route === 'trust') return await trust(req);
     if (route === 'passkey') return await passkey(req);
+    if (route === 'vault' && req.method === 'POST') return await mamaSec(req, 'vault');
+    if (route === 'ghauth' && req.method === 'POST') return await mamaSec(req, 'gh');
     if (route === 'config') return json(await config());
     if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
     if (route === 'box' && req.method === 'POST') { const env = await body(req), p = acceptBox(env); if (p) checkHealth(); const relay = p ? await relayBox(env, p) : null; return p ? json({ ok: true, url: p.url, relay }) : json({ error: 'bad signature' }, 401); }

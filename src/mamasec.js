@@ -80,3 +80,97 @@ sec.sections.push({
     return false;
   },
 });
+
+// ---------------- Accounts vault (Jena's site logins; encrypted on her box) ----------------
+const V = { list: null, out: '', form: { site: '', username: '', password: '', notes: '' }, editing: null, shown: {} };
+const vf = (id) => document.getElementById(id);
+function snapForm() {
+  if (!vf('sec-v-site')) return;
+  V.form = { site: vf('sec-v-site').value, username: vf('sec-v-user').value, password: vf('sec-v-pass').value, notes: vf('sec-v-notes').value };
+}
+sec.sections.push({
+  render() {
+    if (!key()) return '';
+    snapForm();
+    if (!V.list) { V.list = { loading: true }; api('/api/vault', { op: 'list' }).then((d) => { V.list = d; sec.rerender?.(); }); }
+    const L = V.list;
+    const rows = L?.entries?.length
+      ? `<table class="dp-t"><tr><th>site</th><th>username</th><th>password</th><th></th></tr>${L.entries.map((e) => { const s = V.shown[e.id]; return `<tr><td><b>${esc(e.site)}</b></td><td>${s ? esc(s.username) : esc(e.user)}</td><td>${s ? `<code>${esc(s.password)}</code>` : e.has_password ? '••••••••' : '<i>none</i>'}${s && s.notes ? `<br><small>${esc(s.notes)}</small>` : ''}</td><td><button data-v="reveal" data-id="${e.id}">${s ? '🙈 hide' : '👁 reveal'}</button> <button data-v="edit" data-id="${e.id}">✏️ edit</button> <button data-v="del" data-id="${e.id}">🗑</button></td></tr>`; }).join('')}</table>`
+      : L?.loading ? '<p>loading…</p>' : L?.ok === false ? `<p class="dp-warn">${esc(L.error || L.summary)}</p>` : '<p>No accounts saved yet.</p>';
+    const f = V.form;
+    queueMicrotask(() => { const p = vf('sec-v-pass'); if (p && p.value !== f.password) p.value = f.password || ''; });
+    return `<div class="dp-card" id="sec-vault"><h3>🗝 Accounts · Jena's site logins</h3>
+      <p><small>Encrypted on her box (AES-256-GCM, key only on her box). Values show only here, on a trusted device, when you tap reveal; never on stream, in logs or in Tab Live. Jena's own browser fills these on sign-in pages by itself; a CAPTCHA or a 2FA code always raises the Take over card for you instead.</small></p>
+      ${rows}
+      <h4 style="margin:12px 0 4px">${V.editing ? 'Edit account' : 'Add an account'}</h4>
+      <p style="display:flex;flex-wrap:wrap;gap:6px"><input id="sec-v-site" placeholder="site (e.g. github.com)" value="${esc(f.site)}" size="22" autocomplete="off">
+      <input id="sec-v-user" placeholder="username / email" value="${esc(f.username)}" size="22" autocomplete="off">
+      <input id="sec-v-pass" type="password" placeholder="${V.editing ? 'password (blank = keep)' : 'password'}" size="18" autocomplete="new-password">
+      <input id="sec-v-notes" placeholder="notes (optional)" value="${esc(f.notes)}" size="22" autocomplete="off"></p>
+      <p><button data-v="save">💾 ${V.editing ? 'save changes' : 'add account'}</button>${V.editing ? ' <button data-v="cancel">cancel</button>' : ''}</p>${V.out ? `<p><small>${esc(V.out)}</small></p>` : ''}</div>`;
+  },
+  async click(e, rerender) {
+    const b = e.target.closest?.('[data-v]');
+    if (!b) return false;
+    const a = b.dataset.v, id = b.dataset.id;
+    snapForm();
+    if (a === 'reveal') {
+      if (V.shown[id]) { delete V.shown[id]; rerender(); return true; }
+      const d = await api('/api/vault', { op: 'reveal', id });
+      if (d.ok) { V.shown[id] = d; setTimeout(() => { delete V.shown[id]; rerender(); }, 30000); } else V.out = d.error || d.summary;
+      rerender(); return true;
+    }
+    if (a === 'edit') {
+      const d = V.shown[id] || (await api('/api/vault', { op: 'reveal', id }));
+      if (!d.ok) { V.out = d.error || d.summary; rerender(); return true; }
+      V.editing = id; V.form = { site: d.site, username: d.username, password: '', notes: d.notes || '' }; V.out = ''; rerender(); return true;
+    }
+    if (a === 'cancel') { V.editing = null; V.form = { site: '', username: '', password: '', notes: '' }; rerender(); return true; }
+    if (a === 'del') {
+      if (!confirm('Delete this saved account?')) return true;
+      const d = await api('/api/vault', { op: 'delete', id }); V.out = d.ok ? 'deleted' : d.error || d.summary; V.list = null; delete V.shown[id]; rerender(); return true;
+    }
+    if (a === 'save') {
+      const f = V.form;
+      if (!f.site.trim()) { V.out = 'the site is needed'; rerender(); return true; }
+      const d = await api('/api/vault', { op: V.editing ? 'edit' : 'add', id: V.editing || undefined, site: f.site.trim(), username: f.username, password: f.password, notes: f.notes });
+      V.out = d.ok ? (V.editing ? '✅ saved' : '✅ added') : d.error || d.summary;
+      if (d.ok) { V.form = { site: '', username: '', password: '', notes: '' }; V.editing = null; V.list = null; V.shown = {}; }
+      rerender(); return true;
+    }
+    return false;
+  },
+});
+
+// ---------------- GitHub CLI: "Sign Jena into GitHub" (mama finishes it on github.com; Tab never signs in) ----------------
+const G = { st: null, out: '', timer: null };
+function ghPoll() {
+  clearTimeout(G.timer);
+  if (G.st?.state !== 'waiting_for_mama') return;
+  G.timer = setTimeout(async () => { const d = await api('/api/ghauth', { op: 'status' }); if (d.ok) G.st = { ...G.st, ...d }; sec.rerender?.(); ghPoll(); }, 5000);
+}
+sec.sections.push({
+  render() {
+    if (!key()) return '';
+    if (!G.st) { G.st = { loading: true }; api('/api/ghauth', { op: 'status' }).then((d) => { G.st = d; sec.rerender?.(); ghPoll(); }); }
+    const s = G.st;
+    let body;
+    if (s?.loading) body = '<p>checking…</p>';
+    else if (s?.ok === false) body = `<p class="dp-warn">${esc(s.error || s.summary)}</p><p><button data-gh="start">🐙 Sign Jena into GitHub</button></p>`;
+    else if (s?.signed_in) body = `<p>✅ Jena's GitHub CLI is signed in${s.account ? ` as <b>${esc(s.account)}</b>` : ''}.</p>`;
+    else if (s?.state === 'waiting_for_mama' && s.code) body = `<p>1. Open <a href="${esc(s.url)}" target="_blank" rel="noopener"><b>github.com/login/device</b></a> (signed in as Jena's GitHub account)</p>
+        <p>2. Enter this code: <code style="font-size:22px;letter-spacing:3px;padding:2px 8px;border:1px solid #b48cff;border-radius:8px">${esc(s.code)}</code> <button data-gh="copy">copy</button></p>
+        <p><small>waiting for you to approve it… (the code is good for about 15 min)</small> <button data-gh="cancel">cancel</button></p>`;
+    else body = `<p>Not signed in yet. Tap the button: her box starts <code>gh auth login --web</code> as Jena and shows you a one-time code. You approve it on github.com yourself.</p><p><button data-gh="start">🐙 Sign Jena into GitHub</button></p>`;
+    return `<div class="dp-card" id="sec-gh"><h3>🐙 GitHub CLI on her desktop</h3>${body}${G.out ? `<p><small>${esc(G.out)}</small></p>` : ''}</div>`;
+  },
+  async click(e, rerender) {
+    const b = e.target.closest?.('[data-gh]');
+    if (!b) return false;
+    const a = b.dataset.gh;
+    if (a === 'start') { G.out = 'asking GitHub for a code…'; rerender(); const d = await api('/api/ghauth', { op: 'start' }); G.st = d; G.out = d.ok ? '' : ''; rerender(); ghPoll(); return true; }
+    if (a === 'cancel') { const d = await api('/api/ghauth', { op: 'cancel' }); G.st = { ok: true, state: 'idle', signed_in: false }; G.out = d.ok ? 'cancelled' : d.error; rerender(); return true; }
+    if (a === 'copy') { try { await navigator.clipboard.writeText(G.st.code); G.out = 'code copied'; } catch { G.out = 'copy it by hand'; } rerender(); return true; }
+    return false;
+  },
+});
