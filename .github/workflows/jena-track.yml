@@ -29,7 +29,7 @@ jobs:
       - name: deps
         run: |
           sudo apt-get update -qq >/dev/null || true
-          sudo apt-get install -y -qq libegl1 libgles2 libgl1 tesseract-ocr >/dev/null || true   # mediapipe's tasks library needs libEGL.so.1
+          sudo apt-get install -y -qq libegl1 libgles2 libgl1 ffmpeg tesseract-ocr >/dev/null || true   # mediapipe's tasks library needs libEGL.so.1; holistic.py writes its tracking overlay with ffmpeg
           pip install -q "mediapipe==1.1.0" opencv-python-headless numpy scipy yt-dlp || pip install -q "mediapipe==0.10.21" opencv-python-headless numpy scipy yt-dlp
       - name: track ${{ matrix.clip.id }}
         env: { GH_TOKEN: "${{ github.token }}", OMP_NUM_THREADS: "4" }
