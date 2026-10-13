@@ -15,6 +15,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import * as T from './jena-truth.mjs';
+import * as I from './jena-intent.mjs';
 
 const E = (k, d) => process.env[k] || d;
 const PORT = +E('PORT', 8088);
@@ -85,6 +86,54 @@ function mamaFacts() {
 const RECENT = { mama: [], pub: [] };   // last replies per side, so a repeated question gets a different wording
 const LAST_FILE = `${STATE}/last_turn.json`;   // the last exchange per side (mama / public), kept across restarts
 const LAST = (() => { try { return { mama: null, pub: null, ...JSON.parse(fs.readFileSync(LAST_FILE, 'utf8')) }; } catch { return { mama: null, pub: null }; } })();
+// ---------------------------------------------------------------- intent layer: plain speech -> her actions (box/jena-intent.mjs)
+// The site asks /box/skills/auto first, then her brain answers. Here a plain phrasing ("any new mail?", "go open youtube",
+// "sign into grok", "look that up") becomes the action; unsure -> she asks "you want me to X?" and a yes runs it.
+const PENDING = { mama: null, pub: null }, SAYS = { mama: null, pub: null }, REWRITE = new Map();
+const isFresh = (x, ms) => x && Date.now() - x.ts < ms;
+const DESK = () => `http://${DESK_HOST}:${DESK_PORT}`;
+async function deskPost(path, body, key) {
+  const r = await fetch(DESK() + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(key ? { 'X-Jena-Key': key } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(12000) });
+  return { status: r.status, body: await r.json().catch(() => ({})) };
+}
+function intentLog(side, it, did) { try { fs.appendFileSync(`${STATE}/intent-log.jsonl`, JSON.stringify({ ts: Date.now(), side, text: it.text?.slice(0, 200), action: it.action, confidence: +it.confidence.toFixed(2), via: it.via, did }) + '\n'); } catch {} }
+async function intentSkillsAuto(req, res, raw) {
+  let b = {}; try { b = JSON.parse(raw.toString() || '{}'); } catch {}
+  const key = req.headers['x-jena-key'] || '', side = key ? 'mama' : 'pub', text = String(b.text || '');
+  const pass = (body) => pass2(body ? Buffer.from(JSON.stringify(body)) : raw);
+  const pass2 = async (buf) => { const r = await fetch(DESK() + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: buf, signal: AbortSignal.timeout(60000) }); res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(Buffer.from(await r.arrayBuffer())); };
+  const say = (s) => { SAYS[side] = { text: text.trim(), say: s, ts: Date.now() }; };
+  const pend = isFresh(PENDING[side], 180000) ? PENDING[side].it : null;
+  if (pend && I.DENY.test(text)) { PENDING[side] = null; say(T.pickOne(['okay, not doing it.', 'got it, never mind.', 'kk, skipping that.'])); return sendJSON(res, 200, { name: null }); }
+  const lq = isFresh(LAST[side], 15 * 60000) ? LAST[side].q : null;
+  const it = I.intent(text, { lastQ: lq, pending: pend });
+  if (req.headers['x-jena-intent-dry'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '')) return sendJSON(res, 200, { dry: true, side, intent: it, decision: !it || it.confidence < I.ASK_AT ? 'pass_to_her_own_matcher' : I.MAMA_ONLY.has(it.action) && side !== 'mama' ? 'ignored_not_mama' : it.confidence < I.DO_AT ? 'ask_first' : 'do' });   // proof/tests only, localhost
+  if (!it || it.confidence < I.ASK_AT) return pass();
+  if (I.MAMA_ONLY.has(it.action) && side !== 'mama') { intentLog(side, it, 'not_mama'); return pass(); }
+  if (it.confidence < I.DO_AT) { PENDING[side] = { it, ts: Date.now() }; say(I.ASK(it.label)); intentLog(side, it, 'asked'); return sendJSON(res, 200, { name: null, intent: { asked: it.label } }); }
+  PENDING[side] = null; intentLog(side, it, 'do');
+  if (it.action === 'stop' || it.action === 'instead') return sendJSON(res, 200, { name: null });   // her brain queues these (mama-verified there)
+  if (it.action === 'sign_in') {
+    const r = await deskPost('/box/mama/signin/request', { site: it.args.site, reason: 'mama asked in chat' }, key).catch((e) => ({ status: 502, body: { summary: e.message } }));
+    const ok = r.status === 200 && r.body.ok !== false;
+    say(ok ? `okay mama, a sign-in card for ${it.args.site} is up in your dev panel. tap Open, sign in, then Done.` : `couldn't raise the sign-in card: ${String(r.body.summary || r.body.error || r.status).slice(0, 120)}`);
+    return sendJSON(res, 200, { name: 'sign_in_request', ok, summary: ok ? `sign-in card for ${it.args.site} is waiting in mama's dev panel` : 'sign-in request failed' });
+  }
+  if (it.action === 'go_live' || it.action === 'go_offair') {
+    const r = await deskPost('/box/mama/live', { on: it.args.on }, key).catch((e) => ({ status: 502, body: { summary: e.message } }));
+    const ok = r.status === 200 && r.body.ok !== false;
+    say(ok ? (it.args.on ? "🔴 live mode on. my public desktop view is strict now, let's goooo" : '⚪ live mode off. public view stays filtered, just chill now.') : `couldn't flip live mode: ${String(r.body.summary || r.status).slice(0, 120)}`);
+    return sendJSON(res, 200, { name: 'live_mode', ok, summary: ok ? `live mode ${it.args.on ? 'on' : 'off'}` : 'live switch failed' });
+  }
+  if (it.action === 'open_site') {   // her hands open it from /box/event (the site posts that right after this), in the same tab
+    REWRITE.set(text.trim(), { canon: it.canon, ts: Date.now() }); if (REWRITE.size > 50) REWRITE.delete(REWRITE.keys().next().value);
+    say(T.pickOne([`on it, ${it.label.replace(/^open/, 'opening')}.`, `kk, ${it.label.replace(/^open/, 'pulling up')}.`, `${it.label.replace(/^open/, 'opening')} rn.`]));
+    if (it.confirmed) await fetch(DESK() + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: it.canon, user: b.user, source: b.source }), signal: AbortSignal.timeout(5000) }).catch(() => {});
+    return sendJSON(res, 200, { name: null, intent: { did: it.label } });
+  }
+  // her skills: hand the desk a phrasing its own matcher runs (ask grok / check my email / make an asset / search)
+  return pass({ ...b, text: it.canon || text });
+}
 function forgetLastMamaFact() { const f = mamaFacts().at(-1); if (f) fs.appendFileSync(MAMA_FACTS, JSON.stringify({ revoke: f.ts, at: Date.now() }) + '\n'); return f || null; }
 function queueForDesk(c, via) {   // "stop" / "do X instead": her desktop agent reads this file between steps
   const q = { ts: Date.now(), kind: c.kind, do: c.kind === 'stop' ? null : c.right, text: c.raw, from: 'mama', via };
@@ -198,6 +247,7 @@ async function brain(req, res, url, base, modelName) {
     else if (corr && corr.instruction) { const q = queueForDesk(corr, 'chat'); text = vary(() => corr.kind === 'stop' ? T.pickOne(['ok mama, stopping.', 'stopping, mama.', 'okay okay, hands off. stopped.']) : T.pickOne(['ok mama, switching: ', 'on it mama, switching: ', 'got it, doing this instead: ']) + `${T.toYou(corr.right)}.`); rec.routed = 'mama_instruction'; rec.queued = q.queued; }
     else if (corr) { const f = addMamaFact(corr, prevQ, lastJena, 'chat'); text = f.ack; rec.routed = 'mama_correction'; rec.fact = { mama: f.mama, private: f.private, ts: f.ts }; rec.private = f.private; }
     else if (refuse) { text = vary(() => T.pickOne(["nice try, but only mama can change what i know. keeping my answer.", "hmm, only mama gets to correct my facts. i'll stick with what i've got.", "can't take that one from chat, only mama can update my facts."])); rec.routed = 'correction_refused'; }
+    else if (isFresh(SAYS[isMama ? 'mama' : 'pub'], 90000) && SAYS[isMama ? 'mama' : 'pub'].text === strip(userText)) { text = SAYS[isMama ? 'mama' : 'pub'].say; SAYS[isMama ? 'mama' : 'pub'] = null; rec.routed = 'intent'; }
     else if (known && !rawEval) { text = vary(() => known.q ? `${known.right}. ` + T.pickOne(isMama ? ['you told me that, mama.', 'you taught me that one.', 'mama-verified, you told me.', 'you corrected me on that, remember?'] : ['mama told me that, verified.', 'mama taught me that one.', 'verified by mama.']) : (isMama ? T.pickOne(['you told me: ', 'you taught me: ', 'mama-verified: ']) + `${known.you}.` : T.pickOne(['mama told me: ', 'mama taught me: ', 'verified by mama: ']) + `${known.mama}.`)); rec.routed = 'mama_fact'; rec.private = !!known.private; }
     else if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
     else if (routed && (routed.text || routed.kind === 'desktop')) {
@@ -253,7 +303,7 @@ async function brain(req, res, url, base, modelName) {
   const lastText = text, lastUserText = userText;
   if (rec.private) Object.assign(rec, { user: '(private, mama only)', reply: '(private)', raw: '', fact: rec.fact ? { private: true, ts: rec.fact.ts } : undefined });   // /brain/log is readable by the public site
   logBrain(rec);
-  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {} { const R2 = RECENT[rec.mama ? 'mama' : 'pub']; R2.push(String(lastText).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()); if (R2.length > 6) R2.shift(); }
+  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {} if (/\b(?:look (?:it|that) up|search (?:it|for it)|wanna me look|want me to look)\b/i.test(lastText) && !String(req.url).startsWith('/japi')) { const q0 = String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 300); PENDING[rec.mama ? 'mama' : 'pub'] = { it: { action: 'web_search', confidence: 1, args: { query: q0 }, label: `look up "${q0.slice(0, 60)}"`, canon: `search ${q0}`, text: q0, via: 'offer' }, ts: Date.now() }; } { const R2 = RECENT[rec.mama ? 'mama' : 'pub']; R2.push(String(lastText).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()); if (R2.length > 6) R2.shift(); }
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
   const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {
@@ -388,6 +438,15 @@ const server = http.createServer(async (req, res) => {
       if (!site && !rateOk(ip, path)) { authStats.limited++; return sendJSON(res, 429, { error: { message: 'too many requests, slow down' } }); }
       const open = path === '/health' || path.startsWith('/box/') || path.startsWith('/japi/');
       if (!open && !site) { authStats.refused++; return sendJSON(res, 401, { error: { message: 'Jena\'s brain only answers her own site. For apps, use her keyed API: /api/v1/chat/completions on her site.' } }); }
+    }
+    // intent layer: her skills + mama's actions from plain speech (the site asks here before her brain answers)
+    if (req.method === 'POST' && path === '/box/skills/auto') return await intentSkillsAuto(req, res, await readBody(req));
+    if (req.method === 'POST' && path === '/box/event' && REWRITE.size) {
+      const raw = await readBody(req); let b = {}; try { b = JSON.parse(raw.toString() || '{}'); } catch {}
+      const w = REWRITE.get(String(b.text || '').trim());
+      const body = w && isFresh(w, 60000) ? Buffer.from(JSON.stringify({ ...b, text: w.canon })) : raw;
+      const r = await fetch(`http://${DESK_HOST}:${DESK_PORT}/box/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(5000) });
+      res.writeHead(r.status, { 'Content-Type': 'application/json' }); return res.end(Buffer.from(await r.arrayBuffer()));
     }
     // mama's ✎ correct (dev panel / chat button, passcode checked by her site; from outside only her signed site gets here)
     if (req.method === 'POST' && path === '/truth/correct') {
