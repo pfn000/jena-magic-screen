@@ -11,6 +11,7 @@ import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
+import { softRefresh } from './refresh.js';
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -460,6 +461,8 @@ if (!cfg.obs) {
   window.__jenaDev = new DevPanel({ getRuns: () => runs, avatar, cfg });
   deployBar();
 }
+
+softRefresh({ obs: cfg.obs });
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';

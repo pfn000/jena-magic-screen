@@ -17,7 +17,7 @@
 //   {type:"status", text}                     brain state, e.g. offline
 //   {type:"done"}
 import { PERSONA } from './persona.js';
-import { boxLink } from './boxlink.js';
+import { boxLink, boxAuth } from './boxlink.js';
 
 const env = (k) => (process.env[k] || '').trim();
 export const DEFAULT_BASE = 'http://127.0.0.1:8088/v1';
@@ -35,7 +35,7 @@ export async function endpoint() {
   };
 }
 
-const headers = (p) => ({ 'Content-Type': 'application/json', ...(p.key ? { Authorization: `Bearer ${p.key}` } : {}) });
+const headers = (p) => ({ 'Content-Type': 'application/json', ...(p.key ? { Authorization: `Bearer ${p.key}` } : {}), ...(p.box ? boxAuth() : {}) });
 
 // ---------------- health ----------------
 let health = { online: false, checkedAt: 0, detail: 'not checked yet', model: null };

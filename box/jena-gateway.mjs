@@ -233,10 +233,40 @@ setInterval(() => tunnelLoop().catch(() => {}), 30000).unref?.();
 setTimeout(() => tunnelLoop().catch(() => {}), 3000);
 
 // ---------------------------------------------------------------- server
+// Requests that come in through the public tunnel (cloudflared sets cf-ray) must carry a short-lived HMAC the
+// site signs (X-Jena-Auth: <ms>.<hex hmac-sha256(secret, ms)>, valid 2 min). The secret is derived from the
+// site's JENA_DM_KEY; the box stores only the derived value. Open without it: /health (liveness), /box/*
+// (her desktop agent; mama-only doors there check mama's passcode themselves), the view-only noVNC stream,
+// and /japi/* (her keyed API). Plus a per-IP rate limit on everything from outside.
+const AUTH_SECRET = (() => { try { return fs.readFileSync(E('JENA_BOX_AUTH', '/home/user/tab/state/jena-box/auth.secret'), 'utf8').trim(); } catch { return ''; } })();
+function siteAuthOk(h) {
+  const m = String(h || '').match(/^(\d{13})\.([0-9a-f]{64})$/);
+  if (!m || !AUTH_SECRET || Math.abs(Date.now() - +m[1]) > 120000) return false;
+  const want = crypto.createHmac('sha256', AUTH_SECRET).update(m[1]).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(want), Buffer.from(m[2]));
+}
+const hits = new Map();
+function rateOk(ip, path) {
+  const now = Date.now(), lim = path.startsWith('/box/') || path === '/health' ? 240 : 40;   // per minute
+  const k = ip + (lim === 240 ? ':box' : ':brain');
+  const arr = (hits.get(k) || []).filter((t) => now - t < 60000);
+  arr.push(now); hits.set(k, arr);
+  if (hits.size > 5000) hits.clear();
+  return arr.length <= lim;
+}
+const authStats = { refused: 0, limited: 0 };
+
 const server = http.createServer(async (req, res) => {
   try {
     const [path, qs] = req.url.split('?');
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+    if (req.headers['cf-ray']) {   // from outside, through the tunnel
+      const ip = String(req.headers['cf-connecting-ip'] || 'unknown');
+      const site = siteAuthOk(req.headers['x-jena-auth']);   // her own site (signed) is never rate limited
+      if (!site && !rateOk(ip, path)) { authStats.limited++; return sendJSON(res, 429, { error: { message: 'too many requests, slow down' } }); }
+      const open = path === '/health' || path.startsWith('/box/') || path.startsWith('/japi/');
+      if (!open && !site) { authStats.refused++; return sendJSON(res, 401, { error: { message: 'Jena\'s brain only answers her own site. For apps, use her keyed API: /api/v1/chat/completions on her site.' } }); }
+    }
     if (req.method === 'POST' && /^\/(v1\/)?(chat\/)?completions?$/.test(path)) return await brain(req, res, path, CHAT, 'JenaXI-chat');
     // Jena's own OpenAI-compatible API for other apps: Bearer key checked against the sha256 her box stores
     // (the key itself is only ever shown to mama in the dev panel). /japi/v1/models and /japi/v1/chat/completions.
@@ -252,7 +282,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && /^\/jx0\/v1\/(chat\/)?completions$/.test(path)) return await brain(req, res, path, JX0, 'JenaXI-0');
     if (path.startsWith('/jx0/')) return await pass(req, res, JX0, req.url.slice(4));
     if (path === '/status') return sendJSON(res, 200, await status());
-    if (path === '/brain/log') { const n = Math.min(+(new URLSearchParams(qs).get('n') || 20), 50); return sendJSON(res, 200, { stats, log: ring.slice(-n) }); }
+    if (path === '/brain/log') { const n = Math.min(+(new URLSearchParams(qs).get('n') || 20), 50); return sendJSON(res, 200, { stats: { ...stats, outsideRefused: authStats.refused, outsideRateLimited: authStats.limited }, log: ring.slice(-n) }); }
     if (path.startsWith('/box/') || path === '/websockify') return await pass(req, res, `http://${DESK_HOST}:${DESK_PORT}`, req.url);
     return await pass(req, res, CHAT, req.url);
   } catch (e) {

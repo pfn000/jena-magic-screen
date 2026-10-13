@@ -12,7 +12,7 @@
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
-import { boxLink, accept as acceptBox } from './_lib/boxlink.js';
+import { boxLink, boxAuth, accept as acceptBox } from './_lib/boxlink.js';
 import { multiSearch, hotUrls } from './_lib/search.js';
 
 function routeOf(req) {
@@ -130,7 +130,7 @@ async function boxProxy(req) {
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
   const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity' }[what] || '/status';
   try {
-    const r = await fetch(box.url + path, { headers: what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}, signal: AbortSignal.timeout(8000) });
+    const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
     return json({ online: true, box: { url: box.url, announcedAt: box.ts, via: box.via }, data: d });
   } catch (e) {

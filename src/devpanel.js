@@ -213,7 +213,7 @@ export function deployBar() {
     const p = d?.commits?.find((c) => c.deploy?.state === 'pending');
     const liveSha = d?.live?.commit, newest = d?.commits?.[0];
     bar.hidden = !p && !(newest && liveSha && newest.sha !== liveSha && newest.deploy?.state === 'success');
-    bar.querySelector('span').innerHTML = p ? `updating Jena: ${esc(p.message.slice(0, 70))}…` : `new version ready · <a href="" onclick="location.reload();return false">reload</a>`;
+    bar.querySelector('span').innerHTML = p ? `updating Jena: ${esc(p.message.slice(0, 70))}…` : `new version ready · switching over by itself at a quiet moment (nothing you're doing gets lost) · <a href="" onclick="location.reload();return false">now</a>`;
     bar.classList.toggle('done', !p);
   };
   check(); setInterval(check, 45000);

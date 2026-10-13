@@ -45,3 +45,14 @@ export async function boxLink() {
   if (!fresh && Date.now() - polledAt > 15000) { polling ||= poll().finally(() => (polling = null)); await polling; }
   return latest && Date.now() - latest.ts < FRESH_MS ? latest : null;
 }
+
+// Short-lived proof that a request to her box really comes from this site: HMAC of the current time with a
+// secret derived from JENA_DM_KEY (her box stores only the derived secret). Her box refuses brain/status/log
+// requests from the tunnel without it.
+export function boxAuth() {
+  const k = (process.env.JENA_DM_KEY || '').trim();
+  if (!k) return {};
+  const secret = crypto.createHash('sha256').update('jena-box-auth:' + k).digest('hex');
+  const ts = String(Date.now());
+  return { 'X-Jena-Auth': `${ts}.${crypto.createHmac('sha256', secret).update(ts).digest('hex')}` };
+}
