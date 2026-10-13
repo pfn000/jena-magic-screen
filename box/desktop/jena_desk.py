@@ -294,6 +294,7 @@ def act_watch(video=None):
     path = local_video(vid.group(1)) if vid else None
     with lock:
         watching['video'] = {'url': url, 'title': title, 'label': label, 'since': int(time.time() * 1000), 'player': 'ffplay (local copy)' if path else 'firefox'}
+    log_activity('watch', url, f'"{title[:80]}" (learned my {label} move from it)')
     if path:
         did(f'watching "{title[:70]}" again, the video I learned my {label} move from')
         W, H = screen_size()
@@ -571,9 +572,11 @@ def act_read(topic=None):
         if hit:
             title, url = hit
             did(f'looked up "{title}" because people were talking about it')
+            log_activity('open', url, f'looked up "{title}"')
             firefox(url); time.sleep(3); scroll_some(); return
     name, url = random.choice(PAGES)
     did(f'opened Firefox to read about {name}')
+    log_activity('open', url, f'reading about {name}')
     firefox(url); time.sleep(3); scroll_some()
 
 def act_note(extra=None):
