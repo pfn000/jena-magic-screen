@@ -218,7 +218,7 @@ export async function* thinkEvents(input) {
   const chatMode = p.format === 'chat';
   const ask = (base, model) => fetch(`${base}/${chatMode ? 'chat/completions' : 'completions'}`, {
     method: 'POST',
-    headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20) },
+    headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20), 'X-Jena-Mama': input.mama ? '1' : '0' },
     body: JSON.stringify(chatMode
       ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) + memNote(input.memories) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
       : { model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 160, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),

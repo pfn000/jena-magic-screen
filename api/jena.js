@@ -90,8 +90,14 @@ async function mamaDo(req) {
   const box = await boxLink();
   if (!box) return json({ error: 'her box is offline' }, 503);
   const b = await body(req);
-  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard' }[b.action];
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
+  if (action === 'correct') {   // mama's ✎ correct on a reply -> verified fact + corrections training chat (her gateway)
+    try {
+      const r = await fetch(`${box.url}/truth/correct`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q: clip(b.q, 400), wrong: clip(b.wrong, 600), right: clip(b.right, 300) }), signal: AbortSignal.timeout(10000) });
+      return json(await r.json().catch(() => ({ error: `her box answered ${r.status}` })), r.status);
+    } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
+  }
   try {
     // site edits (merge a checked Jena branch / roll back her last change) go to her studio's site-edit checker
     const studio = ['merge', 'rollback', 'discard'].includes(action);
@@ -243,6 +249,7 @@ async function think(req) {
     user: clip(b.user, 40) || 'someone',
     attachment: b.attachment ? { name: clip(b.attachment.name, 120), type: clip(b.attachment.type, 80), size: +b.attachment.size || 0 } : undefined,
   };
+  input.mama = keyed && input.source !== 'twitch' && input.user === 'mama';   // mama (passcode, her own words, never relayed chat): her corrections become verified facts on her box
   const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
   // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
   // a message that matches one of her skills runs that skill on her box FIRST, and her brain answers from what it found

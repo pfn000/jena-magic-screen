@@ -55,7 +55,7 @@ $('#talk')?.addEventListener('submit', () => voice.unlock()); // sending a messa
 // speech bubble
 const bubble = $('#speech');
 let bubbleTimer;
-function say(text) {
+function say(text, { noCorrect = false } = {}) {
   text = tidy(text);
   if (!text) return;
   const ms = avatar.talkFor(text);
@@ -63,7 +63,34 @@ function say(text) {
   bubble.classList.add('show');
   clearTimeout(bubbleTimer);
   bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms + 2600);
-  if (!twitchLive) addChat({ user: 'Jena', text, cls: 'from-jena' }); // with Twitch on, her own talk lives in the thought chain
+  if (!twitchLive) { const li = addChat({ user: 'Jena', text, cls: 'from-jena' }); if (!noCorrect && localStorage.getItem(KEY_STORE) && !cfg.obs) addCorrect(li, text); } // with Twitch on, her own talk lives in the thought chain
+}
+// mama-only: correct any reply on the fly -> verified fact on her box (used from her next reply) + a corrections training chat
+let lastAsked = '';
+function addCorrect(li, wrong) {
+  const q = lastAsked, b = document.createElement('button');
+  b.type = 'button'; b.className = 'msg-correct'; b.textContent = '✎ Correct'; b.title = 'mama: tell her the right answer';
+  b.style.cssText = 'margin-left:6px;font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;opacity:.75';
+  b.onclick = () => {
+    if (li.querySelector('.msg-correct-box')) return;
+    const box = document.createElement('form');
+    box.className = 'msg-correct-box';
+    box.style.cssText = 'display:flex;gap:6px;margin-top:6px;width:100%';
+    box.innerHTML = '<input type="text" maxlength="300" enterkeyhint="done" style="flex:1;min-width:0;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid rgba(127,127,127,.5);background:rgba(255,255,255,.92);color:#111"><button type="submit" style="font-size:13px;padding:6px 10px;border-radius:8px;border:0;background:#ff5fa2;color:#fff">Save</button>';
+    const inp = box.querySelector('input');
+    inp.placeholder = q ? `right answer to "${q.slice(0, 40)}"` : 'what should she have said?';
+    box.onsubmit = async (e) => {
+      e.preventDefault();
+      const right = inp.value.trim();
+      if (!right) return;
+      inp.disabled = true; b.disabled = true; b.textContent = 'saving…';
+      const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': localStorage.getItem(KEY_STORE) || '' }, body: JSON.stringify({ action: 'correct', q, wrong, right }) }).then((x) => x.json()).catch((err) => ({ error: err.message }));
+      if (r.ok) { box.remove(); b.textContent = 'corrected ✓'; say(r.ack || 'ohh my bad mama, got it.', { noCorrect: true }); }
+      else { inp.disabled = false; b.disabled = false; b.textContent = `✕ ${r.error || 'failed'}, retry`; }
+    };
+    li.appendChild(box); inp.focus();
+  };
+  li.querySelector('span')?.after(b);
 }
 let twitchLive = false;
 
@@ -337,6 +364,7 @@ $('#talk').addEventListener('submit', (e) => {
   if (!text) return;
   input.value = '';
   const who = localStorage.getItem(KEY_STORE) ? 'mama' : 'guest';
+  lastAsked = text;
   const el = twitchLive ? null : addChat({ user: who, text: clean(text), cls: 'from-you' });
   if (twitchLive) { chain.self('status', `${who} (off-Twitch): ${text.slice(0, 120)}`); thinkAbout({ message: text, source: 'stage', user: who }); return; }
   send(text, who, el);
