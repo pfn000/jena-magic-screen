@@ -2,7 +2,8 @@
  "name": "learn_move",
  "description": "She learns a new move from an online video by herself: queues a YouTube link (or a search) and her box tracks the person with MediaPipe, retargets it onto her bones, checks quality honestly and adds the clip to her moves (or says why it was rejected).",
  "triggers": [
-  "\\blearn (a |the |this |that )?(new )?(move|moves|dance|dancing)\\b"
+  "\\blearn\\b.{0,60}\\b(move|moves|dance|dances|dancing)\\b",
+  "\\blearn\\b.{0,40}(youtube\\.com|youtu\\.be)"
  ],
  "kind": "script",
  "entry": "run.py",

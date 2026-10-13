@@ -807,8 +807,10 @@ def mem_recall(q, user=None, k=5):
     scored = []
     for r in mem_all() + mem_learned():
         fw = set(re.findall(r'[a-z0-9]{3,}', r['fact'].lower()))
-        s = len(words & fw) + (1.5 if user and r.get('who') == user else 0) + (0.5 if r.get('who') == 'mama' else 0)
-        if s > 0: scored.append((s, r['ts'], r))
+        hit = len(words & fw)
+        if not hit: continue                       # only memories that share a real word with the message
+        s = hit + (1.5 if user and r.get('who') == user else 0) + (0.5 if r.get('who') == 'mama' else 0)
+        scored.append((s, r['ts'], r))
     scored.sort(key=lambda x: (-x[0], -x[1]))
     return [r for _, _, r in scored[:k]]
 
