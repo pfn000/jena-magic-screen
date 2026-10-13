@@ -14,6 +14,7 @@ import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
 import { softRefresh } from './refresh.js';
+import { obsGuard, requestObsReload } from './obsguard.js';
 import { Voice } from './voice.js';
 import { Mic } from './mic.js';
 import { mobileShell } from './mobile.js';
@@ -643,6 +644,8 @@ if (!cfg.obs) {
 }
 
 softRefresh({ obs: cfg.obs });
+if (cfg.obs) obsGuard();   // stream-safe: no reloads unless mama asks (src/obsguard.js)
+else window.__jenaObsReload = requestObsReload;
 
 window.__jenaMobile = mobileShell({ obs: cfg.obs });
 

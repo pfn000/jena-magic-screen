@@ -26,15 +26,35 @@ async function pass(req, box) {
   return new Response(await r.text(), { status: r.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
+// OBS reload mark (src/obsguard.js): GET what=obs is public (just a timestamp); POST what=obs-reload is mama only.
+async function obsMark(req, box) {
+  const post = req.method === 'POST';
+  const r = await fetch(box.url + (post ? '/box/tab-live/obs-reload' : '/box/tab-live/obs'), {
+    method: post ? 'POST' : 'GET', headers: { ...boxAuth(), 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, signal: AbortSignal.timeout(6000) });
+  return new Response(await r.text(), { status: r.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+}
+
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
+  const what = new URL(req.url).searchParams.get('what');
+  if (what === 'obs' && req.method === 'GET') {
+    const box = (await boxLink()) || (await viaConfig(req)) || lastGood;
+    if (!box) return json({ reload_at: 0, offline: true }, 503);
+    lastGood = box;
+    try { return await obsMark(req, box); } catch (e) { return json({ reload_at: 0, offline: true, error: e.message }, 502); }
+  }
   const stepUp = await elevate(req, 'tablive');   // mama's trusted device: no passcode needed (api/_lib/mama.js)
   if (stepUp) return stepUp;
   const k = checkKey(req);
   if (!k.ok) return json({ error: 'mama only: ' + k.why }, 401);
   const box = (await boxLink()) || (await viaConfig(req));
   if (box) lastGood = box;
-  else if (lastGood) return pass(req, lastGood);
+  if (what === 'obs-reload' && req.method === 'POST') {
+    const b = box || lastGood;
+    if (!b) return json({ error: 'her box is offline (no tunnel announced)', offline: true }, 503);
+    try { return await obsMark(req, b); } catch (e) { return json({ error: `her box did not answer: ${e.message}`, offline: true }, 502); }
+  }
+  if (!box && lastGood) return pass(req, lastGood);
   if (!box) return json({ error: 'her box is offline (no tunnel announced)', offline: true }, 503);
   try { return await pass(req, box); } catch (e) { return json({ error: `her box did not answer: ${e.message}`, offline: true }, 502); }
 }

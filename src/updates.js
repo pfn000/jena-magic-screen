@@ -1,7 +1,7 @@
 // Update banner: the page asks /api/version every 30 s which commit is live. When it changes, a small banner says
 // "✨ Jena just got an update, refreshing in 10s" with "now" and "later". The reload never happens while mama is
 // typing, recording a voice note, in a desktop takeover or in a private sign-in window: the countdown pauses and
-// resumes once she's done. ?obs=1 gets only a small quiet badge (OBS reloads on its own schedule).
+// resumes once she's done. ?obs=1 shows nothing and never reloads (mama reloads it from her dev panel).
 // Also: a "🧠 brain restarting…" pill while her brain's health check blips offline after being online.
 import { softReloadTo } from './refresh.js';
 
@@ -61,13 +61,9 @@ export function startUpdates({ obs = false } = {}) {
   };
 
   const show = () => {
-    if (obs) {
-      if (!document.getElementById('upd-badge')) {
-        const b = document.createElement('div'); b.id = 'upd-badge'; b.textContent = `✨ update ready · ${live.slice(0, 7)}`;
-        document.body.appendChild(b);
-      }
-      return;
-    }
+    // ?obs=1 is what goes out on stream: nothing on screen and never a reload. A new version reaches the OBS page
+    // only when mama presses "reload OBS view" in her dev panel (src/obsguard.js).
+    if (obs) { window.__jenaObsUpdate = live; return; }
     if (bar || dismissedFor === live || Date.now() < laterUntil) return;
     bar = document.createElement('div'); bar.id = 'upd-bar'; bar.setAttribute('role', 'status');
     bar.innerHTML = '<span class="t"><span class="msg"></span><small class="sub"></small></span><button class="now">now</button><button class="later">later</button>';
@@ -103,6 +99,7 @@ export function startUpdates({ obs = false } = {}) {
   // brain restarting pill: her health goes online -> offline (a blip), pill stays until it's back
   let wasOnline = null, pill = null, pillTimer = null;
   window.addEventListener('jena-health', (e) => {
+    if (obs) return;   // nothing about her plumbing goes out on stream
     const on = !!e.detail?.online;
     if (wasOnline && !on && !pill) {
       pill = document.createElement('div'); pill.id = 'brain-pill'; if (obs) pill.className = 'obs';

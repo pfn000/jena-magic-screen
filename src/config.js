@@ -24,8 +24,21 @@ async function getJSON(url) {
   } catch { return null; }
 }
 
+// the last /api/config that named her box: used when the server is down, slow or answers something unexpected,
+// so a page (above all the OBS stream view) always comes up whole (STREAM_SAFETY.md)
+const LAST_CFG = 'jena.lastConfig';
+function lastGood(api) {
+  try {
+    if (api && typeof api === 'object' && api.box?.url) { localStorage.setItem(LAST_CFG, JSON.stringify({ ...api, savedAt: Date.now() })); return api; }
+    const old = JSON.parse(localStorage.getItem(LAST_CFG) || 'null');
+    if (old && old.box?.url) return api && typeof api === 'object' ? { ...old, ...api, box: old.box, desktopUrl: api.desktopUrl || old.desktopUrl, fromCache: true } : { ...old, fromCache: true };
+  } catch {}
+  return api && typeof api === 'object' ? api : null;
+}
+
 export async function loadConfig() {
-  const [api, file] = await Promise.all([getJSON('/api/config'), getJSON('/jena-config.json')]);
+  const [api0, file] = await Promise.all([getJSON('/api/config'), getJSON('/jena-config.json')]);
+  const api = lastGood(api0);
   const pickv = (k, apiKey = k) => q.get(k) || api?.[apiKey] || file?.[apiKey] || null;
   const cfg = {
     ...DEFAULTS,
