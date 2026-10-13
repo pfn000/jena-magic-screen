@@ -46,11 +46,29 @@ export class Avatar {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(22, 1, 0.1, 50);
-    const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(0.6, 1.6, 2.2);
-    const rim = new THREE.DirectionalLight(0xffd6f0, 1.2);
-    rim.position.set(-1.5, 2, -1.5);
-    this.scene.add(key, rim, new THREE.AmbientLight(0xffffff, 0.9));
+    // lights matched to her room (bg-room.jpg): pink-lavender room bounce, the warm bedside lamp on the
+    // viewer's left, the sunset window behind her (back sunlight = warm rim on hair + shoulders), fairy
+    // lights up-left that twinkle a little, and the bunny night-light low on the right. ?light=flat = old setup.
+    const flat = new URLSearchParams(location.search).get('light') === 'flat';
+    if (flat) {
+      const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(0.6, 1.6, 2.2);
+      const rim = new THREE.DirectionalLight(0xffd6f0, 1.2); rim.position.set(-1.5, 2, -1.5);
+      this.scene.add(key, rim, new THREE.AmbientLight(0xffffff, 0.9));
+      this.lights = { flat: true };
+    } else {
+      const room = new THREE.HemisphereLight(0xf1dcff, 0xffe4dc, 0.62);          // lavender ceiling, warm rug
+      const front = new THREE.DirectionalLight(0xfff1f5, 0.6); front.position.set(0.2, 1.3, 2.6);   // soft room fill so her face reads
+      const lamp = new THREE.DirectionalLight(0xffd9ad, 0.75); lamp.position.set(-2.2, 1.0, 1.4);    // bedside lamp, viewer's left
+      const sun = new THREE.DirectionalLight(0xffc6a3, 1.7); sun.position.set(1.6, 2.2, -2.4);       // sunset window behind her
+      const fairy = new THREE.PointLight(0xffe2b8, 1.0, 6, 1.5); fairy.position.set(-1.4, 2.3, -0.6); // fairy lights up-left
+      const bunny = new THREE.PointLight(0xffe7c4, 0.5, 3, 2); bunny.position.set(1.1, 0.5, 1.1);     // bunny night-light, low right
+      this.scene.add(room, front, lamp, sun, fairy, bunny);
+      this.lights = { room, front, lamp, sun, fairy, bunny };
+      this.frameHooksLight = (t) => {
+        fairy.intensity = 1.0 + 0.14 * Math.sin(t * 2.3) + 0.07 * Math.sin(t * 5.1 + 1.7);   // soft twinkle
+        sun.intensity = 1.7 + 0.12 * Math.sin(t * 0.05);                                     // slow sunset drift
+      };
+    }
     this.clock = new THREE.Timer();
     this.vrm = null;
     this.pose = {}; // bone -> current [x,y,z]
@@ -576,6 +594,7 @@ export class Avatar {
       this.updateFace(dt, t, now);
       vrm.update(dt);
     }
+    this.frameHooksLight?.(t);
     this.renderer.render(this.scene, this.camera);
     if (vrm) for (const f of this.frameHooks) { try { f(vrm, dt); } catch (e) { console.warn('frame hook', e); } }
   }
