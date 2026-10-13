@@ -23,7 +23,7 @@ jobs:
         clip: ${{ fromJSON(inputs.clips) }}
     steps:
       - uses: actions/checkout@v4
-        with: { sparse-checkout: "moves-pipeline\npublic/moves/index.json", sparse-checkout-cone-mode: false }
+        with: { sparse-checkout: "moves-pipeline\npublic/moves/index.json\nANIMATIONS/sources.json", sparse-checkout-cone-mode: false }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - name: deps

@@ -7,7 +7,9 @@ import json, os, sys, subprocess, base64, urllib.request, time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 cid, blob = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else '')
 idx = json.load(open(os.path.join(ROOT, 'public/moves/index.json')))
-c = next(x for x in idx['clips'] if x['id'] == cid)
+c = next((x for x in idx['clips'] if x['id'] == cid), None)
+if c is None:   # motion-study clips (ANIMATIONS/sources.json): Saidie's examples + public 3D VTuber clips
+    c = next(x for x in json.load(open(os.path.join(ROOT, 'ANIMATIONS/sources.json')))['clips'] if x['id'] == cid)
 W = os.path.join(ROOT, 'work'); os.makedirs(W + '/tmp', exist_ok=True); os.makedirs(W + '/raw', exist_ok=True)
 os.makedirs(os.path.join(ROOT, 'out'), exist_ok=True)
 vid = f'{W}/tmp/{cid}.mp4'

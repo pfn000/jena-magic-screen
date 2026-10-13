@@ -1,0 +1,148 @@
+{
+ "version": 1,
+ "note": "Clips Jena learns motion from. Keypoints only are kept (ANIMATIONS/tracked/*.json); source video is never stored. EXCLUDED (never tracked): https://www.tiktok.com/t/ZPLSf4w7t/ (suggestive; Jena is a minor).",
+ "clips": [
+  {
+   "id": "sx_carrey_dance",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "dance",
+   "asked": "Saidie 6:49 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@carrey_play/video/7682618730848832786",
+    "title": "✨? #carrey_play #3danimation #dance #vtuber #fyp ",
+    "channel": "carrey_play",
+    "duration": 30,
+    "start": null,
+    "end": null
+   },
+   "duration": 30
+  },
+  {
+   "id": "sx_salpoww_sleepy",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "camera transitions / idle",
+   "asked": "Saidie 6:49-6:50 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@salpoww/video/7314082075252903200",
+    "title": "🛌 shhh she's sleeping #vtuber #3dvtuber #waifu #sleepy #sleepygirl ",
+    "channel": "salpoww",
+    "duration": 15,
+    "start": null,
+    "end": null
+   },
+   "duration": 15
+  },
+  {
+   "id": "sx_feralune_troll",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "reactions, hyper detail",
+   "asked": "Saidie 6:50 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@feralune/video/7679863361789578527",
+    "title": "3D gives me whole new ways to troll #vtuber #vtuberclips #feralune #3...",
+    "channel": "feralune",
+    "duration": 15,
+    "start": null,
+    "end": null
+   },
+   "duration": 15
+  },
+  {
+   "id": "sx_feralune_driver",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "reaction comedy",
+   "asked": "Saidie 6:51 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@feralune/video/7692483246432603422",
+    "title": "I’m a GREAT driver #vtuber #vtuberclips #feralune #streamer #vtuberme...",
+    "channel": "feralune",
+    "duration": 12,
+    "start": null,
+    "end": null
+   },
+   "duration": 12
+  },
+  {
+   "id": "sx_kumivt_unhinged",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "big human reactions + camera zooms",
+   "asked": "Saidie 6:52 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@kumivt/video/7675201090635189534",
+    "title": "Kumi is Even MORE Unhinged in 3D #kumivt #vtuber #vtuberclips #vtuber...",
+    "channel": "kumivt",
+    "duration": 36,
+    "start": null,
+    "end": null
+   },
+   "duration": 36
+  },
+  {
+   "id": "vt_debut_warudo",
+   "from": "public",
+   "dim": "3d",
+   "why": "3D VTuber debut (Warudo/VRChat model) talk",
+   "asked": "public 3D",
+   "source": {
+    "url": "https://www.youtube.com/watch?v=L8d8Hcn_QQY",
+    "title": "3D DEBUT STREAM - New VTuber and VRChat Model Showcase",
+    "channel": "Skulls Nightshade",
+    "duration": null,
+    "start": null,
+    "end": null
+   },
+   "duration": 40
+  },
+  {
+   "id": "vt_dreamtrove",
+   "from": "public",
+   "dim": "3d",
+   "why": "3D VTuber model showcase",
+   "asked": "public 3D",
+   "source": {
+    "url": "https://www.youtube.com/watch?v=8FoJY56h2y0",
+    "title": "DreamTrove (Knight) 3D Vtuber Model Showcase",
+    "channel": "DreamTrove",
+    "duration": 146,
+    "start": null,
+    "end": null
+   },
+   "duration": 40
+  },
+  {
+   "id": "sx_xtralir_skit",
+   "from": "saidie",
+   "dim": "3d",
+   "why": "comedy skit structure",
+   "asked": "Saidie 6:53 PM",
+   "source": {
+    "url": "https://www.tiktok.com/@xtralir/video/7685967188376997150",
+    "title": "xtralir skit",
+    "channel": "xtralir",
+    "start": null,
+    "end": null
+   },
+   "duration": 28
+  },
+  {
+   "id": "sx_reallife_lipsync",
+   "from": "saidie",
+   "dim": "2d-ref",
+   "why": "real-life face tracking, expressions, hands, lip sync to audio",
+   "asked": "Saidie 6:56 PM",
+   "source": {
+    "url": "https://www.tiktok.com/t/ZPLSf6xRL/",
+    "title": "real-life face/hand tracking example",
+    "channel": null,
+    "start": null,
+    "end": null
+   },
+   "duration": 40
+  }
+ ]
+}
