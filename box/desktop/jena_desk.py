@@ -799,7 +799,8 @@ async def client(reader, writer):
                 url = items[0].get('url') if items else res.get('url') if name == 'fetch_page' else None
                 if res.get('ok') and url and safe(url):
                     with lock: events_in.append({'show_url': url, 'why': f'{name}: {text[:80]}', 'ts': time.time()})
-                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'ms': res.get('ms')}).encode()
+                top = {'title': (items[0].get('title') or items[0].get('name')) if items else res.get('title') or u, 'url': url} if url else None
+                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms')}).encode()
         except Exception as e:
             out = json.dumps({'name': None, 'error': str(e)[:200]}).encode()
     elif p == '/box/skills/create' and method == 'POST':

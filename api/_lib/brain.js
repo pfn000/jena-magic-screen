@@ -157,6 +157,9 @@ function jenaxiPrompt(input) {
   }
   const msg = input.attachment ? describe(input) : input.message;
   turns.push(`<|mama|>${msg}`);
+  // a skill result rides as the system turn (her box's gateway uses it in place of its short default persona)
+  const note = skillNote(input.skill);
+  if (note) turns.unshift(`<|system|>You are Jena (JenaXI), Saidie's AI: a chaotic, funny teen gremlin hacker girl. Saidie is mama. Never flirty.${note.replace(/\s+/g, ' ')}`);
   return turns.join('\n') + '\n<|jena|>';
 }
 
@@ -248,7 +251,7 @@ export async function* thinkEvents(input) {
     } else said.push(v);
   }
   // nothing fake: a link she "remembers" that no real source gave her is removed, and the chain says so
-  const real = `${input.message || ''} ${input.skill?.facts || ''}`;
+  const real = `${input.message || ''} ${input.skill?.facts || ''} ${input.skill?.top?.url || ''}`;
   let invented = 0;
   const cleaned = said.join(' ').replace(/<?(https?:\/\/[^\s<>)\]]+)>?/g, (m, u) => {
     const bare = u.replace(/[.,!?;:]+$/, '');
@@ -256,7 +259,10 @@ export async function* thinkEvents(input) {
     invented++; return '[link removed]';
   });
   if (invented) yield { type: 'step', kind: 'status', text: `removed ${invented} link${invented > 1 ? 's' : ''} she made up (not from her search or your message)` };
-  const { text, events } = extractTags(cleaned);
+  let { text, events } = extractTags(cleaned);
+  // if her words skipped what her skill really found, the real top result rides along, labelled as the skill's
+  const top = input.skill?.ok && input.skill.top;
+  if (text && top?.url && !text.includes(top.url) && !(top.title && text.toLowerCase().includes(String(top.title).toLowerCase()))) text = `${text} (what my ${input.skill.name} skill really found: ${top.title ? top.title + ' ' : ''}${top.url})`;
   for (const e of events) yield e;
   if (text) yield { type: 'say', text: text.slice(0, 600) };
   else yield { type: 'status', text: 'JenaXI answered with nothing this time' };
