@@ -135,3 +135,48 @@ export class BodyCollision {
     return new THREE.Vector3(s.cx + sg * (s.rx + out), y, s.cz - s.rz * 0.15).applyMatrix4(hips.matrixWorld);
   }
 }
+
+// Her room as colliders, matched to her background: the floor (her rug, y = 0 where her soles stand), the
+// wall behind her, and the stage edges left/right. Elbows, wrists, fingertips and her head are kept inside;
+// her hips can't travel through a wall during a move. (Her room picture has no chair in front of her, so
+// there is no chair collider.)
+export class RoomCollision {
+  constructor(avatar) {
+    this.avatar = avatar;
+    const hips = avatar.vrm.humanoid.getNormalizedBoneNode('hips');
+    const c = hips.getWorldPosition(new THREE.Vector3());
+    this.room = { floorY: avatar.floorY || 0, wallZ: c.z - 0.5, left: c.x - 0.85, right: c.x + 0.85 };
+    this.stats = { checks: 0, touches: 0, lastTouch: null, wallCm: null, floorCm: null, sideCm: null };
+  }
+  apply() {
+    const H = this.avatar.vrm.humanoid, R = this.room, col = this.avatar.collision;
+    H.normalizedHumanBonesRoot.updateMatrixWorld(true);
+    const hips = H.getNormalizedBoneNode('hips');
+    const hp = hips.getWorldPosition(new THREE.Vector3());
+    // hips stay in the room (moves carry her hips a little; never through the wall or off the stage)
+    const dz = Math.max(0, R.wallZ + 0.25 - hp.z), dx = Math.max(0, R.left + 0.2 - hp.x) - Math.max(0, hp.x - (R.right - 0.2));
+    if (dz || dx) { hips.position.z += dz; hips.position.x += dx; hips.updateMatrixWorld(true); this.touch('hips', 'wall/edge'); }
+    let wall = Infinity, floor = Infinity, side = Infinity;
+    for (const s of ['left', 'right']) {
+      const U = H.getNormalizedBoneNode(s + 'UpperArm'), E = H.getNormalizedBoneNode(s + 'LowerArm'), W = H.getNormalizedBoneNode(s + 'Hand');
+      const tip = H.getNormalizedBoneNode(s + 'MiddleIntermediate') || H.getNormalizedBoneNode(s + 'MiddleProximal');
+      if (!U || !E || !W) continue;
+      for (const [node, m] of [[E, 0.04], [W, 0.03], [tip, 0.02]]) {
+        if (!node) continue;
+        const p = node.getWorldPosition(new THREE.Vector3());
+        this.stats.checks++;
+        wall = Math.min(wall, p.z - R.wallZ); floor = Math.min(floor, p.y - R.floorY); side = Math.min(side, p.x - R.left, R.right - p.x);
+        const t = p.clone();
+        if (p.z < R.wallZ + m) t.z = R.wallZ + m;
+        if (p.y < R.floorY + m) t.y = R.floorY + m;
+        if (p.x < R.left + m) t.x = R.left + m;
+        if (p.x > R.right - m) t.x = R.right - m;
+        if (!t.equals(p) && col) { col.swing(U, p, t); this.touch(`${s} ${node === E ? 'elbow' : node === W ? 'wrist' : 'fingers'}`, p.z < R.wallZ + m ? 'wall' : p.y < R.floorY + m ? 'floor' : 'stage edge'); }
+      }
+    }
+    const head = H.getNormalizedBoneNode('head')?.getWorldPosition(new THREE.Vector3());
+    if (head) wall = Math.min(wall, head.z - R.wallZ);
+    Object.assign(this.stats, { wallCm: Math.round(wall * 100), floorCm: Math.round(floor * 100), sideCm: Math.round(side * 100) });
+  }
+  touch(what, where) { this.stats.touches++; this.stats.lastTouch = { what, where, at: Date.now() }; }
+}

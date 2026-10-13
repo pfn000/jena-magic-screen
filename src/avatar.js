@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { fitBodyCollider, BodyCollision } from './body.js';
+import { fitBodyCollider, BodyCollision, RoomCollision } from './body.js';
 
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'];
 const ALIASES = { joy: 'happy', fun: 'relaxed', sorrow: 'sad', mad: 'angry', shock: 'surprised', calm: 'relaxed', smug: 'relaxed' };
@@ -562,6 +562,9 @@ export class Avatar {
       }
       // her own body's shape keeps her arms and hands outside her clothes/hips/skirt (mesh-fitted collider)
       if (this.collision) { try { this.collision.apply(); } catch (e) { console.warn('collision', e); } }
+      // her room (floor, wall behind her, stage edges) as colliders too
+      if (!this.roomCol && this.feet) { try { this.roomCol = new RoomCollision(this); } catch (e) { console.warn('room', e); } }
+      if (this.roomCol) { try { this.roomCol.apply(); } catch (e) { console.warn('room collision', e); } }
       // eyes: she looks at things (you, her desktop panel, chat, her own hand when it's doing something,
       // sometimes the floor), with little saccades on top and the head following big eye turns a bit
       if (this.gazeGoal && now > this.gazeGoal.until) this.gazeGoal = null;

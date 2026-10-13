@@ -4,3 +4,4 @@ dist/
 .env*
 public/bg-room.jpg
 public/mediapipe/
+__pycache__/

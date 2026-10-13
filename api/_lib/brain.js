@@ -196,6 +196,9 @@ export async function* thinkEvents(input) {
     yield { type: 'done' };
     return;
   }
+  // multi-model routing, as it actually happened for this message (run side by side where they can)
+  const routes = [input.skill ? `${input.skill.name} skill (${input.skill.queued ? 'on her desktop' : 'ran on her box'})` : null, input.memories ? `memory (${input.memories.length} recalled)` : null].filter(Boolean);
+  yield { type: 'step', kind: 'plan', text: `routing: ${routes.length ? routes.join(' + ') + ' in parallel → ' : ''}JenaXI-chat answers (JenaXI-0 is the backup)${input.skill?.name === 'ask_grok' ? ' · Grok is asked on her desktop, labelled as Grok' : ''}` };
   if (input.memories?.length) yield { type: 'step', kind: 'think', text: `remembered: ${input.memories.map((x) => x.fact).join(' · ').slice(0, 220)}` };
   if (input.skill) yield { type: 'step', kind: 'tool', text: input.skill.queued ? `using skill: ${input.skill.name} (on her desktop, results show there)` : `using skill: ${input.skill.name} → ${input.skill.ok ? input.skill.summary : 'failed: ' + input.skill.summary}` };
   const chatMode = p.format === 'chat';

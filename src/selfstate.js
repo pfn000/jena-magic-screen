@@ -219,6 +219,7 @@ export class SelfSense {
       ...(() => { const b = this.avatar.balance?.(); return b ? [`balance ${b.ok ? 'ok' : 'OFF'} · over ${b.over === 'left' ? 'L' : 'R'} foot (${b.marginCm}cm)`, `facing ${b.facing >= 0 ? '+' : ''}${b.facing}° (0 = you)`] : []; })(),
       ...(this.avatar.collision ? [`arms clear of body ${this.avatar.collision.stats.minClearCm ?? '?'}cm · pushes ${this.avatar.collision.stats.corrections}`] : []),
       `looking at ${this.avatar.gazeNow || 'you'}`,
+      ...(() => { const r = this.avatar.roomCol?.stats; return r && r.wallCm != null ? [`room: wall ${r.wallCm}cm behind · hands ${r.floorCm}cm over floor · edge ${r.sideCm}cm${r.lastTouch && Date.now() - r.lastTouch.at < 5000 ? ` · kept ${r.lastTouch.what} off the ${r.lastTouch.where}` : ''}`] : []; })(),
       `${S.counts.bones} bones`,
     ];
     const E = (n) => Math.round((S.expressions[n] || 0) * 100);
