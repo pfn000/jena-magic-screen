@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mama's mid-action corrections for Jena's desktop agent (read side).
 
-Her gateway (box/jena-gateway.mjs) appends one JSON line to /home/jena/.jena/mama_queue.jsonl when MAMA
+Her gateway (box/jena-gateway.mjs) appends one JSON line to /home/jena/.jena-mama/mama_queue.jsonl when MAMA
 (passcode-verified on her site, never public or Twitch chat) says "stop" or "no, do X instead" while Jena works:
   {"ts": 1791903970751, "kind": "stop", "do": null, "text": "stop", "from": "mama", "via": "chat"}
   {"ts": 1791903970770, "kind": "instead", "do": "open youtube", "text": "no, open youtube instead", "from": "mama", "via": "chat"}
@@ -14,11 +14,11 @@ Integration in jena_desk.py (owner integrates; 3 lines):
     if m:  # abort the current action; if m["do"] is set, run it as her next command (same path as a chat command)
         ...
 poll() returns the newest unread instruction younger than max_age seconds (older ones are skipped, never replayed after a
-restart) and remembers how far it read in /home/jena/.jena/mama_queue.offset. Read-only on the queue; no network, no deps.
+restart) and remembers how far it read in /home/jena/.jena-mama/mama_queue.offset (the dir is jena's, writable by her gateway via ACL). Read-only on the queue; no network, no deps.
 """
 import json, os, time
 
-QUEUE = os.environ.get('JENA_MAMA_QUEUE', '/home/jena/.jena/mama_queue.jsonl')
+QUEUE = os.environ.get('JENA_MAMA_QUEUE', '/home/jena/.jena-mama/mama_queue.jsonl')
 
 
 class MamaQueue:

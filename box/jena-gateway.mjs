@@ -75,14 +75,15 @@ function desktopSay(ctx, box) {
 // ---------------------------------------------------------------- mama corrections: verified facts (persist across restarts)
 const MAMA_FACTS = `${STATE}/mama_facts.jsonl`;
 const CORR_TRAIN = E('JENA_CORRECTIONS', '/home/user/tab/files/jenaxi/data/persona_corrections.jsonl');
-const MAMA_QUEUE = E('JENA_MAMA_QUEUE', '/home/jena/.jena/mama_queue.jsonl');   // her desktop agent reads this between steps
+const MAMA_QUEUE = E('JENA_MAMA_QUEUE', '/home/jena/.jena-mama/mama_queue.jsonl');   // her desktop agent reads this between steps (not in ~/.jena: jena_desk.py chmods that 700 on every start)
 // facts file: one JSON line per fact; a {"revoke": ts} line takes one back ("forget that")
 function mamaFacts() {
   let L = []; try { L = fs.readFileSync(MAMA_FACTS, 'utf8').trim().split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch {}
   const gone = new Set(L.filter((x) => x.revoke).map((x) => x.revoke));
   return L.filter((f) => f.right && !f.revoked && !gone.has(f.ts)).slice(-200);
 }
-const LAST = { mama: null, pub: null };
+const LAST_FILE = `${STATE}/last_turn.json`;   // the last exchange per side (mama / public), kept across restarts
+const LAST = (() => { try { return { mama: null, pub: null, ...JSON.parse(fs.readFileSync(LAST_FILE, 'utf8')) }; } catch { return { mama: null, pub: null }; } })();
 function forgetLastMamaFact() { const f = mamaFacts().at(-1); if (f) fs.appendFileSync(MAMA_FACTS, JSON.stringify({ revoke: f.ts, at: Date.now() }) + '\n'); return f || null; }
 function queueForDesk(c, via) {   // "stop" / "do X instead": her desktop agent reads this file between steps
   const q = { ts: Date.now(), kind: c.kind, do: c.kind === 'stop' ? null : c.right, text: c.raw, from: 'mama', via };
@@ -180,7 +181,8 @@ async function brain(req, res, url, base, modelName) {
     const lastJena = [...messages].reverse().find((m) => m.role === 'assistant')?.content || (fresh ? last.a : null);
     const parsed = T.parseCorrection(userText, { afterReply: !!lastJena });
     const corr = isMama ? parsed : null;
-    const refuse = !isMama && parsed && !parsed.instruction && !String(req.url).startsWith('/japi');   // public "no, it's X": facts don't change
+    const pubTry = isMama ? null : T.parseCorrection(userText, { afterReply: true });
+    const refuse = !isMama && pubTry && !pubTry.instruction && !String(req.url).startsWith('/japi');   // public "no, it's X": facts don't change
     const forget = isMama && /^\s*(?:jena[\s,]+)?forget (?:that|the last (?:fact|correction|thing i (?:told|taught) you))[\s.!]*$/i.test(strip(userText));
     const known = corr || refuse || forget ? null : T.factAnswer(strip(userText), seenFacts);
     rec.mama = isMama;
@@ -247,7 +249,7 @@ async function brain(req, res, url, base, modelName) {
   const lastText = text, lastUserText = userText;
   if (rec.private) Object.assign(rec, { user: '(private, mama only)', reply: '(private)', raw: '', fact: rec.fact ? { private: true, ts: rec.fact.ts } : undefined });   // /brain/log is readable by the public site
   logBrain(rec);
-  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() };
+  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {}
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
   const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {
