@@ -1,7 +1,7 @@
 // Jena's virtual desktop panel. Two views, picked per device:
 //  * MAMA VIEW (this device holds mama's dev passcode, not OBS): her smooth, RAW, full-fps desktop through a one-time
 //    view-only token (/api/mama watch -> wss://box/websockify-watch?t=…, the view-only VNC). Never censored, never
-//    public; only a private sign-in window covers it. ?public=1 shows mama the public view instead.
+//    public; a private sign-in window only adds a small corner pill. ?public=1 shows mama the public view instead.
 //  * PUBLIC / OBS: censored frames only (box/desktop/jena_censor.py OCRs + blacks out emails, IPs, codes, keys,
 //    phones on her box). A slow read never flashes the lock card: the last good censored frame stays up until the
 //    next one is ready. The whole-screen card only shows for real private states (sign-in page, inbox, keys on
@@ -69,10 +69,14 @@ export class Desktop {
     this.vnc.className = 'desk-mama';
     this.vnc.style.cssText = 'position:absolute;inset:0;display:none;background:#000;';
     this.screen.appendChild(this.vnc);
-    this.cover = document.createElement('div');   // mama view: only a private sign-in window covers it
-    this.cover.className = 'desk-cover';
-    this.cover.style.cssText = 'position:absolute;inset:0;display:none;place-content:center;text-align:center;color:#f8eaff;font-weight:800;background:radial-gradient(circle at 50% 40%,#6b4f8c 0%,#2e2142 70%);';
-    this.cover.textContent = '🔒 private sign-in window open';
+    this.cover = document.createElement('a');   // mama view: a small corner pill while a private sign-in window is open
+    this.cover.className = 'desk-signin-pill';
+    this.cover.style.cssText = 'position:absolute;right:8px;bottom:8px;display:none;padding:5px 10px;border-radius:999px;background:rgba(46,33,66,.88);color:#f8eaff;font:700 12px system-ui;text-decoration:none;z-index:3;';
+    this.cover.textContent = '🔑 sign-in window open';
+    this.cover.addEventListener('click', (e) => {   // opens the sign-in window when the dev panel shows its card
+      const open = document.querySelector('[data-ask-signin]');
+      if (open) { e.preventDefault(); open.click(); } else if (!this.cover.getAttribute('href')) e.preventDefault();
+    });
     this.screen.appendChild(this.cover);
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.mode === 'public') this.kick(); });
     this.setUrl(url, true);
@@ -114,7 +118,7 @@ export class Desktop {
     this.vnc.style.display = 'block';
     this.imgs.forEach((im) => { im.style.opacity = '0'; });
     const rfb = new RFB(this.vnc, r.ws, { shared: true });
-    rfb.viewOnly = true; rfb.scaleViewport = true; rfb.resizeSession = false; rfb.focusOnClick = false; rfb.showDotCursor = false;
+    rfb.viewOnly = true; rfb.scaleViewport = true; rfb.resizeSession = false; rfb.focusOnClick = false; rfb.showDotCursor = true;   // her cursor is drawn into the picture by the box too
     rfb.background = '#000';
     this.rfb = rfb;
     rfb.addEventListener('connect', () => { this.mamaOk = Date.now(); this.awake(); });
@@ -211,7 +215,11 @@ export class Desktop {
     const priv = s.state === 'private';
     this.privRun = priv === this.privLast ? (this.privRun || 0) + 1 : 1; this.privLast = priv;
     if (this.privRun >= 2) this.root.classList.toggle('is-private', this.mode === 'public' && priv);
-    if (this.mode === 'mama') this.cover.style.display = s.reason === 'signin' ? 'grid' : 'none';
+    if (this.mode === 'mama') {
+      const on = s.reason === 'signin';
+      this.cover.style.display = on ? 'block' : 'none';
+      if (on) this.cover.textContent = document.querySelector('[data-ask-signin]') ? '🔑 sign-in window open, tap to open it' : '🔑 sign-in window open';
+    }
     this.paintBadge();
   }
 

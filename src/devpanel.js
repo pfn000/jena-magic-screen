@@ -113,7 +113,7 @@ export class DevPanel {
     box.innerHTML = '<header>🖐 You are driving Jena\'s desktop (her hands are paused) <span class="to-st">connecting…</span><button style="margin-left:auto">give it back ✕</button></header><div class="to-screen"></div>';
     document.body.appendChild(box);
     const rfb = new RFB(box.querySelector('.to-screen'), ws, { shared: true });
-    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true;
+    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.showDotCursor = true;
     const st = box.querySelector('.to-st');
     rfb.addEventListener('connect', () => (st.textContent = 'connected'));
     rfb.addEventListener('disconnect', (ev) => (st.textContent = ev.detail?.clean ? 'disconnected' : 'connection dropped (token used or expired? press take over again)'));
