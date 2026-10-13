@@ -9,6 +9,11 @@
   const dur = (s) => { if (s == null) return '–'; s = Math.round(s); if (s < 60) return s + 's'; if (s < 3600) return Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : ''); return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm'; };
   const ago = (iso) => { const a = age(iso); return a == null ? '–' : dur(a) + ' ago'; };
   const tone = (s) => (s == null ? '' : s < 120 ? 'g' : s < 300 ? 'y' : 'r');
+  const openTerms = new Set(JSON.parse(localStorage.getItem('tablive.terms') || '[]'));
+  const TK = { cmd: ['#3ddc84', '$ '], code: ['#d6e2ee', '> '], out: ['#7d8b9b', '  '], err: ['#ff5f56', '! '], tool: ['#c58cff', ''], git: ['#f5c542', ''], file: ['#58a6ff', '── '], add: ['#3ddc84', ''], del: ['#ff5f56', ''], more: ['#5b6776', ''] };
+  function termHTML(lines, tag) {
+    return lines.map((l) => { const [c, pre] = TK[l.k] || ['#d6e2ee', '']; return `<div style="color:${c}">${tag && l.b ? `<span style="color:#5b6776">[${esc(l.b)}]</span> ` : ''}${l.k === 'cmd' || l.k === 'git' ? `<span style="color:#5b6776">${hhmm2(l.t)}</span> ` : ''}${esc(pre + l.x)}</div>`; }).join('');
+  }
   const openActs = new Set(JSON.parse(localStorage.getItem('tablive.open') || '[]'));
   const hhmm2 = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch { return ''; } };
   const TODO_ST = { new: ['y', '🆕 new'], seen: ['b', '👀 seen by Tab'], building: ['g', '🔨 building'], done: ['b', '✓ done'] };
@@ -60,12 +65,13 @@
     const act = b.activity;
     const nowRun = live && act && act.now ? `<div class="cur"><b style="color:var(--y)">now running:</b> ${esc(act.now.what)} <span class="sub">(${dur(age(act.now.since))})</span></div>` : '';
     const feed = act && act.recent && act.recent.length ? `<details class="acts"${live && openActs.has(b.id) ? ' open' : ''} data-id="${esc(b.id)}"><summary class="sub">last ${act.recent.length} actions${act.count ? ` · ${act.count} in view` : ''}</summary><ul class="steps">${act.recent.map((a) => `<li class="${a.err ? '' : a.done ? 'd' : 'c'}"${a.err ? ' style="color:var(--r)"' : ''}><span class="sub mono">${hhmm2(a.at)}</span> ${esc(a.what)}${a.done ? ` <span class="sub">${dur((Date.parse(a.done) - Date.parse(a.at)) / 1000)}</span>` : ' …'}</li>`).join('')}</ul></details>` : '';
+    const term = live && act && act.term && act.term.length ? `<details class="termd"${openTerms.has(b.id) ? ' open' : ''} data-id="${esc(b.id)}"><summary class="sub">▸ live terminal (${act.term.length} lines${act.diffs && act.diffs.length ? ' + commit diffs' : ''})</summary><div class="term" data-scroll="${esc(b.id)}">${termHTML(act.term.concat(act.diffs || []))}</div></details>` : '';
     return `<div class="card ${b.status === 'stalled?' ? 'stall' : live ? 'run' : 'old'}">
       <div class="t">${esc(b.title)}</div>
       <div class="row"><span class="pill ${tn}">${tl}</span>
         ${live ? `<span class="pill ${tone(idle)}"><span class="dot ${tone(idle)}"></span> active ${idle == null ? '–' : dur(idle) + ' ago'}</span>` : `<span class="sub">ended ${b.ended ? ago(b.ended) : b.last_active ? ago(b.last_active) : ''}</span>`}
         <span class="sub mono">⏱ ${dur(runS)}</span><span class="sub">#${esc(b.id)}</span></div>
-      ${steps}${cur && cur !== 'done' ? `<div class="cur">${esc(cur)}</div>` : ''}${nowRun}${feed}
+      ${steps}${cur && cur !== 'done' ? `<div class="cur">${esc(cur)}</div>` : ''}${nowRun}${feed}${term}
       ${b.error ? `<div class="row" style="color:var(--r)">${esc(b.error)}</div>` : ''}
       ${b.commits && b.commits.length ? `<div class="row sub">commits: ${b.commits.map((c) => `<span class="sha">${esc(c)}</span>`).join(' ')}</div>` : ''}
     </div>`;
@@ -99,6 +105,7 @@
     ${ncomRecent.length ? `<h2>📡 mama → Tab (NCOM_Sys)</h2><div class="ncom">${ncomRecent.map((m) => `<div><span class="sub">${hhmm(m.at)}</span> ${m.from === 'mama' ? '<b style="color:var(--m)">mama →</b>' : '<b style="color:var(--g)">NCOM_Sys:</b>'} ${esc(m.text)}</div>`).join('')}</div>` : ''}
     <h2>Building now (${live.length})</h2>
     <div class="grid">${live.map(card).join('') || '<div class="card sub">nothing running right now</div>'}</div>
+    ${(() => { const all = []; live.forEach((b) => (b.activity?.term || []).forEach((l) => all.push({ ...l, b: b.id }))); all.sort((a, z) => (a.t || '').localeCompare(z.t || '')); return all.length ? `<h2>🖥 Live terminal · all builders</h2><div class="term" data-scroll="all" style="max-height:340px">${termHTML(all.slice(-200), true)}</div>` : ''; })()}
     ${d.queue && d.queue.length ? `<h2>Waiting for a builder (${d.queue.length})</h2><div class="grid">${d.queue.map((q) => `<div class="card"><div class="t">${esc(q.ask)}</div><div class="row sub">${q.at ? 'asked ' + ago(q.at) : ''}${q.note ? ' · ' + esc(q.note) : ''}</div></div>`).join('')}</div>` : ''}
     <h2>Finished in the last 3 h (${old.length})</h2>
     <div class="grid">${old.map(card).join('') || '<div class="card sub">none</div>'}</div>
@@ -120,6 +127,7 @@
   function wire() {
     const b = document.getElementById('todo-add'); if (b) b.onclick = addTodo;
     const ta = document.getElementById('todo-in'); if (ta) ta.onkeydown = (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addTodo(); };
+    app.querySelectorAll('details.termd').forEach((el) => el.addEventListener('toggle', () => { el.open ? openTerms.add(el.dataset.id) : openTerms.delete(el.dataset.id); localStorage.setItem('tablive.terms', JSON.stringify([...openTerms])); const t = el.querySelector('.term'); if (t) t.scrollTop = t.scrollHeight; }));
     app.querySelectorAll('details.acts').forEach((el) => el.addEventListener('toggle', () => { el.open ? openActs.add(el.dataset.id) : openActs.delete(el.dataset.id); localStorage.setItem('tablive.open', JSON.stringify([...openActs])); }));
   }
   async function poll() {
@@ -135,12 +143,14 @@
       skew = (t0 + Date.now()) / 2 - Date.parse(d.now);
       last = d; lastOk = Date.now(); fails = 0;
       const sc = document.getElementById('feed')?.scrollTop || 0;
+      const tsc = {}; app.querySelectorAll('.term[data-scroll]').forEach((el) => { tsc[el.dataset.scroll] = el.scrollHeight - el.scrollTop - el.clientHeight < 24 ? 'bottom' : el.scrollTop; });
       const ta = document.getElementById('todo-in'); const focused = ta && document.activeElement === ta; const sel = ta ? [ta.selectionStart, ta.selectionEnd] : null;
       if (ta) draft = ta.value;
       if (focused && draft) { timer = setTimeout(poll, 3000); last = d; return; }   // don't redraw under her fingers
       render(d); wire();
       if (focused) { const t2 = document.getElementById('todo-in'); t2.focus(); try { t2.setSelectionRange(...sel); } catch {} }
       const f = document.getElementById('feed'); if (f) f.scrollTop = sc;
+      app.querySelectorAll('.term[data-scroll]').forEach((el) => { const v = tsc[el.dataset.scroll]; el.scrollTop = v === undefined || v === 'bottom' ? el.scrollHeight : v; });
     } catch (e) {
       fails++;
       if (last) { render(last); wire(); app.querySelector('.bar')?.insertAdjacentHTML('beforeend', `<span class="pill r">box not answering (${esc(e.message)}) · retrying</span>`); }
