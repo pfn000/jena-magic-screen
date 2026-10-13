@@ -14,7 +14,7 @@ vid = f'{W}/tmp/{cid}.mp4'
 src = c.get('source') or {}
 if blob:
     req = urllib.request.Request(f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/git/blobs/{blob}",
-                                 headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github.raw'})
+                                 headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github.raw+json', 'User-Agent': 'jena-track'})
     open(vid, 'wb').write(urllib.request.urlopen(req, timeout=120).read())
 if not os.path.exists(vid) or os.path.getsize(vid) < 1000:
     a, b = src.get('start'), src.get('end')
@@ -32,7 +32,7 @@ r = subprocess.run([sys.executable, os.path.join(ROOT, 'moves-pipeline/holistic.
                    capture_output=True, text=True, timeout=2400)
 line = (r.stdout.strip().splitlines() or [''])[-1]
 if r.returncode != 0 or not line.startswith('{'):
-    print(r.stdout[-3000:], r.stderr[-3000:]); raise SystemExit('tracking failed')
+    print(r.stdout[-4000:]); print(r.stderr[-6000:]); raise SystemExit('tracking failed')
 res = json.loads(line)
 sys.path.insert(0, os.path.join(ROOT, 'moves-pipeline'))
 import numpy as np, retarget_full

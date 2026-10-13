@@ -32,9 +32,15 @@ jobs:
           pip install -q "mediapipe==1.1.0" opencv-python-headless numpy scipy yt-dlp || pip install -q "mediapipe==0.10.21" opencv-python-headless numpy scipy yt-dlp
       - name: track ${{ matrix.clip.id }}
         env: { GH_TOKEN: "${{ github.token }}", OMP_NUM_THREADS: "4" }
-        run: python3 moves-pipeline/gha_track.py "${{ matrix.clip.id }}" "${{ matrix.clip.blob }}"
+        shell: bash
+        run: |
+          mkdir -p out
+          python3 -c "import mediapipe, cv2, numpy; print('mediapipe', mediapipe.__version__, 'cv2', cv2.__version__, 'numpy', numpy.__version__)" 2>&1 | tee out/${{ matrix.clip.id }}.log
+          python3 moves-pipeline/gha_track.py "${{ matrix.clip.id }}" "${{ matrix.clip.blob }}" 2>&1 | tail -c 20000 | tee -a out/${{ matrix.clip.id }}.log
+          exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@v4
-        with: { name: "move-${{ matrix.clip.id }}", path: "out/${{ matrix.clip.id }}.json", retention-days: 7 }
+        if: always()
+        with: { name: "move-${{ matrix.clip.id }}", path: "out/${{ matrix.clip.id }}.*", retention-days: 7 }
   publish:
     needs: track
     if: always()
@@ -48,6 +54,8 @@ jobs:
         run: |
           ls -la arts || true
           gh release view jena-track-moves -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create jena-track-moves -R "$GITHUB_REPOSITORY" --title "Jena whole-body moves" --notes "body + fingers + face, tracked on GitHub runners (jena-track.yml)" --prerelease
-          ls arts/*.json >/dev/null 2>&1 && gh release upload jena-track-moves arts/*.json --clobber -R "$GITHUB_REPOSITORY"
+          ls arts/*.json >/dev/null 2>&1 && gh release upload jena-track-moves arts/*.json --clobber -R "$GITHUB_REPOSITORY" || true
+          for f in arts/*.log; do [ -f "$f" ] && cp "$f" "$REQ-$(basename "$f")"; done
+          ls "$REQ"-*.log >/dev/null 2>&1 && gh release upload jena-track-moves "$REQ"-*.log --clobber -R "$GITHUB_REPOSITORY" || true
           echo "{\"request_id\":\"$REQ\",\"run\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\",\"files\":[$(ls arts 2>/dev/null | sed 's/.*/"&"/' | paste -sd,)]}" > "$REQ.manifest.json"
           gh release upload jena-track-moves "$REQ.manifest.json" --clobber -R "$GITHUB_REPOSITORY"
