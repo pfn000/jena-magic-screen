@@ -366,7 +366,8 @@ def clipboard_text():
     return sh(['xclip', '-o', '-selection', 'clipboard'], timeout=4)
 
 def skill_ask_grok(inp):
-    """ask Grok on grok.com in her own Firefox, signed out like any visitor; label the answer as Grok's"""
+    """ask Grok on grok.com in her own Firefox (her persistent profile: if mama signed in there once via takeover, it stays
+    signed in); label the answer as Grok's. Never signs in, never makes accounts, never touches a CAPTCHA."""
     q = (inp.get('question') or inp.get('text') or '').strip()
     q = re.sub(r'^(jena[, ]+)?(please )?(can you )?(ask grok( to| about)?)\s*', '', q, flags=re.I).strip(' ?') or q
     if not q: return {'ok': False, 'summary': 'no question for Grok'}
@@ -379,33 +380,58 @@ def skill_ask_grok(inp):
     if not wid: return {'ok': False, 'summary': 'my browser did not open'}
     g = dict(l.split('=', 1) for l in sh(['xdotool', 'getwindowgeometry', '--shell', str(int(wid, 16))]).splitlines() if '=' in l)
     X, Y, W, H = (int(g.get(k, 0)) for k in ('X', 'Y', 'WIDTH', 'HEIGHT'))
-    focus(wid)
-    sh(['xdotool', 'mousemove', str(X + W // 2), str(Y + int(H * 0.42)), 'click', '1']); time.sleep(0.6)
-    sh(['xdotool', 'type', '--delay', '35', q[:300]]); time.sleep(0.4); key('Return')
-    before = ''
-    text = ''
+    def page_text():
+        if mama['driving']: return ''
+        focus(wid); key('ctrl+a'); time.sleep(0.3); key('ctrl+c'); time.sleep(0.4)
+        t = clipboard_text()
+        sh(['xdotool', 'mousemove', str(X + W - 30), str(Y + H // 2), 'click', '1'])   # drop the selection
+        return t
+    WALL = r'sign up to continue|continue your conversation|sign in to continue|log in to continue|create an account|sign up for free'
+    CF = r'verify you are human|checking your browser|just a moment|performance & security by cloudflare|needs to review the security'
+    first = page_text()
+    if re.search(CF, first or '', re.I):
+        why = 'grok.com put up a Cloudflare "verify you are human" check, and I do not do CAPTCHAs by myself'
+        ask_mama(f'I tried asking Grok "{q[:80]}" but {why}.'); return {'ok': False, 'summary': why}
+    # the composer is in the middle of a fresh page (signed out or in) and at the bottom of an open chat: try both,
+    # and only press Enter once the question is really in a box
+    typed = False
+    for frac in (0.42, 0.5, 0.88):
+        if mama['driving']: return {'ok': False, 'summary': 'mama took over, so I stopped asking Grok'}
+        focus(wid)
+        sh(['xdotool', 'mousemove', str(X + W // 2), str(Y + int(H * frac)), 'click', '1']); time.sleep(0.6)
+        key('ctrl+a'); sh(['xdotool', 'type', '--delay', '35', q[:300]]); time.sleep(0.5)
+        key('ctrl+a'); time.sleep(0.2); key('ctrl+c'); time.sleep(0.3)
+        sel = clipboard_text()
+        if sel and sel.strip() == q[:300].strip():   # the box holds exactly the question: that was the composer
+            key('End'); typed = True; break
+        key('Escape')
+    if not typed:
+        why = 'I could not find the question box on grok.com'
+        ask_mama(f'I tried asking Grok "{q[:80]}" but {why}.'); return {'ok': False, 'summary': why}
+    key('Return')
+    before, text = '', ''
     for _ in range(9):
         time.sleep(5)
-        focus(wid); key('ctrl+a'); time.sleep(0.3); key('ctrl+c'); time.sleep(0.4)
-        text = clipboard_text()
-        sh(['xdotool', 'mousemove', str(X + W - 30), str(Y + H // 2), 'click', '1'])
+        if mama['driving']: return {'ok': False, 'summary': 'mama took over, so I stopped asking Grok'}
+        text = page_text()
         if text and text == before and q[:30] in text: break
         before = text
     ans = ''
     if q[:30] in text:
-        ans = text.split(q[:30], 1)[1]
+        ans = text.rsplit(q[:30], 1)[1]          # the last copy of the question is the one in the chat (the sidebar lists it too when signed in)
         ans = ans.split(q[30:], 1)[-1] if len(q) > 30 else ans
-        ans = re.split(r'\n\s*(Ask anything|How can Grok help|Grok can make mistakes|DeepSearch|Think\b|Auto\b|By messaging Grok)', ans)[0]
+        ans = re.split(r'\n\s*(Ask anything|How can Grok help|What do you want to know|Grok can make mistakes|DeepSearch|Think\b|Auto\b|By messaging Grok)', ans)[0]
         ans = re.sub(r'\n{2,}', '\n', ans).strip()
-    wall = re.search(r'sign up to continue|continue your conversation|sign in to continue|log in to continue|create an account', ans or text or '', re.I)
+    wall = re.search(WALL, ans or text or '', re.I)
     if wall: ans = ''
     if not ans:
-        signed = wall or re.search(r'\b(sign in|log in|sign up)\b', text or '', re.I)
-        why = 'grok.com showed a "sign up to continue" wall, and I do not sign in or make accounts by myself' if signed else 'I could not read an answer off the page'
+        if re.search(CF, text or '', re.I): why = 'grok.com put up a Cloudflare "verify you are human" check, and I do not do CAPTCHAs by myself'
+        elif wall or re.search(r'\b(sign in|log in|sign up)\b', text or '', re.I): why = 'grok.com showed a "sign up to continue" wall (signed-out visitors get no answer), and I do not sign in or make accounts by myself. Mama: sign in once on my desktop (dev panel -> take over) and it stays signed in'
+        else: why = 'I could not read an answer off the page'
         ask_mama(f'I tried asking Grok "{q[:80]}" but {why}.')
         return {'ok': False, 'summary': why}
     os.makedirs(os.path.join(HOME, 'learned'), exist_ok=True)
-    rec = {'ts': int(time.time() * 1000), 'question': q, 'answer': ans[:4000], 'source': 'Grok (grok.com, signed out, in her browser)', 'note': 'Grok\'s answer, not Jena\'s own brain'}
+    rec = {'ts': int(time.time() * 1000), 'question': q, 'answer': ans[:4000], 'source': 'Grok (grok.com, in her own browser)', 'note': 'Grok\'s answer, not Jena\'s own brain'}
     with open(os.path.join(HOME, 'learned', 'grok_notes.jsonl'), 'a') as f: f.write(json.dumps(rec) + '\n')
     with open(os.path.join(HOME, 'notes', 'learned_from_grok.md'), 'a') as f: f.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} I asked Grok: {q}\nGrok said: {ans[:1500]}\n")
     did(f'Grok answered (Grok\'s words, saved to my memory): "{re.sub(chr(10), " ", ans)[:160]}"', 'skill')
@@ -714,6 +740,10 @@ def eyes():
     global shot_jpg
     lasthash = None
     while True:
+        if mama['driving']:   # mama is driving (e.g. signing in somewhere): no screenshot, no OCR, nothing published
+            with lock:
+                screen.update({'ts': int(time.time() * 1000), 'summary': 'mama is driving my desktop, so I am not looking (private)', 'text': ''})
+            time.sleep(2); continue
         try:
             raw = os.path.join(STATE, 'screen.png')
             sh(['import', '-silent', '-window', 'root', raw], timeout=8)
@@ -763,6 +793,7 @@ seen_recent = deque(maxlen=30)
 import secrets
 MAMA_HASH = os.path.join(STATE, 'mama.sha256')
 takeover_tokens = {}          # token -> expiry
+public_viewers = set()        # open view-only stream connections (closed the moment mama takes over)
 mama = {'driving': 0, 'private_until': 0}
 def is_mama(hdrs):
     try: want = open(MAMA_HASH).read().strip()
@@ -882,8 +913,11 @@ def thoughts_since(since=0, last=8):
 # ---------------------------------------------------------------- the door (http + websocket passthrough)
 def payload():
     with lock:
+        if mama['driving']:
+            return {'ok': True, 'summary': 'mama is driving my desktop (private)', 'text': '', 'active': {}, 'windows': [],
+                    'actions': [], 'video': None, 'now': int(time.time() * 1000), 'mama_driving': True, 'private': True, 'updating': {}}
         return dict(screen, actions=list(actions)[-8:], video=watching['video'], now=int(time.time() * 1000),
-                    mama_driving=mama['driving'] > 0, private=time.time() < mama['private_until'], updating=updating.copy())
+                    mama_driving=mama['driving'] > 0, private=(time.time() < mama['private_until'] or mama['driving'] > 0), updating=updating.copy())
 
 CORS = b'Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
 
@@ -990,19 +1024,27 @@ async def client(reader, writer):
         except Exception:
             writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
-        mama['driving'] += 1; did('mama took over my desktop, my hands are off', 'help')
+        mama['driving'] += 1; did('mama took over my desktop, my hands are off (and my screen is private while she drives)', 'help')
+        for v in list(public_viewers):   # the public view-only stream stops while mama drives
+            try: v.close()
+            except Exception: pass
         try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
         finally:
             mama['driving'] = max(0, mama['driving'] - 1)
             if not mama['driving']: did('mama gave my desktop back', 'help')
         return
     if p.startswith('/websockify'):
+        if mama['driving']:   # private while mama drives; the page's viewer retries by itself afterwards
+            writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         try:
             ur, uw = await asyncio.open_connection(*WS_UPSTREAM)
         except Exception:
             writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
-        await asyncio.gather(pipe(reader, uw), pipe(ur, writer)); return
+        public_viewers.add(writer)
+        try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+        finally: public_viewers.discard(writer)
+        return
     hdrs = {}
     for l in head.decode('latin1').split('\r\n')[1:]:
         if ':' in l:
@@ -1017,7 +1059,8 @@ async def client(reader, writer):
     elif p in ('/box/screen.json', '/box/screen', '/screen.json'):
         out = json.dumps(payload()).encode()
     elif p in ('/box/shot.jpg', '/shot.jpg'):
-        ctype, out = 'image/jpeg', shot_jpg
+        if mama['driving']: status, out = 403, b'{"error":"private while mama drives"}'
+        else: ctype, out = 'image/jpeg', shot_jpg
     elif p in ('/box/desktop.json', '/box', '/box/'):
         out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
     elif p == '/box/thoughts':
