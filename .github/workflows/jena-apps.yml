@@ -1,0 +1,96 @@
+# Jena's app pipeline (free GitHub-hosted runners, public repo). Her box dispatches this with an app name from
+# ops/apps/apps.json; the build/download/run commands live in that file, never in the dispatch. Linux apps are built
+# or downloaded inside debian:bookworm (same glibc as her box) and packaged as .tar.gz; Windows-only programs run
+# headless on windows-latest and their output comes back. Each run uploads an artifact and refreshes the release
+# "jena-app-<name>" (package + <name>.manifest.json with name, version, sha256, size, source URL, run URL).
+name: jena-apps
+run-name: "jena-apps ${{ inputs.app }} [${{ inputs.request_id }}]"
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "app name from ops/apps/apps.json"
+        required: true
+        type: string
+      request_id:
+        description: "id Jena's box uses to find this run"
+        required: false
+        default: manual
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: jena-apps-${{ inputs.app }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      name: ${{ steps.p.outputs.name }}
+      platform: ${{ steps.p.outputs.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: ops/apps }
+      - id: p
+        shell: bash
+        env: { APP: "${{ inputs.app }}" }
+        run: python3 ops/apps/plan.py "$APP" | tee -a "$GITHUB_OUTPUT"
+
+  linux:
+    needs: plan
+    if: needs.plan.outputs.platform == 'linux'
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    timeout-minutes: 60
+    steps:
+      - run: apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates git python3 file bzip2 xz-utils >/dev/null
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: ops/apps }
+      - name: build or download
+        env:
+          APP: ${{ needs.plan.outputs.name }}
+          REQ: ${{ inputs.request_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ops/apps/jena_apps_build.py "$APP"
+      - uses: actions/upload-artifact@v4
+        with: { name: "jena-app-${{ needs.plan.outputs.name }}", path: out/, retention-days: 7, if-no-files-found: error }
+
+  windows:
+    needs: plan
+    if: needs.plan.outputs.platform == 'windows'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: ops/apps }
+      - name: run headless
+        shell: pwsh
+        env:
+          APP: ${{ needs.plan.outputs.name }}
+          REQ: ${{ inputs.request_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python ops/apps/jena_apps_build.py "$env:APP"
+      - uses: actions/upload-artifact@v4
+        with: { name: "jena-app-${{ needs.plan.outputs.name }}", path: out/, retention-days: 7, if-no-files-found: error }
+
+  publish:
+    needs: [plan, linux, windows]
+    if: always() && needs.plan.result == 'success' && (needs.linux.result == 'success' || needs.windows.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: "jena-app-${{ needs.plan.outputs.name }}", path: out }
+      - name: refresh release jena-app-<name>
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.plan.outputs.name }}
+        run: |
+          tag="jena-app-$NAME"
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --title "Jena app: $NAME" \
+              --notes "Built by the jena-apps workflow for Jena's desktop. Assets are replaced on every run; check <name>.manifest.json for the sha256 and the run it came from."
+          gh release upload "$tag" out/* -R "$GITHUB_REPOSITORY" --clobber
+          ls -l out; cat out/*.manifest.json
