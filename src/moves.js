@@ -19,8 +19,9 @@ const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THRE
 const [_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8] = Array.from({ length: 8 }, () => new THREE.Vector3());
 
 export class Moves {
-  constructor(avatar, { log = () => {}, base = '/moves/', remember = null, card = null } = {}) {
+  constructor(avatar, { log = () => {}, base = '/moves/', boxBase = null, remember = null, card = null } = {}) {
     this.avatar = avatar;
+    this.boxBase = boxBase; // moves she learned by herself on her box (served from ~/learned/moves)
     this.log = log;
     this.base = base;
     this.remember = remember; // optional (event) => void: her memory, when there is one
@@ -44,13 +45,20 @@ export class Moves {
       const j = await r.json();
       this.library = (j.clips || []).filter((c) => c.file);
     } catch (e) { console.warn('moves: no library', e); this.library = []; }
+    if (this.boxBase) {
+      try {
+        const b = await fetch(this.boxBase + 'index.json', { cache: 'no-cache' }).then((r) => r.json());
+        this.boxLearned = b;
+        for (const c of b.clips || []) if (c.file && !this.library.some((x) => x.id === c.id)) this.library.push({ ...c, base: this.boxBase });
+      } catch (e) { this.boxLearned = { error: String(e.message || e) }; }
+    }
     if (typeof window !== 'undefined') window.jenaMoves = this;
     return this.library.length;
   }
 
   async clip(meta) {
     if (this.cache.has(meta.id)) return this.cache.get(meta.id);
-    const r = await fetch(this.base + meta.file);
+    const r = await fetch((meta.base || this.base) + meta.file);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     const s = 1 / (j.scale || 1000);

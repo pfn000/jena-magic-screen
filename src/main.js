@@ -118,7 +118,7 @@ if (skillsPub) {
 // ---------------- her own body: autonomy + self-vision ----------------
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
 // moves she learned by watching videos of real people move (pose-tracked into her own clips, /moves/)
-autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), remember: rememberMove, card: (trigger) => chain.start(trigger) });
+autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), remember: rememberMove, card: (trigger) => chain.start(trigger), boxBase: cfg.apiInfo?.box?.url ? cfg.apiInfo.box.url + '/box/moves/' : null });
 const params = new URLSearchParams(location.search);
 // her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
 const selfSense = new SelfSense(avatar, {

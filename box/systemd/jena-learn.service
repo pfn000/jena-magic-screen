@@ -1,0 +1,13 @@
+[Unit]
+Description=Jena learns moves from online videos (one at a time, low priority, waits for free RAM)
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+User=user
+Nice=15
+ExecStart=/home/user/moves-venv/bin/python /home/user/tab/files/jena-magic-screen/repo/box/learn/learn_service.py
+Environment=MPLBACKEND=Agg
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

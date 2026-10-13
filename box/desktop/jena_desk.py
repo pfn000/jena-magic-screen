@@ -631,7 +631,7 @@ def hands():
                 text = ev.get('text', '')
                 u = url_in(text)
                 sk = skills.match(text)
-                if sk and not (u and sk not in ('fetch_page', 'ask_grok')):
+                if sk and not (u and sk not in ('fetch_page', 'ask_grok', 'learn_move')):
                     use_skill(sk, text)
                 elif u:
                     did(f'{ev.get("user") or "someone"} sent me a link, opening exactly {u[:90]}')
@@ -955,6 +955,12 @@ async def client(reader, writer):
     elif p in ('/box/skills/run', '/box/skills/create', '/box/activity') or p.startswith('/box/mama/'):
         if not is_mama(hdrs): status, out = 401, json.dumps({'ok': False, 'summary': "mama's passcode is needed for this"}).encode()
         else: status, out = await mama_door(p, method, body)
+    elif p.startswith('/box/moves/'):
+        fn = os.path.basename(p)
+        fp = os.path.join(HOME, 'learned', 'moves', fn)
+        if re.fullmatch(r'[\w-]+\.json', fn) and os.path.exists(fp): out = open(fp, 'rb').read()
+        elif fn == 'index.json': out = json.dumps({'version': 1, 'clips': [], 'rejected': [], 'note': 'nothing learned on her box yet'}).encode()
+        else: status, out = 404, b'{"error":"no such clip"}'
     elif p == '/box/memory/observe' and method == 'POST':
         try: b = json.loads(body or b'{}'); out = json.dumps({'saved': mem_observe(b.get('text', ''), str(b.get('user') or 'someone')[:40], str(b.get('source') or ''))}).encode()
         except Exception as e: out = json.dumps({'saved': [], 'error': str(e)[:120]}).encode()
@@ -970,7 +976,7 @@ async def client(reader, writer):
         try:
             b = json.loads(body or b'{}'); text = str(b.get('text', ''))[:500]
             u = url_in(text); name = skills.match(text)
-            if name and u and name not in ('fetch_page', 'ask_grok'): name = None
+            if name and u and name not in ('fetch_page', 'ask_grok', 'learn_move'): name = None
             spec = skills.load().get(name, {}) if name else {}
             if not name: out = json.dumps({'name': None}).encode()
             elif spec.get('kind') == 'desktop':
