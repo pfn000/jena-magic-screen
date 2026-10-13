@@ -314,16 +314,40 @@ export class Avatar {
       const H = this.vrm.humanoid, P = (b) => H.getNormalizedBoneNode(b)?.getWorldPosition(new THREE.Vector3());
       const head = P('head'), hips = P('hips'), lh = P('leftHand'), rh = P('rightHand');
       if (head && hips && lh && rh) {
-        top = Math.max(head.y + 0.17, lh.y + 0.1, rh.y + 0.1);
-        // waist-up: hands included when she lifts them, but resting hands never pull the frame below mid-thigh
-        bottom = Math.min(hips.y - 0.1, Math.max(Math.min(lh.y, rh.y) - 0.07, hips.y - 0.3));
-        wantW = Math.max(0.62, Math.abs(lh.x - rh.x) + 0.3);
-        cx = (lh.x + rh.x) / 2 * 0.5;
+        // fingertips, not wrists: a hanging hand's fingers reach ~10-12 cm below the hand bone
+        const pts = [lh, rh]; for (const s of ['left', 'right']) for (const f of ['IndexDistal', 'MiddleDistal', 'LittleDistal', 'ThumbDistal']) { const v = P(s + f); if (v) pts.push(v); }
+        const handLow = Math.min(...pts.map((v) => v.y)), handHigh = Math.max(...pts.map((v) => v.y));
+        const xs = pts.map((v) => v.x), handL = Math.min(...xs), handR = Math.max(...xs);
+        top = Math.max(head.y + 0.25, handHigh + 0.12);   // the head bone sits at the base of her skull: +0.25 clears her hair
+        // face big AND both hands (with their fingers) in shot: the frame always reaches a little below the lower
+        // hand (fingertips hang ~0.09 below the hand bone), never above the hips, and at most to mid-thigh
+        bottom = Math.min(hips.y - 0.12, Math.max(handLow - 0.06, hips.y - 0.45));
+        // a gesture (hands lifted or spread) eases the camera back a little so the fingers never touch the edge
+        const gesture = Math.max(0, handHigh - (hips.y + 0.05)) + Math.max(0, handR - handL - 0.5);
+        wantW = Math.max(0.66, handR - handL + 0.22) + Math.min(0.25, gesture * 0.5);
+        cx = (handL + handR) / 2 * 0.5;
       }
     }
     if (top === undefined) { bottom = -0.16; top = this.height + 0.36; } // feet a little above the bottom, headroom for a raised arm
-    const d = Math.max((top - bottom) / 2 / tan, wantW / 2 / (tan * asp));
-    return { x: cx, y: (top + bottom) / 2, d };
+    // panels laid over the bottom of her stage (the chat card on phones) hide part of the canvas: frame her in
+    // the part that is actually visible
+    const cover = Math.min(0.45, Math.max(0, this.coverBottom || 0));
+    const span = (top - bottom) / (1 - cover);
+    const d = Math.max(span / 2 / tan, wantW / 2 / (tan * asp));
+    const visH = 2 * d * tan; // world height the camera shows at her depth
+    return { x: cx, y: top - visH / 2 + (visH - span) / 2 * (mode === 'talk' ? 0.35 : 0.5), d };
+  }
+  measureCover() {
+    try {
+      const c = this.canvas.getBoundingClientRect(); let cover = 0;
+      for (const el of document.querySelectorAll('#chat, #composer, .composer, #mobile-bar')) {
+        const r = el.getBoundingClientRect(), st = getComputedStyle(el);
+        if (!r.height || st.display === 'none' || st.visibility === 'hidden') continue;
+        if (r.top > c.top + c.height * 0.4 && r.top < c.bottom && r.left < c.right && r.right > c.left && (r.right - r.left) > c.width * 0.6)
+          cover = Math.max(cover, (c.bottom - r.top) / c.height);
+      }
+      this.coverBottom = cover;
+    } catch { this.coverBottom = 0; }
   }
   frameCamera() {
     const pin = new URLSearchParams(location.search).get('view');
@@ -345,6 +369,7 @@ export class Avatar {
   }
   updateCamera(dt, now) {
     if (!this.cam) return;
+    if (!(now < this._coverAt)) { this._coverAt = now + 1000; this.measureCover(); }
     const mode = this.viewMode(now);
     this.viewNow = mode;
     const g = this.frameGoal(mode), k = mode === this._lastMode ? 1.6 : 2.2;

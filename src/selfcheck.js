@@ -200,6 +200,7 @@ export function bodyBrief(selfSense, moves) {
       face: Object.fromEntries(Object.entries(S.expressions || {}).filter(([, v]) => v > 0.15)),
       move: p ? { id: p.c.id, what: p.c.what || p.c.label, fingers: !!p.c.fingers, face: !!p.c.face, t: +(p.start + p.t).toFixed(1) } : null,
       selfCheck: moves?.selfCheck?.brief?.() || null,
+      selfTrack: (() => { try { const t = window.jena?.selfTrack; return t && { clippingPct: t.clippingPct, fingersBackwardsPct: t.fingersBackwardsPct, floatyFeetPct: t.floatyFeetPct, now: t.now && { clipping: t.now.clipping, fingersBackwards: t.now.fingersBackwards, floaty: t.now.floaty } }; } catch { return null; } })(),
     };
   } catch { return null; }
 }

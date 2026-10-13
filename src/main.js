@@ -10,6 +10,7 @@ import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { Moves, rememberMove } from './moves.js';
 import { bodyBrief } from './selfcheck.js';
+import { SelfTrack } from './selfview.js';
 import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
@@ -623,6 +624,7 @@ if (cfg.api && !new URLSearchParams(location.search).get('desktop')) {
   }, 60000);
 }
 
+const selfTrack = new SelfTrack();   // src/selfview.js: her live self-tracking checks (dev panel 🪞 + every brain request)
 // ---------------- public JS API (read-only on her body: she moves herself) ----------------
 window.jena = {
   think: (message, user = 'guest') => thinkAbout({ message, source: 'stage', user }),
@@ -631,6 +633,9 @@ window.jena = {
   arms: () => avatar.armState(),
   // everything she feels of her own body right now: all bones (degrees), all expressions (0-1), eyes, and what it means
   get selfState() { return selfSense.snapshot(); },
+  // her own self-tracking checks over the last minute: hands in her torso, fingers bent back, floaty feet, pose score
+  get selfTrack() { return selfTrack.summary(); },
+  __selfTrack: selfTrack,
   desktop: (url) => desktop.setUrl(url),
   desktopStats: () => desktop.stats(),   // {mode: mama|public, fps measured here, box censor status}
   config: cfg,

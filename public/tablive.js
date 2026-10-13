@@ -192,8 +192,12 @@
     </div>
     <h2>🦴 Tracking <span class="sub" id="tr-sub"></span></h2>
     <div class="two">
-      <div class="card"><video id="tr-vid" muted loop playsinline autoplay style="width:100%;border-radius:8px;background:#000"></video>
-        <div class="sub" style="margin-top:4px">what her tracker saw: body skeleton, coloured body-part boxes (head, shoulders, chest, hips, upper/lower arms, hands, thighs, shins, feet), both hands' 21 points each (green = her left, orange = her right), face points, and objects tagged in red</div></div>
+      <div class="card"><div id="tr-state" style="font-size:15px;font-weight:600;margin:0 0 8px"></div>
+        <video id="tr-vid" muted loop playsinline autoplay style="display:block;width:100%;max-width:560px;max-height:82vh;margin:0 auto;border-radius:8px;background:#000;object-fit:contain"></video>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:15px;line-height:1.3">
+          <span><b style="color:#ffdc00">━</b> skeleton</span><span><b style="color:#6eff50">●</b> her LEFT hand (21 points)</span>
+          <span><b style="color:#ff9628">●</b> her RIGHT hand (21 points)</span><span><b style="color:#78f0ff">●</b> face points</span><span><b style="color:#3cb4ff">▢</b> body-part boxes, labelled</span></div>
+        <div class="sub" style="margin-top:4px">zoomed onto the person; close-ups of both hands and her face under the video</div></div>
       <div class="card" id="tr-info"></div>
     </div>
     <h2>👩‍🏫 Learned from mama <span class="sub">(only you see this)</span></h2>
@@ -225,7 +229,16 @@
     if (!t) { info.innerHTML = '<span class="sub">tracker not running yet</span>'; }
     else {
       const cur = t.current, l = t.last;
-      jv.querySelector('#tr-sub').textContent = `· ${t.state}${cur ? ': ' + (cur.label || cur.id) + ' — ' + cur.step : ''}${t.why ? ' (' + t.why + ')' : ''}`;
+      // honest state: the tracker writes its status every few seconds while it runs; an old status means it is not running
+      const stAge = t.at ? (Date.now() - skew - t.at) / 1000 : 1e9, stale = stAge > 180 && t.state !== 'idle';
+      const vm = t.video || null, vAge = vm?.tracked_at ? (Date.now() - skew - vm.tracked_at) / 1000 : t.video_at ? (Date.now() - skew - t.video_at) / 1000 : null;
+      const live = !stale && t.state === 'tracking';
+      const st = live ? `<span style="color:#3ddc84">● LIVE</span> tracking ${esc(cur?.label || cur?.id || '')}${cur?.step ? ' — ' + esc(cur.step) : ''}`
+        : !stale && t.state === 'waiting' ? `<span style="color:#ffb020">⏸ PAUSED</span> ${esc(t.why || '')}${t.queue ? ` · ${t.queue} moves queued` : ''}`
+        : !stale && (t.state === 'idle' || t.state === 'queued') ? `<span style="color:#3ddc84">✓ up to date</span>${t.queue ? ` · ${t.queue} queued` : ''}`
+        : `<span style="color:#ff5a5a">■ NOT RUNNING</span> ${esc(t.why || '')}${stale ? ` (no update for ${dur(stAge)})` : ''}`;
+      jv.querySelector('#tr-state').innerHTML = `${st}<div class="sub" style="font-weight:400;margin-top:2px">${live ? 'the video below is the newest finished move' : 'showing the newest real tracked move'}${vm?.label ? `: <b>${esc(vm.label)}</b>` : ''}${vAge != null ? `, tracked ${dur(vAge)} ago` : ''}</div>`;
+      jv.querySelector('#tr-sub').textContent = live ? '· live' : stale || t.state === 'stopped' ? '· not running' : `· ${t.state}`;
       const pc = (x) => (x == null ? '–' : Math.round(x * 100) + '%');
       const row = (h) => `<div style="margin:3px 0"><b>${esc(h.label || h.id)}</b> ${h.ok ? '' : '<span class="pill r">failed</span>'}<br><span class="sub">${h.ok ? `light: <b>${esc(h.lighting)}</b>${h.luma != null ? ` (luma ${h.luma})` : ''} · ${h.mirrored_source ? '<b>mirrored video, un-mirrored</b>' : 'not mirrored'} · body ${pc(h.detected?.body)} · L hand ${pc(h.detected?.left_hand)} · R hand ${pc(h.detected?.right_hand)} · face ${pc(h.detected?.face)}` : esc(h.error || '')}</span></div>`;
       info.innerHTML = `${l ? row(l) : ''}

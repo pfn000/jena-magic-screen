@@ -35,6 +35,8 @@ def save_state(s):
     json.dump(s, open(STATE_P + '.tmp', 'w'), indent=1); os.replace(STATE_P + '.tmp', STATE_P)
 def write_status(**k):
     s = {'at': int(time.time() * 1000), **k}
+    try: s['video'] = json.load(open(os.path.join(MAMA, 'tracking-latest.meta.json')))   # what the Tab Live video shows
+    except Exception: pass
     try:
         p = os.path.join(MAMA, 'tracking.json'); json.dump(s, open(p + '.tmp', 'w')); os.replace(p + '.tmp', p)
     except Exception: json.dump(s, open(os.path.join(WORK, 'status.json'), 'w'))
@@ -87,10 +89,25 @@ def track(kind, c, state):
     gif = os.path.join(STAGE, cid + '.gif')
     run(NICE + [PY, os.path.join(PIPE, 'preview_gif.py'), npz, gif, '0.4', str(max(1.0, n / FPS - 0.4))], timeout=300)
     ov = os.path.join(WORK, 'tmp', cid + '-track.mp4')
+    # her own self-check on this move: her real site code (moves.js + selfcheck.js, copies in site-src/) plays it on her VRM
+    # in Node and scores each body part against the performer's metrics, correcting and re-checking (no browser)
+    write_status(state='tracking', current={'id': cid, 'label': c.get('label') or c.get('what'), 'kind': kind, 'step': 'checking my own pose against it', 'since': int(time.time() * 1000)}, **summary(state))
+    try:
+        open(os.path.join(WORK, 'raw', cid + '.clip.json'), 'w').write(json.dumps(clip))
+        r2 = run(NICE + ['timeout', '200', 'node', '--max-old-space-size=400', os.path.join(HERE, 'selfcheck_harness.mjs'), os.path.join(WORK, 'raw'), cid, 'normal', '10'],
+                 env=dict(os.environ, SRC=os.path.join(HERE, 'site-src')), timeout=240)
+        row = next((l[7:] for l in r2.stdout.splitlines() if l.startswith('RESULT ')), None)
+        if row:
+            sc = json.loads(row)
+            clip['self_check'] = {'how': "her real site code (src/selfcheck.js) measured her own VRM bones while doing this move, scored each body part against the performer's metrics, corrected and re-checked",
+                                  'normal': {'first': (sc.get('summary') or {}).get('first'), 'final': (sc.get('summary') or {}).get('final'), 'corrections': (sc.get('summary') or {}).get('tries'), 'log': sc.get('log', [])[1:]},
+                                  'checked_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+    except Exception as e: print('self-check', repr(e)[:200], flush=True)
     # stage for ANIMATIONS/
     js = json.dumps(clip, separators=(',', ':'))
     open(os.path.join(STAGE, cid + '.json'), 'w').write(js)
-    entry = {'id': cid, 'file': cid + '.json', 'preview': cid + '.gif' if os.path.exists(gif) else None, 'label': c.get('label') or cid, 'what': c.get('what'),
+    scn = (clip.get('self_check') or {}).get('normal') or {}
+    entry = {'self_check': {'normal': f"{(scn.get('first') or {}).get('overall')}% -> {(scn.get('final') or {}).get('overall')}%"} if scn.get('final') else None, 'id': cid, 'file': cid + '.json', 'preview': cid + '.gif' if os.path.exists(gif) else None, 'label': c.get('label') or cid, 'what': c.get('what'),
              'kind': c.get('kind'), 'moods': c.get('moods'), 'duration': clip['duration'], 'fps': clip['fps'], 'frames': clip['frames'], 'sides': 'performer',
              'fingers': sorted((clip.get('fingers') or {}).keys()), 'face': bool(clip.get('face')),
              'lighting': (meta.get('lighting') or {}).get('used'), 'luma': (meta.get('lighting') or {}).get('luma'), 'mirrored_source': (meta.get('mirror') or {}).get('mirrored'),
@@ -109,11 +126,27 @@ def track(kind, c, state):
         open(dst + '.tmp', 'w').write(js); os.replace(dst + '.tmp', dst)
         for src_, name in ((gif, cid + '.gif'), (ov, cid + '-track.mp4')):
             if os.path.exists(src_): shutil.copy(src_, os.path.join(LEARNED, name))
-    # Tab Live: the newest tracking overlay
-    if os.path.exists(ov):
+    # Tab Live: the newest tracking view, re-drawn big from the tracker's own landmarks (track_overlay.py: follows and
+    # zooms onto the person, full-res thick skeleton + labelled body-part boxes, 21-point hands + face mesh, close-ups,
+    # legend). Falls back to holistic.py's own 360p overlay if the re-draw fails.
+    write_status(state='tracking', current={'id': cid, 'label': c.get('label') or c.get('what'), 'kind': kind, 'step': 'drawing the tracking view', 'since': int(time.time() * 1000)}, **summary(state))
+    big = os.path.join(WORK, 'tmp', cid + '-view.mp4'); bigj = os.path.join(WORK, 'tmp', cid + '-view.jpg'); vmeta = None
+    try:
+        r3 = run(NICE + ['timeout', '400', PY, os.path.join(HERE, 'track_overlay.py'), cid, vid, big, '--label', str(c.get('label') or c.get('what') or cid)[:40], '--jpg', bigj, '--tracked-at', str(time.time())],
+                 env=dict(os.environ, MOVES_DIR=WORK), timeout=450)
+        vmeta = json.loads((r3.stdout.strip().splitlines() or ['{}'])[-1])
+    except Exception as e: print('track view', repr(e)[:200], flush=True)
+    use, usej = (big, bigj) if os.path.exists(big) and vmeta else (ov, None)
+    if os.path.exists(use):
         try:
-            shutil.copy(ov, os.path.join(MAMA, 'tracking-latest.mp4.tmp')); os.replace(os.path.join(MAMA, 'tracking-latest.mp4.tmp'), os.path.join(MAMA, 'tracking-latest.mp4'))
-            run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', str(min(4, n / FPS / 2)), '-i', ov, '-frames:v', '1', os.path.join(MAMA, 'tracking-latest.jpg')], timeout=60)
+            shutil.copy(use, os.path.join(MAMA, 'tracking-latest.mp4.tmp')); os.replace(os.path.join(MAMA, 'tracking-latest.mp4.tmp'), os.path.join(MAMA, 'tracking-latest.mp4'))
+            if usej and os.path.exists(usej): shutil.copy(usej, os.path.join(MAMA, 'tracking-latest.jpg'))
+            else: run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', str(min(4, n / FPS / 2)), '-i', use, '-frames:v', '1', os.path.join(MAMA, 'tracking-latest.jpg')], timeout=60)
+            json.dump({'id': cid, 'label': c.get('label') or c.get('what') or cid, 'tracked_at': int(time.time() * 1000), 'zoom': (vmeta or {}).get('zoom'), 'size': (vmeta or {}).get('size'), 'best_t': (vmeta or {}).get('best_t'),
+                       'how': 'track_overlay.py' if vmeta else 'holistic.py 360p'}, open(os.path.join(MAMA, 'tracking-latest.meta.json'), 'w'))
+        except Exception: pass
+    for f in (big, bigj):
+        try: os.remove(f)
         except Exception: pass
     for f in (vid, vid[:-4] + '.info.json'):
         try: os.remove(f)

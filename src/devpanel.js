@@ -3,6 +3,7 @@
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
 import { renderSecurity, handleSecurityClick } from './mamasec.js';
+import { mountSelfView } from './selfview.js';
 import { openTakeover } from './takeover.js';
 import { asks, startAsks, renderAsks, handleAskClick, pendingCount } from './signin.js';
 // styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
@@ -28,7 +29,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><a href="/tab-live" target="_blank" rel="noopener" style="margin-left:auto;margin-right:8px;font-size:12px;color:#3ddc84;text-decoration:none;border:1px solid #1f5f3a;border-radius:999px;padding:1px 8px">🖥 Tab Live</a><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['asks', 'live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys' }[t]}</button>`).join('')}</nav>
+      <nav>${['asks', 'live', 'self', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', self: '🪞 Her body (self-view)', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -127,7 +128,7 @@ export class DevPanel {
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
     if (moves && !moves.error) this.data.moves = moves;
     this.data.at = Date.now();
-    if (!this.el.hidden && this.tab !== 'security' && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
+    if (!this.el.hidden && this.tab !== 'security' && this.tab !== 'self' && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
   }
   render() {
     const d = this.data, box = d.box?.data, live = box && d.box.online;
@@ -142,6 +143,7 @@ export class DevPanel {
       h += `<p class="dp-obs">📺 <button type="button" onclick="window.__jenaObsReload && window.__jenaObsReload(this)">reload OBS view</button> <small>the stream view never reloads on its own after an update; this switches it to the newest version now</small> <span class="dp-obs-msg"></span></p>`;
       h += `<h3>Recent pushes (GitHub → Vercel)</h3>${dep.error ? `<p class="dp-warn">GitHub: ${esc(dep.error)}</p>` : ''}<ol class="dp-commits">${commits.map((c) => `<li>${okDot(c.deploy?.state === 'success')}<code>${c.sha.slice(0, 7)}</code> ${esc(c.message)} <small>${esc(c.author)} · ${ago(Date.parse(c.date))} · ${esc(c.deploy ? c.deploy.state + ' — ' + c.deploy.description : 'no deploy status')}${c.sha === liveSha ? ' · <b>this page</b>' : ''}</small></li>`).join('')}</ol>`;
     }
+    if (this.tab === 'self') h += `<h3>🪞 Jena's own body, live (what she knows about herself)</h3><div id="dp-self"></div>`;
     if (this.tab === 'brain') {
       const b = d.health?.brain || {};
       h += `<h3>Brain</h3><p>${okDot(b.online)} <b>${esc(b.name)}</b> — ${esc(b.detail)} · checked ${ago(b.checkedAt)}${b.box ? ` · box ${esc(b.box.url)} announced ${ago(b.box.announcedAt)} via ${esc(b.box.via)}` : ''}</p>`;
@@ -281,6 +283,7 @@ export class DevPanel {
     const mamaKeep = this.body.querySelector('#dp-mama-out')?.textContent;
     const keepOpen = [...this.body.querySelectorAll('details[open]')].length;
     this.body.innerHTML = h;
+    if (this.tab === 'self') { const el = this.body.querySelector('#dp-self'); if (el) mountSelfView(el, window.jena?.__selfTrack); }
     if (keepOpen) this.body.querySelectorAll('details').forEach((x) => (x.open = true));
     if (outKeep && this.body.querySelector('#dp-skill-out')) this.body.querySelector('#dp-skill-out').textContent = outKeep;
     if (mamaKeep && this.body.querySelector('#dp-mama-out')) this.body.querySelector('#dp-mama-out').textContent = mamaKeep;
