@@ -11,7 +11,7 @@ DIRS = [(os.path.join(REPO, 'skills'), 'repo'), (os.path.join(HOME, 'skills-loca
 STATS = os.path.join(HOME, '.jena', 'skills_stats.json')
 # skills run on the python that has her MCP client installed (pip --user under /usr/local/bin/python3)
 PY = '/usr/local/bin/python3' if os.path.exists('/usr/local/bin/python3') else sys.executable
-ORDER = ['ask_grok', 'explore_my_box', 'fetch_page', 'github_repos', 'web_search', 'repo_history', 'env_probe', 'my_files']
+ORDER = ['edit_my_site', 'roast_critique', 'make_asset', 'ask_grok', 'explore_my_box', 'library_lookup', 'fetch_page', 'github_repos', 'web_search', 'repo_history', 'env_probe', 'my_files']
 lock = threading.Lock()
 desktop_skills = {}   # name -> python function(input) -> result (skills that use her screen)
 mcp_cache = {'at': 0, 'servers': {}}

@@ -3,6 +3,17 @@
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
 import RFB from '@novnc/novnc';
+// styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
+const STUDIO_CSS = `#devpanel .dp-card{border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.04)}
+#devpanel .dp-card p{margin:6px 0 0;font-size:12px;line-height:1.45}
+#devpanel .dp-pre{white-space:pre-wrap;word-break:break-word;font-size:11px;max-height:260px;overflow:auto;background:rgba(0,0,0,.35);padding:8px;border-radius:8px}
+#devpanel .dp-pill{font-size:11px;padding:1px 8px;border-radius:99px;background:#555}
+#devpanel .dp-pill.ready{background:#1f7a3d}#devpanel .dp-pill.blocked{background:#8a1f2b}#devpanel .dp-pill.merged{background:#2b4f8a}#devpanel .dp-pill.checking{background:#7a5a1f}
+#devpanel .dp-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+#devpanel .dp-asset{margin:0;padding:8px;border-radius:10px;background:repeating-conic-gradient(#2a2a2a 0 25%,#333 0 50%) 0 0/16px 16px;text-align:center}
+#devpanel .dp-asset img{max-width:100%;height:96px;object-fit:contain}
+#devpanel .dp-asset figcaption{font-size:11px;margin-top:6px;color:#ddd}`;
+if (typeof document !== 'undefined' && !document.getElementById('dp-studio-css')) { const st = document.createElement('style'); st.id = 'dp-studio-css'; st.textContent = STUDIO_CSS; document.head.appendChild(st); }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ago = (ts) => { if (!ts) return '—'; const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${(s / 3600).toFixed(1)}h ago`; };
 const gb = (b) => (b == null ? '?' : (b / 1e9).toFixed(1) + ' GB');
@@ -15,7 +26,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health' }[t]}</button>`).join('')}</nav>
+      <nav>${['live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -28,6 +39,8 @@ export class DevPanel {
     const tick = (t) => { n++; if (t - t0 >= 1000) { this.fps = Math.round((n * 1000) / (t - t0)); n = 0; t0 = t; } requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
     this.armCorner();
+    this.body.addEventListener('input', (e) => { if (e.target.id === 'dp-lib-q') this.libQ = e.target.value; });
+    this.body.addEventListener('keydown', (e) => { if (e.target.id === 'dp-lib-q' && e.key === 'Enter') this.body.querySelector('[data-libsearch]')?.click(); });
     this.body.addEventListener('click', async (e) => {
       const key = localStorage.getItem('jena.dmKey');
       const out = this.body.querySelector('#dp-skill-out');
@@ -47,6 +60,23 @@ export class DevPanel {
         if (act === 'apikey') mo.textContent = r.ok ? `Jena's API key (keep it secret; only you can see this):\n${r.key}\n\nOpenAI-compatible:\ncurl ${location.origin}/api/v1/chat/completions -H "Authorization: Bearer ${r.key}" -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"hi jena"}]}'` : JSON.stringify(r);
         if (act === 'takeover') { if (r.ok) this.takeover(r.ws); else mo.textContent = JSON.stringify(r); }
         this.mamaOut = mo.textContent;
+        return;
+      }
+      if (e.target.dataset.libsearch !== undefined) {
+        this.libQ = this.body.querySelector('#dp-lib-q')?.value || '';
+        this.data.libRes = { loading: true };
+        this.render();
+        this.data.libRes = await fetch('/api/box?what=library&q=' + encodeURIComponent(this.libQ), { cache: 'no-store' }).then((r) => r.json()).catch((er) => ({ error: er.message }));
+        this.render();
+        return;
+      }
+      if (e.target.dataset.edit) {
+        const act = e.target.dataset.edit;
+        if (!key) { this.editOut = 'unlock the private DM drawer with your passcode first (only mama can merge or roll back)'; this.render(); return; }
+        if (act === 'rollback' && !confirm('Undo Jena\'s last change on the live site (git revert, pushed to main)?')) return;
+        this.editOut = `${act}… (checks + push can take a minute)`; this.render();
+        const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key }, body: JSON.stringify({ action: act, id: e.target.dataset.id || '' }) }).then((x) => x.json()).catch((er) => ({ error: er.message }));
+        this.editOut = JSON.stringify(r, null, 1).slice(0, 3000); this.data.edits = null; this.refresh();
         return;
       }
       if (e.target.dataset.create) {
@@ -90,15 +120,16 @@ export class DevPanel {
     const want = [get('/api/health'), get('/api/box?what=status')];
     if (!this.data.deploysAt || Date.now() - this.data.deploysAt > 15000) want.push(get('/api/deploys')); else want.push(null);
     if (!this.data.moves) want.push(get('/moves/index.json')); else want.push(null);
-    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null, this.tab === 'memory' ? get('/api/box?what=memory') : null);
-    const [health, box, deploys, moves, sk, act, hot, mem] = await Promise.all(want);
+    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null, this.tab === 'memory' ? get('/api/box?what=memory') : null, this.tab === 'library' && !this.data.lib ? get('/api/box?what=library') : null, this.tab === 'assets' ? get('/api/box?what=assets') : null, this.tab === 'edits' ? get('/api/box?what=edits') : null);
+    const [health, box, deploys, moves, sk, act, hot, mem, lib, assets, edits] = await Promise.all(want);
+    if (lib?.online) this.data.lib = lib; if (assets) this.data.assets = assets; if (edits) this.data.edits = edits;
     if (mem) this.data.mem = mem;
     if (sk) this.data.skills = sk; if (act) this.data.activity = act; if (hot) this.data.hot = hot;
     Object.assign(this.data, { health, box });
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
     if (moves && !moves.error) this.data.moves = moves;
     this.data.at = Date.now();
-    if (!this.el.hidden) this.render();
+    if (!this.el.hidden && document.activeElement?.id !== 'dp-lib-q') this.render();
   }
   render() {
     const d = this.data, box = d.box?.data, live = box && d.box.online;
@@ -196,6 +227,43 @@ export class DevPanel {
           <h3>JenaXI-0</h3><p>${esc(t['JenaXI-0'].what)}</p><pre>${j(t['JenaXI-0'].pretrain)}</pre>
           <h3>Training running right now</h3><pre>${esc(t.running || 'nothing is training on her box right now')}</pre>`;
       } else h += notOn;
+    }
+    if (this.tab === 'library') {
+      const L = d.lib?.data;
+      if (!L) h += d.lib ? notOn : '<p>reading her library catalog from her box…</p>';
+      else {
+        const kb = (b) => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' KB';
+        h += `<h3>Her design + dev library (on her box: ~/library) · ${L.sources.reduce((a, s) => a + s.docs, 0)} documents · ${L.sources.reduce((a, s) => a + s.passages, 0).toLocaleString()} searchable passages · ${kb(L.total_bytes)} total</h3>
+          <p><small>Only free, openly licensed sources. Search: ${esc(L.index)} (${kb(L.db_bytes)} index). Her skills <b>library_lookup</b> and <b>roast_critique</b> quote these passages and cite book + license + link. Built ${ago(L.built_at * 1000)}.</small></p>
+          <p><input id="dp-lib-q" placeholder="search her library, e.g. touch target size" value="${esc(this.libQ || '')}" style="width:60%"> <button data-libsearch>search</button></p>`;
+        const R = d.libRes;
+        if (R?.loading) h += '<p>searching…</p>';
+        else if (R) h += R.data?.results?.length ? R.data.results.map((x) => `<div class="dp-card"><b>${esc(x.title)}</b>${x.section ? ' › ' + esc(x.section) : ''}<br><small>${esc(x.book)} · ${esc(x.license)} · <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">source</a></small><p>${esc(x.passage)}</p></div>`).join('') : `<p>${esc(R.error || R.data?.error || 'no passages matched')}</p>`;
+        h += `<table class="dp-t"><tr><th>source</th><th>license</th><th>docs</th><th>passages</th><th>size</th><th>topic</th></tr>${L.sources.map((s) => `<tr><td><a href="${esc(s.home)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></td><td>${esc(s.license)}</td><td>${s.docs}</td><td>${s.passages.toLocaleString()}</td><td>${kb(s.bytes_on_disk)}</td><td>${esc(s.topic)}</td></tr>`).join('')}
+          ${(L.asset_sets || []).map((s) => `<tr><td><a href="${esc(s.home)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></td><td>${esc(s.license)}</td><td>${s.icons} icons</td><td>—</td><td>${kb(s.bytes_on_disk)}</td><td>assets</td></tr>`).join('')}</table>
+          <p><small><b>Not in her library (honest):</b> ${(L.not_included || []).map(esc).join(' · ')}</small></p>`;
+      }
+    }
+    if (this.tab === 'assets') {
+      const A = d.assets?.data;
+      if (!A) h += d.assets ? notOn : '<p>reading her assets…</p>';
+      else if (!A.count) h += '<p>She has not made any assets yet. Ask her in chat: "jena make an icon of a rocket" or "jena make a button that says Follow".</p>';
+      else h += `<h3>Assets she made (${A.count}) · saved on her box in ~/assets · real SVG + PNG files</h3><div class="dp-gallery">${A.assets.map((a) => `<figure class="dp-asset"><img src="/api/asset?name=${encodeURIComponent(a.png || a.svg)}" alt="${esc(a.title || a.svg)}" loading="lazy"><figcaption><b>${esc(a.title || a.kind)}</b><br><small>${esc(a.kind)} · ${esc(a.base || 'drawn by her')}${a.license ? ' (' + esc(a.license) + ')' : ''} · ${ago(a.ts * 1000)}</small><br><a href="/api/asset?name=${encodeURIComponent(a.svg)}" target="_blank" rel="noopener">svg</a>${a.png ? ` · <a href="/api/asset?name=${encodeURIComponent(a.png)}" target="_blank" rel="noopener">png ${a.png_px || ''}</a>` : ''}</figcaption></figure>`).join('')}</div>`;
+    }
+    if (this.tab === 'edits') {
+      const E = d.edits?.data;
+      h += `<h3>Site edits Jena proposes · branch → checks → Vercel preview → <u>only mama merges</u></h3><p><small>She never pushes to main herself. Each change gets its own branch in a sandbox copy, then build + lint + a headless smoke test (page loads, no console errors, key parts present, 390 px phone has no sideways scroll, OBS view intact). Only a passing branch is pushed for a Vercel preview. Merge and undo need your passcode.</small></p>`;
+      if (!E) h += d.edits ? `<p class="dp-warn">${esc(d.edits.error || d.edits.data?.error || 'her site-edit checker is not answering')}</p>` : '<p>reading…</p>';
+      else {
+        h += `<p><button data-edit="rollback">↶ undo Jena's last change on the live site</button> <small>${E.last_jena_commit ? 'last Jena commit on main: ' + esc(E.last_jena_commit.sha.slice(0, 7)) + ' “' + esc(E.last_jena_commit.message) + '”' : 'no Jena commit on main yet'}</small></p>`;
+        h += (E.proposals || []).map((p) => `<div class="dp-card"><b>${esc(p.title)}</b> <span class="dp-pill ${p.state}">${esc(p.state)}</span><br><small>${esc(p.why || '')} · branch ${esc(p.branch)} · ${ago(p.ts * 1000)}</small>
+          <ul>${(p.checks || []).map((c) => `<li>${c.ok ? '✅' : '❌'} ${esc(c.name)}${c.detail ? ' — ' + esc(c.detail) : ''}</li>`).join('')}</ul>
+          ${p.preview ? `<p>preview: <a href="${esc(p.preview)}" target="_blank" rel="noopener noreferrer">${esc(p.preview)}</a>${p.preview_note ? ' <small>(' + esc(p.preview_note) + ')</small>' : ''}</p>` : ''}
+          ${p.diff ? `<pre class="dp-pre">${esc(p.diff.slice(0, 1800))}</pre>` : ''}
+          ${p.state === 'ready' ? `<button data-edit="merge" data-id="${esc(p.id)}">✓ merge to live site</button> <button data-edit="discard" data-id="${esc(p.id)}">✕ discard</button>` : ''}</div>`).join('') || '<p>No proposals yet.</p>';
+        h += `<h4>Log</h4><pre class="dp-pre">${esc((E.log || []).slice(-25).join('\n'))}</pre>`;
+      }
+      if (this.editOut) h += `<pre class="dp-pre">${esc(this.editOut)}</pre>`;
     }
     if (this.tab === 'health') {
       h += `<h3>This page</h3><p>render loop: ${this.fps} fps · avatar ${this.avatar?.ready ? 'loaded' : 'loading'} · ${esc(navigator.userAgent.slice(0, 80))}</p>`;

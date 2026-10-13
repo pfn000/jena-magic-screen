@@ -932,6 +932,17 @@ async def mama_door(p, method, body):
         return 200, json.dumps({'ok': True, 'key': open(API_KEY).read().strip()}).encode()
     return 404, json.dumps({'ok': False, 'summary': 'no such mama door'}).encode()
 
+# her studio (library, assets, site edits) lives in its own module, reloaded from her repo when it changes
+_studio = {'mod': None, 'mtime': 0}
+def studio():
+    import importlib.util
+    f = os.path.join(HOME, 'jena-repo', 'box', 'desktop', 'jena_studio.py')
+    m = os.path.getmtime(f)
+    if _studio['mod'] is None or m != _studio['mtime']:
+        spec = importlib.util.spec_from_file_location('jena_studio', f); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        _studio.update(mod=mod, mtime=m)
+    return _studio['mod']
+
 async def client(reader, writer):
     try:
         head = await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), 15)
@@ -1016,9 +1027,9 @@ async def client(reader, writer):
         # the site asks first: does this message need one of her skills? script skills run now so her brain
         # answers from real results; desktop skills (ask_grok, explore_my_box) are queued for her hands
         try:
-            b = json.loads(body or b'{}'); text = str(b.get('text', ''))[:500]
+            b = json.loads(body or b'{}'); text = str(b.get('text', ''))[:4000]
             u = url_in(text); name = skills.match(text)
-            if name and u and name not in ('fetch_page', 'ask_grok', 'learn_move'): name = None
+            if name and u and name not in ('fetch_page', 'ask_grok', 'learn_move', 'roast_critique', 'make_asset', 'edit_my_site'): name = None
             spec = skills.load().get(name, {}) if name else {}
             if not name: out = json.dumps({'name': None}).encode()
             elif spec.get('kind') == 'desktop':
@@ -1031,13 +1042,20 @@ async def client(reader, writer):
                 items = (res.get('hits') or res.get('repos') or [])[:4]
                 facts = res.get('summary', '') + ''.join(f' | {x.get("title") or x.get("name") or ""} {x.get("url", "")} {str(x.get("about") or x.get("snippet") or "")[:100]}' for x in items)
                 if name == 'fetch_page': facts += ' | ' + str(res.get('text', ''))[:600]
+                if res.get('facts'): facts = str(res['facts'])
                 url = items[0].get('url') if items else res.get('url') if name == 'fetch_page' else None
                 if res.get('ok') and url and safe(url):
                     with lock: events_in.append({'show_url': url, 'why': f'{name}: {text[:80]}', 'ts': time.time()})
                 top = {'title': (items[0].get('title') or items[0].get('name')) if items else res.get('title') or u, 'url': url} if url else None
-                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms')}).encode()
+                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms'), 'steps': [str(x)[:300] for x in (res.get('steps') or [])][:8], 'say': str(res.get('say') or '')[:600] or None}).encode()
         except Exception as e:
             out = json.dumps({'name': None, 'error': str(e)[:200]}).encode()
+    elif p.startswith('/box/studio/'):
+        try:
+            qs_ = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
+            status, ctype, out = await asyncio.get_running_loop().run_in_executor(None, studio().handle, p, method, body, hdrs, qs_, is_mama)
+        except Exception as e:
+            status, out = 500, json.dumps({'error': f'studio: {str(e)[:200]}'}).encode()
     elif p in ('/', '/health', '/box/health'):
         out = json.dumps({'ok': True, 'who': "Jena's desktop"}).encode()
     else:

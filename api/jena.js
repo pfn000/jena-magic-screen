@@ -89,10 +89,12 @@ async function mamaDo(req) {
   const box = await boxLink();
   if (!box) return json({ error: 'her box is offline' }, 503);
   const b = await body(req);
-  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey' }[b.action];
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
   try {
-    const r = await fetch(`${box.url}/box/mama/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+    // site edits (merge a checked Jena branch / roll back her last change) go to her studio's site-edit checker
+    const studio = ['merge', 'rollback', 'discard'].includes(action);
+    const r = await fetch(studio ? `${box.url}/box/studio/mama/${action}` : `${box.url}/box/mama/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(b), signal: AbortSignal.timeout(studio ? 28000 : 10000) });
     const d = await r.json();
     if (action === 'takeover' && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
     return json(d, r.status);
@@ -145,7 +147,7 @@ async function boxProxy(req) {
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
   const q = new URL(req.url).searchParams;
   const th = `/box/thoughts?since=${Math.max(0, parseInt(q.get('since') || '0', 10) || 0)}&last=${Math.min(40, Math.max(1, parseInt(q.get('last') || '8', 10) || 8))}`;
-  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory', thoughts: th }[what] || '/status';
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory', thoughts: th, library: '/box/studio/library' + (q.get('q') ? '?q=' + encodeURIComponent(q.get('q').slice(0, 200)) : ''), assets: '/box/studio/assets', edits: '/box/studio/edits' }[what] || '/status';
   try {
     const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
@@ -153,6 +155,19 @@ async function boxProxy(req) {
   } catch (e) {
     return json({ online: false, box: { url: box.url, announcedAt: box.ts }, error: `box announced but did not answer: ${e.message}` }, 502);
   }
+}
+
+// an asset she made on her box (svg/png), passed through so the dev panel gallery can show it
+async function assetFile(req) {
+  const name = new URL(req.url).searchParams.get('name') || '';
+  if (!/^[\w.-]+\.(svg|png)$/.test(name)) return json({ error: 'bad name' }, 400);
+  const box = await boxLink();
+  if (!box) return json({ error: 'her box is offline' }, 503);
+  try {
+    const r = await fetch(`${box.url}/box/studio/asset/${name}`, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return json({ error: `box answered ${r.status}` }, r.status);
+    return new Response(await r.arrayBuffer(), { headers: { 'Content-Type': name.endsWith('.svg') ? 'image/svg+xml' : 'image/png', 'Cache-Control': 'public, max-age=300', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'", 'Access-Control-Allow-Origin': '*' } });
+  } catch (e) { return json({ error: e.message }, 502); }
 }
 
 // her memory service on her box: recall before she answers, save what's worth remembering after
@@ -300,6 +315,7 @@ async function handle(req) {
     if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
     if (route === 'tts') return await tts(req);
     if (route === 'v1') return await jenaApi(req);
+    if (route === 'asset') return await assetFile(req);
     if (route === 'hot') { try { return json({ list: await hotUrls(), source: 'Hot URLS/URLS.md in her repo (read live)' }); } catch (e) { return json({ error: e.message }, 502); } }
     if (route === 'boxdo' && req.method === 'POST') return await boxDo(req);
     if (route === 'search') { const u = new URL(req.url); return json(await multiSearch(clip(u.searchParams.get('q'), 200), clip(u.searchParams.get('src'), 60))); }

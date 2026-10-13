@@ -1,0 +1,18 @@
+{
+ "name": "library_lookup",
+ "description": "Search her own library of open-licensed design + coding books (MDN, web.dev Learn, WCAG 2.2, Eloquent JavaScript, You Don't Know JS, The Odin Project, Full Stack Open, react.dev, Pro Git, Material Web docs, ~135 Wikipedia design/UX articles) and answer with real passages, each cited with its book, license and link.",
+ "triggers": [
+  "\\b(your|the|her|my) (library|textbooks?|books?)\\b",
+  "\\blibrary\\b",
+  "\\b(mdn|wcag|web\\.dev|odin project|eloquent javascript|you don.?t know js|ydkjs|pro git|full ?stack open|react\\.dev)\\b",
+  "\\bwhat do(es)? the (docs|books?) say\\b",
+  "\\b(cite|citation) (it|that|this|a source)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 20,
+ "needs": [],
+ "example": {
+  "query": "what does the library say about color contrast for text"
+ }
+}
