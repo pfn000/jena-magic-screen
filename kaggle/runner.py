@@ -13,7 +13,7 @@ T0 = time.time()
 SESSION_LIMIT_H = float(os.environ.get("JENA_SESSION_LIMIT_H", "11.5"))   # Kaggle stops a session at 12 h
 os.makedirs(W, exist_ok=True); os.makedirs(TMP, exist_ok=True)
 
-def now(): return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+def now(): return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 def say(*a): print(f"[jena-kaggle {now()}]", *a, flush=True)
 
 STATUS = os.path.join(W, "status.json")
@@ -47,7 +47,11 @@ if not os.path.exists(REPO):
 commit = sh(["git", "-C", REPO, "rev-parse", "--short", "HEAD"])
 say("repo pfn000/jena-magic-screen @", commit)
 status(repo_commit=commit)
+# Kaggle's image ships a torchao that this peft refuses to import ("incompatible version of torchao");
+# LoRA here does not use torchao, so remove it (seen on the first Kaggle run, 2026-10-13).
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchao"], check=False)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "peft", "sentencepiece", "gguf"], check=False)
+say("peft import check:", sh([sys.executable, "-c", "import peft, transformers, torch; print(peft.__version__, transformers.__version__, torch.__version__)"]))
 
 # 3) resume: copy the previous version's checkpoints (attached as a kernel data source) into /kaggle/working
 SUB = {"chat": "JenaXI-chat", "jx1": "JenaXI-1"}[JOB]
