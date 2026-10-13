@@ -34,7 +34,7 @@ RUN python3 -m venv /opt/voice && /opt/voice/bin/pip install --no-cache-dir pipe
 # her MCP servers + skills runtime, installed as her
 USER jena
 RUN pip3 install --user --no-cache-dir --break-system-packages mcp mcp-server-fetch mcp-server-git \
- && mkdir -p ~/.npm-global && cd ~/.npm-global && npm init -y >/dev/null && npm install --no-audit --no-fund @modelcontextprotocol/server-filesystem
+ && mkdir -p ~/.npm-global && cd ~/.npm-global && printf '{"name":"jena-mcp","private":true}\n' > package.json && npm install --no-audit --no-fund @modelcontextprotocol/server-filesystem
 USER root
 COPY . /opt/jena-repo
 RUN cp /opt/jena-repo/box/voice/tts_server.py /opt/voice/ \
