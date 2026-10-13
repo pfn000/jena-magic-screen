@@ -131,14 +131,21 @@ export function extractTags(text) {
   return { text: clean, events };
 }
 
+// what one of her skills really did for this message, put where her small brain actually follows it
+function skillNote(s) {
+  if (!s) return '';
+  if (s.queued) return `\n\nRIGHT NOW your ${s.name} skill is running on your desktop for this message${s.name === 'ask_grok' ? ' (you are asking Grok on grok.com; the answer is Grok\'s and shows on your screen)' : ''}. Say you are on it. Do not make up the result.`;
+  if (!s.ok) return `\n\nRIGHT NOW your ${s.name} skill tried and failed: ${s.summary}. Say so honestly. Do not make up a result.`;
+  return `\n\nRIGHT NOW your ${s.name} skill just ran for real and found: ${s.facts}. Answer using ONLY these real results by their exact names and links. Say you found them with your skill. Never invent other names or links.`;
+}
+
 function describe(input) {
   if (input.attachment) {
     const a = input.attachment;
     return `${input.user || 'mama'} dropped a file on you: "${a.name}" (${a.type || 'unknown type'}, ${Math.round((a.size || 0) / 1024)} KB).${input.message ? ' Note: ' + input.message : ''}`;
   }
-  const found = input.skill?.ok && input.skill.facts ? `\n[your skill ${input.skill.name} really found this, use only these facts and links, say you found it with ${input.skill.name}, do not claim you made it: ${input.skill.facts}]` : '';
   const where = input.source === 'twitch' ? `Twitch chat (#${input.channel || '?'})` : input.source === 'dm' ? 'a PRIVATE message (not on stream)' : 'the stage chat box';
-  return `[${where}] ${input.user || 'someone'}: ${input.message}${found}`;
+  return `[${where}] ${input.user || 'someone'}: ${input.message}`;
 }
 
 // What JenaXI-0 was trained on: "<|mama|>hi jena\n<|jena|>HEY MAMA…"
@@ -186,7 +193,7 @@ export async function* thinkEvents(input) {
     method: 'POST',
     headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20) },
     body: JSON.stringify(chatMode
-      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
+      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
       : { model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 160, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
     signal: AbortSignal.timeout(process.env.VERCEL ? 22000 : 45000), // Vercel function limit is 30 s
   });
