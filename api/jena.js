@@ -296,11 +296,14 @@ async function think(req) {
     const ev = [{ type: 'ncom', ok: !!r?.ok, text: r?.ok ? '→ sent to NCOM_Sys' : '✕ NCOM_Sys did not get it (her box is offline)' }, { type: 'done' }];
     return new Response(ev.map((e) => JSON.stringify(e)).join('\n') + '\n', { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' } });
   }   // mama (passcode, her own words, never relayed chat): her corrections become verified facts on her box
-  const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
+  // the box's own site watcher (files/ops/sitewatch) asks a tagged question every 10 min to prove chat works end to
+  // end: it gets a real brain answer but never reaches her desktop, skills, memory or the broadcast feed
+  const probe = keyed && b.probe === true && input.source === 'sitewatch';
+  const broadcast = keyed && !probe && b.broadcast !== false && input.source !== 'twitch';
   // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
   // a message that matches one of her skills runs that skill on her box FIRST, and her brain answers from what it found
   let toDesk = null, memSave = null;
-  if (input.message) {
+  if (input.message && !probe) {
     const bx = await boxLink().catch(() => null);
     if (bx) {
       const [sk, mem] = await Promise.all([
