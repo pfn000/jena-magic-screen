@@ -1034,6 +1034,7 @@ async def client(reader, writer):
         try:
             b = json.loads(body or b'{}'); text = str(b.get('text', ''))[:4000]
             u = url_in(text); name = skills.match(text)
+            if '```' in text or (name == 'roast_critique' and u and not re.search(r'https?://|www\.', text)): u = None   # code like d.code is not a link
             if name and u and name not in ('fetch_page', 'ask_grok', 'learn_move', 'roast_critique', 'make_asset', 'edit_my_site'): name = None
             spec = skills.load().get(name, {}) if name else {}
             if not name: out = json.dumps({'name': None}).encode()
