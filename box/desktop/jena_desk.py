@@ -59,7 +59,8 @@ private_session = False
 mama_stop = {'until': 0}       # mama said 'stop' / 'no, do X instead': her hands drop what they are doing for a moment
 def hands_blocked():
     si = globals().get('signin')
-    return bool(globals().get('mama', {}).get('driving') or private_session or (si is not None and si.active()) or time.time() < mama_stop['until'])
+    tk = globals().get('TK')   # jena_takeover.py: mama's 60-min double-click pause holds even across a dropped connection
+    return bool(globals().get('mama', {}).get('driving') or private_session or (si is not None and si.active()) or time.time() < mama_stop['until'] or (tk is not None and tk.paused()))
 
 def input_command(cmd):
     words = cmd if isinstance(cmd, (list, tuple)) else str(cmd).split()
@@ -893,18 +894,19 @@ def wiki_random():
     try:
         d = json.loads(_get('https://en.wikipedia.org/api/rest_v1/feed/featured/' + time.strftime('%Y/%m/%d')))
         if d.get('tfa'): cands.append(d['tfa'])
-        cands += (d.get('mostread') or {}).get('articles', [])[:25]
-        for e in (d.get('onthisday') or [])[:8]: cands += e.get('pages', [])[:1]
+        # (no 'most read' / 'on this day': those are mostly news, crashes and wars)
     except Exception:
         pass
     random.shuffle(cands)
-    for _ in range(3):
+    for _ in range(6):
         try: cands.append(json.loads(_get('https://en.wikipedia.org/api/rest_v1/page/random/summary')))
         except Exception: pass
     for d in cands:
         t, x = d.get('title', '') or '', d.get('extract', '') or ''
         u = (d.get('content_urls') or {}).get('desktop', {}).get('page')
         if not u or len(x) < 250 or d.get('type') != 'standard' or memory.seen('read:' + u): continue
+        if re.search(r'(politician|businessman|businesswoman|television personality|criminal|murderer|terroris|militar|soldier|footballer|athlete|cricketer|baseball|wrestler|actor|actress|singer|rapper|lawyer|judge|bishop|priest)', d.get('description', '') or '', re.I): continue
+        if re.search(r'\b(crash\w*|disaster|cannibal\w*|conflict|violence|attack\w*|bomb\w*|massacre|genocide|abuse\w*|scandal|assassin\w*|execut\w*|prison\w*|riot\w*|hostage|weapon\w*|army|battle|invasion|troubles)\b', x, re.I): continue
         if re.search(r'\b(commune|village|municipality|census|unincorporated|footballer|politician|election|war|murder|shooting|killed|death|crime|thriller|horror|terror\w*)\b', x[:300], re.I): continue
         if safe(t + ' ' + x) and not FLAG.search(t + ' ' + x):
             return d.get('normalizedtitle') or t, u, x
@@ -967,10 +969,9 @@ def idle_menu():
 def idle_choice():
     mood, menu = idle_menu()
     o = memory.choose(menu, mood=mood)
-    before = len(memory.rows(1))
+    t0 = int(time.time() * 1000)
     o['fn']()
-    rs = memory.rows(1)
-    if len(rs) == before or rs[-1].get('action') != o['name']:
+    if not any(r.get('ts', 0) >= t0 and r.get('action') == o['name'] for r in memory.rows(1)):
         memory.record('task', f'{o["name"].replace("_", " ")} ({mood})', key='task:' + o['name'], action=o['name'])
 
 ROTATION = [act_htop, act_fetch, act_python, act_read, act_hot, act_watch, act_watch, act_note, act_tidy, act_explore]
@@ -1137,6 +1138,18 @@ def set_private_reason(reason, on):
     try:
         if CENSOR is not None: CENSOR.set_private(reason, bool(on))
     except Exception as e: print('censor set_private', e, flush=True)
+
+# ---- mama's takeover sessions: phone mode (portrait :99 + public frame hold), the 60-min pause flag, what-changed summary
+TK = None
+takeover_params = {}          # token -> what the site asked for (minutes, phone size)
+try:
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location('jena_takeover', os.path.join(HOME, 'jena_takeover.py'))
+    TK = _ilu.module_from_spec(_spec); _spec.loader.exec_module(TK)
+    TK.configure(censor=CENSOR, did=did, memory=memory)
+    TK.boot()
+except Exception as _e:
+    TK = None; print('jena_takeover not loaded:', _e, flush=True)
 
 # ---- private sign-in windows (jena_signin.py): mama signs in to a site in a hidden window with Jena's own Firefox profile
 signin = None
@@ -1467,8 +1480,14 @@ async def mama_door(p, method, body):
         except HandsPaused: return 409, json.dumps({'ok': False, 'summary': 'her desktop is private right now (takeover / sign-in); try again after'}).encode()
         return 200, json.dumps({'ok': True, 'shown_for_s': 28}).encode()
     if p == '/box/mama/takeover':
+        if TK is not None and b.get('op') in ('status', 'end', 'extend'):
+            return 200, json.dumps(await loop.run_in_executor(None, TK.door, b)).encode()
         tok = secrets.token_urlsafe(24); takeover_tokens[tok] = time.time() + 60
-        return 200, json.dumps({'ok': True, 'token': tok, 'path': '/websockify-mama?t=' + tok, 'valid_s': 60}).encode()
+        prm = TK.params(b) if TK is not None else {}
+        takeover_params[tok] = prm
+        for t in [t for t, e in takeover_tokens.items() if e < time.time()]: takeover_tokens.pop(t, None); takeover_params.pop(t, None)
+        return 200, json.dumps({'ok': True, 'token': tok, 'path': '/websockify-mama?t=' + tok, 'valid_s': 60,
+                                'phone': list(prm['phone']) if prm.get('phone') else None, 'minutes': prm.get('minutes') or 0}).encode()
     if p == '/box/mama/apikey':
         if b.get('rotate') or not os.path.exists(API_KEY):
             k = 'jena-' + secrets.token_urlsafe(30)
@@ -1535,6 +1554,7 @@ async def client(reader, writer):
     if p == '/websockify-mama':
         tok = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '').get('t', [''])[0]
         exp = takeover_tokens.pop(tok, 0)
+        tprm = takeover_params.pop(tok, {})
         if not tok or exp < time.time():
             writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         try:
@@ -1545,7 +1565,11 @@ async def client(reader, writer):
         with input_gate:
             mama['driving'] += 1
             stop_her_inputs()
-        set_private_reason('mama_takeover', True)
+        tinfo = {}
+        if TK is not None:
+            try: tinfo = await asyncio.get_running_loop().run_in_executor(None, TK.begin, tprm) or {}
+            except Exception as _e: print('takeover begin', _e, flush=True)
+        if not tinfo.get('phone'): set_private_reason('mama_takeover', True)   # phone mode: the public view holds its last frame instead
         did("mama's driving, hands off 🙌", 'skill')
         did('mama took over my desktop (private)', 'help')
         for v in list(public_viewers):   # the public view-only stream stops while mama drives
@@ -1554,6 +1578,9 @@ async def client(reader, writer):
         try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
         finally:
             mama['driving'] = max(0, mama['driving'] - 1)
+            if TK is not None:
+                try: TK.end()
+                except Exception as _e: print('takeover end', _e, flush=True)
             if not mama['driving']:
                 set_private_reason('mama_takeover', False); after_private['tidy'] = True
                 did('mama gave my desktop back', 'help')

@@ -25,8 +25,8 @@ def index():
     except Exception: return {'version': 1, 'note': 'Moves Jena learned by herself on her box from online videos (same pipeline as her first moves).', 'clips': [], 'rejected': []}
 
 # teen-appropriate only: a title blocklist + YouTube's own age gate (age_limit must be 0)
-BAD = re.compile(r"(sex|porn|nude|naked|nsfw|onlyfans|fetish|erotic|hentai|xxx|twerk|strip|lingerie|bikini|sexy|hot girl|"
-                 r"pole dance|lap dance|seductive|kiss|drunk|beer|vodka|weed|vape|gun|knife|fight|gore|horror|prank)", re.I)
+BAD = re.compile(r"\b(sex|porn|nude|naked|nsfw|onlyfans|fetish|erotic|hentai|xxx|twerk|strip|lingerie|bikini|sexy|hot girl|"
+                 r"pole dance|lap dance|seductive|kiss\w*|drunk|beer|vodka|weed|vape|guns?|knife|fight\w*|gore|horror|prank\w*)\b", re.I)
 def teen_safe(title): return bool(title) and not BAD.search(title)
 def age_ok(vid):
     try:
