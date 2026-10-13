@@ -1,0 +1,24 @@
+name: kaggle-train
+# Backup driver for Jena's Kaggle GPU training. Tab's box runs the main driver through Saidie's connected Kaggle
+# account, so this workflow stays idle unless the repo variable JENA_KAGGLE_DRIVER is set to "github" AND the
+# secrets KAGGLE_USERNAME / KAGGLE_KEY exist (Saidie pastes them herself; never send the key in a chat).
+on:
+  schedule:
+    - cron: "17 */3 * * *"      # every 3 hours
+  workflow_dispatch: {}
+concurrency: { group: kaggle-train, cancel-in-progress: false }
+jobs:
+  tick:
+    if: vars.JENA_KAGGLE_DRIVER == 'github'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: kaggle }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q kaggle
+      - run: python kaggle/gha_driver.py
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}

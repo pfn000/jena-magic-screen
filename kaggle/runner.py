@@ -70,6 +70,27 @@ if not os.path.exists(dst):
         say("no previous checkpoints attached: fresh start")
 os.makedirs(dst, exist_ok=True)
 
+# 3b) extra training chats Tab syncs from her box (e.g. Jena's Grok notes), attached as the private
+#     Kaggle dataset saidienewara/jenaxi-training-data. Deduped against her handwritten persona chats and
+#     appended to the persona file of THIS session's copy of the repo (her repo itself is not changed).
+extra = sorted(glob.glob("/kaggle/input/**/jenaxi_extra_chats.jsonl", recursive=True))
+if extra:
+    pf = os.path.join(REPO, "colab", "data", "jena_persona.jsonl")
+    base = [json.loads(l) for l in open(pf, encoding="utf-8") if l.strip()]
+    key = lambda c: " ".join(c["turns"][0]["user"].lower().split())
+    seen = {key(c) for c in base}; added = 0; by_src = {}
+    with open(pf, "a", encoding="utf-8") as f:
+        for l in open(extra[0], encoding="utf-8"):
+            try: c = json.loads(l)
+            except Exception: continue
+            if not c.get("turns") or key(c) in seen: continue
+            seen.add(key(c)); f.write(json.dumps(c, ensure_ascii=False) + "\n"); added += 1
+            by_src[c.get("src", "?")] = by_src.get(c.get("src", "?"), 0) + 1
+    say(f"extra training chats from {extra[0]}: +{added} new (by source {by_src}); persona chats now {len(base) + added}")
+    status(extra_chats_added=added, extra_by_source=by_src)
+else:
+    say("no extra training-data dataset attached (persona + open datasets only)")
+
 env = dict(os.environ, HF_HOME=os.path.join(TMP, "hf"), HF_HUB_DISABLE_PROGRESS_BARS="1", TOKENIZERS_PARALLELISM="false",
            JENAXI_WORK_DIR=os.path.join(TMP, "work"), CUDA_VISIBLE_DEVICES=os.environ.get("CUDA_VISIBLE_DEVICES", "0"))
 left_h = lambda: SESSION_LIMIT_H - (time.time() - T0) / 3600

@@ -1,0 +1,19 @@
+{
+ "id": "saidienewara/jenaxi-chat-gpu",
+ "title": "JenaXI-chat GPU",
+ "code_file": "../kernel_chat.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": true,
+ "enable_gpu": true,
+ "enable_internet": true,
+ "machine_shape": "NvidiaTeslaT4",
+ "kernel_sources": [
+  "saidienewara/jenaxi-chat-gpu"
+ ],
+ "dataset_sources": [
+  "saidienewara/jenaxi-training-data"
+ ],
+ "competition_sources": [],
+ "model_sources": []
+}

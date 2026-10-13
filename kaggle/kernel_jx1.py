@@ -1,6 +1,7 @@
-# JenaXI on Kaggle (jx1). Bootstrap: fetch the runner from Saidie's repo and run it.
+# JenaXI on Kaggle (jx1). Bootstrap: clone Saidie's repo (always the latest main) and run kaggle/runner.py.
 # Source: https://github.com/pfn000/jena-magic-screen/tree/main/kaggle
-import subprocess, sys, urllib.request
-src = urllib.request.urlopen("https://raw.githubusercontent.com/pfn000/jena-magic-screen/main/kaggle/runner.py", timeout=60).read()
-open("/tmp/jena_runner.py", "wb").write(src)
-sys.exit(subprocess.call([sys.executable, "-u", "/tmp/jena_runner.py", "jx1"]))
+import subprocess, sys
+R = "/tmp/jena-magic-screen"
+subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse", "https://github.com/pfn000/jena-magic-screen", R], check=True)
+subprocess.run(["git", "-C", R, "sparse-checkout", "set", "colab", "kaggle"], check=True)
+sys.exit(subprocess.call([sys.executable, "-u", R + "/kaggle/runner.py", "jx1"]))
