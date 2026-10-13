@@ -579,7 +579,15 @@ def act_read(topic=None):
     log_activity('open', url, f'reading about {name}')
     firefox(url); time.sleep(3); scroll_some()
 
+def notes_reset():
+    # her editor and the file disagree (unsaved edits, or the file changed under it): close it without saving
+    # and open the file fresh, so what she sees is exactly what's in thoughts.txt
+    sh(['pkill', '-u', 'jena', '-x', 'mousepad']); time.sleep(1)
+    return notes()
+
 def act_note(extra=None):
+    w = find('mousepad')
+    if w and any(x['id'] == w and x['title'].startswith('*') for x in windows()): notes_reset()
     if not notes(): return
     with lock:
         s = screen.get('summary', '')
@@ -592,9 +600,18 @@ def act_note(extra=None):
                 "mama is cool. dont tell her i said that", "bug: my brain is tiny rn. upgrade pending", "goal: win a CTF before i turn 1",
                 f"chat was talking about {extra}. noted." if extra else "chat is quiet. suspicious."]
         line = random.choice(pool)
+    stamp = time.strftime('%H:%M') + '  ' + line
     key('ctrl+End')
-    type_('\n' + time.strftime('%H:%M') + '  ' + line, delay=60)
-    key('ctrl+s')
+    type_('\n' + stamp, delay=60)
+    key('ctrl+s'); time.sleep(1.5)
+    # every thought she types has to land in thoughts.txt (the site's thought chain reads that file).
+    # If the editor didn't save it (a dialog, a stale buffer), she writes it to the file herself and reopens it.
+    try: tail = open(THOUGHTS, encoding='utf-8', errors='replace').read()[-2000:]
+    except Exception: tail = ''
+    if stamp.strip() not in tail:
+        with open(THOUGHTS, 'a', encoding='utf-8') as f: f.write(('' if tail.endswith('\n') or not tail else '\n') + stamp)
+        notes_reset()
+        did('my editor didn\'t save that note, so i wrote it into thoughts.txt myself')
     did(f'typed in my notes: "{line[:80]}"' + (' (from my brain)' if src == 'my brain' else ''))
 
 def act_tidy():

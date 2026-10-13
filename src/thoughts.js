@@ -98,6 +98,7 @@ export class ThoughtChain {
       this.noteCard = card;
       this.mount(card);
     }
+    if (this.noteCard !== this.list.lastElementChild) this.list.appendChild(this.noteCard);   // newest thought sits at the bottom, where you're looking
     this.addStep(this.noteCard.querySelector('.steps'), 'note', text);
     const li = this.noteCard.querySelector('.steps').lastElementChild;
     li.dataset.n = n; li.dataset.text = text;
