@@ -119,6 +119,8 @@ function sendSSE(res, chunks) {
 }
 
 async function brain(req, res, url, base, modelName) {
+  // eval only (localhost): run the same truth code against a test brain on 127.0.0.1:8099 (e.g. the waiting 1.5B), never public
+  if (req.headers['x-jena-eval-backend'] === '8099' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '')) base = 'http://127.0.0.1:8099';
   const raw = await readBody(req);
   let b = {}; try { b = JSON.parse(raw.toString() || '{}'); } catch {}
   const isChat = url.endsWith('/chat/completions');
@@ -139,7 +141,8 @@ async function brain(req, res, url, base, modelName) {
     const sourceText = facts + '\n' + messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
     const creative = T.CREATIVE.test(userText);
     const rawEval = req.headers['x-jena-eval-raw'] === '1' && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '');   // baseline eval only: the old path, no truth code
-    const routed = ROMANCE_IN.test(userText) || rawEval ? null : T.route(userText, sourceText);
+    const sysText = facts + '\n' + messages.filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n');
+    const routed = ROMANCE_IN.test(userText) || rawEval ? null : (T.route(userText, sysText) || (T.needsSource(userText, sysText) ? { kind: 'idk_no_source', text: T.IDK_Q() } : null));
     if (ROMANCE_IN.test(userText)) { const g = guard(userText, ''); text = g.text; rec.guarded = true; }
     else if (routed && (routed.text || routed.kind === 'desktop')) {
       text = routed.text || desktopSay(routed.ctx, box); rec.routed = routed.kind;   // answered from facts, the model never guesses here
@@ -183,13 +186,15 @@ async function brain(req, res, url, base, modelName) {
       if (caught.length) { rec.caught = caught; rec.oops = OOPS[Math.floor(Math.random() * OOPS.length)]; logCatch(caught, userText); }
       }
     }
+    // no markdown symbols (TTS reads them out loud); an *action* rides as its own field, shown not spoken
+    { const dm = T.demark(text); text = dm.text || text.replace(/[*#`]/g, ''); rec.action = (routed && routed.action) || dm.action || null; }
   } catch (e) {
     rec.error = e.message; rec.ms = Date.now() - t0; logBrain(rec);
     return sendJSON(res, e.status || (e.name === 'TimeoutError' ? 504 : 502), { error: { message: `${modelName}: ${e.message}` } });
   }
   rec.ms = Date.now() - t0; rec.raw = rawReply; rec.reply = text; rec.usage = usage; logBrain(rec);
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
-  const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null } };
+  const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {
     if (b.stream) return sendSSE(res, [
       { id, object: 'chat.completion.chunk', created, model: modelName, choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }], ...extra },

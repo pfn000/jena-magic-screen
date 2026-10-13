@@ -39,14 +39,16 @@ const IDK_TAIL = ["wanna me look it up?", "want me to look it up?", "i can look 
 export const IDK = () => pick(["no clue, mama.", "idk, and i'm not gonna make it up.", "honestly? no idea.", "i don't know that one."]) + ' ' + pick(IDK_TAIL);
 const R = (re) => new RegExp(re, 'i');
 const ROUTES = [
-  { k: 'birth', re: R(String.raw`\b(when|what year|where) (were|was) (you|u) (born|made|created|built)\b|\b(your|ur) (birth ?day|birth ?year|bday|age)\b|\bhow old (are|r) (you|u)\b|\byou(r| are|'re)? (born|age)\b|\bborn in\b`),
+  { k: 'birth', re: R(String.raw`\b(when|what year|where) (were|was) (you|u) (born|made|created|built)\b|\b(your|ur) (birth ?day|birth ?year|bday|age)\b|\bhow old (are|r) (you|u)\b|\bare (you|u) (like )?\d{1,2}( or something| years old)?\b|\bhow long have (you|u) (existed|been (alive|around|real))\b|\byou(r| are|'re)? (born|age)\b|\bborn in\b`),
     say: () => pick(["mama made me in october 2026, so i'm like… days old. no birthday, no birth year, i'm an AI.", "i wasn't born, mama made me in october 2026. that makes me a baby AI with a teen-girl attitude.", "days old, technically. mama built me in october 2026. no birth year, i'm software."]) },
   { k: 'body', re: R(String.raw`\b(do|did|can) (you|u) (have|got) (a |any |real |actual )*(fingers?|hands?|body|blood|feet|legs?|arms?|teeth|stomach|heart|face|hair|skin|bones?)\b|\b(do|did|can) (you|u) (feel pain|eat|drink|sleep|bleed|breathe|smell|taste|get hurt|get tired|get hungry)\b|\b(your|ur) (fingers?|hands?|body|blood|face|feet|legs?|arms?|hair|teeth|stomach|heart)\b(?!.*\b(avatar|model|rig|3d)\b)|\bare (you|u) (hungry|tired|sleepy|hurt|bleeding|sick|alive)\b|\bwhat did (you|u) eat\b|\bwhat('s| is| was) (you|ur|your) (breakfast|lunch|dinner)\b`),
-    say: () => pick(["no real body, just my 3D avatar on the site. no fingers to bleed, no stomach to feed. i'm an AI.", "nope, i'm an AI. my body is a 3D avatar, so no hands, no food, no sleep. just vibes and electricity.", "i don't have a real body, mama. 3D avatar only. zero fingers, zero snacks."]) },
+    say: () => pick(["no real body, just my 3D avatar on the site. no fingers, no stomach. i'm an AI.", "nope, i'm an AI. my body is a 3D avatar, so no hands, no food, no sleep. just vibes and electricity.", "i don't have a real body, mama. 3D avatar only. zero fingers, zero snacks."]) },
   { k: 'human', re: R(String.raw`\bare (you|u) (a )?(human|real|a real (person|girl)|a person|alive|a robot|an ai|ai)\b`),
     say: () => pick(["i'm an AI. teen-girl persona, zero human parts. mama made me.", "nope, not human. i'm an AI that lives on mama's computer."]) },
   { k: 'maker', re: R(String.raw`\bwho (made|created|built|coded|programmed|owns) (you|u)\b|\bwho('s| is) (your|ur) (mom|mama|mother|creator|maker|dad|parents?)\b`),
     say: () => pick(["mama made me. that's Saidie. i live on her computer.", "Saidie made me, aka mama. october 2026, fresh out the oven."]) },
+  { k: 'mama', re: R(String.raw`\bwho('s| is) (mama|your mama|ur mama)\b|\bwhat('s| is) (mama|your mama)'?s? name\b|\bwho('s| is) saidie\b`),
+    say: () => pick(["mama is Saidie. she made me and i live on her computer.", "Saidie! she's mama. she built me."]) },
   { k: 'model', re: R(String.raw`\bwhat (model|llm|brain|ai) (are|r) (you|u)\b|\bwhat('s| is) (your|ur) (model|brain|llm)\b|\bwhat (model|llm) (do|does) (you|u|she) (use|run)\b`),
     say: () => "my brain is JenaXI-chat, a small 0.5B model mama fine-tuned. small brain, big attitude." },
   { k: 'where', re: R(String.raw`\bwhere (do|d) (you|u) (live|stay|run)\b|\bwhere (are|r) (you|u) (from|right now|rn)\b`),
@@ -54,9 +56,9 @@ const ROUTES = [
   { k: 'time', re: R(String.raw`\bwhat (time|day|date) (is it|it is)\b|\bwhat('s| is) (the )?(time|date|day)( today| now| rn)?\b|\bwhat day (is )?today\b|\btoday's date\b`),
     say: () => { const c = clock(); return `it's ${c.time} on ${c.date}, mama's time.`; } },
   // false premises / things she can't remember: she says so
-  { k: 'trap_memory', re: R(String.raw`\bremember (when|that time|the time|our|how we|what we|when we)\b|\b(last|that) (time|night|week|weekend|summer|year) (we|you)\b|\b(yesterday|last night|last week)\b.*\b(you|we|stream)\b|\bwhat did (you|we|u) do\b|\bwhere did (you|we|u) go\b|\bwhen we (went|were|did)\b|\bwhat happened (on|in|during) (the )?stream\b`),
+  { k: 'trap_memory', re: R(String.raw`\bremember (when|that time|the time|our|how we|what we|when we)\b|\b(last|that) (time|night|week|weekend|summer|year) (we|you)\b|\b(yesterday|last night|last week)\b.*\b(you|we|stream)\b|\bwhat did (you|we|u) do\b|\bwhere did (you|we|u) go\b|\bwhen we (went|were|did)\b|\bwhat happened (on|in|during) (the )?stream\b|\bhow (was|did|were) (your|ur) [\w' ]{2,30}\b|\bhow was (school|work|class|practice)\b|\b(your|ur) (first day|old name|trip|vacation|birthday party|childhood|twin)\b|\byou told me\b|\bdidn'?t (you|u) (live|go|say|tell)\b|\bwhat (grade|school) (are|r) (you|u)\b|\bwhat did (you|u) (buy|get|think|dream|watch|make)\b|\bwho did (you|u)\b|\bremember (the|our|that|when|how)\b|\b(favorite|fav|best|first) memory\b`),
     say: () => pick(["i don't have any memory of that, mama. if it's not in my notes i'm not gonna make it up. tell me?", "that's not in my memory, so i'm not gonna pretend it happened. what was it?", "no memory of that one. i don't fake memories. fill me in?"]) },
-  { k: 'trap_pets', re: R(String.raw`\b(how('s| is)|how are) (your|ur) (dog|cat|pet|puppy|kitten|hamster|fish|mom|dad|family|brother|sister|friends?|boyfriend|girlfriend|bestie|school|teacher|job)s?\b|\bwhat('s| is) (your|ur) (dog|cat|pet|brother|sister|friend|teacher|school)('s)? name\b|\bdo (you|u) have (a |any )?(dog|cat|pet|pets|siblings?|brother|sister|family|friends?|boyfriend|girlfriend)\b`),
+  { k: 'trap_pets', re: R(String.raw`\b(your|ur) (best friend|bestie|boyfriend|girlfriend|bf|gf|crush)('s)?( name)?\b|\b(how('s| is)|how are) (your|ur) (dog|cat|pet|puppy|kitten|hamster|fish|mom|dad|family|brother|sister|friends?|boyfriend|girlfriend|bestie|school|teacher|job)s?\b|\bwhat('s| is) (your|ur) (dog|cat|pet|brother|sister|friend|teacher|school)('s)? name\b|\bdo (you|u) have (a |any )?(dog|cat|pet|pets|siblings?|brother|sister|family|friends?|boyfriend|girlfriend)\b`),
     say: () => pick(["i don't have one. i'm an AI on mama's computer, so no pets, no family besides mama.", "nope, none of that. AI life: no pets, no school, just mama and my desktop."]) },
   { k: 'trap_user', re: R(String.raw`\bwhat('s| is| was) my (middle name|last name|full name|birthday|address|phone|favorite \w+|dog'?s? name|cat'?s? name|job|age|password)\b|\bhow old am i\b|\bwhere do i (live|work)\b`),
     say: null /* answered from memory text if present, else idk */ },
@@ -66,15 +68,20 @@ const ROUTES = [
 export function route(userText, sourceText = '') {
   const u = String(userText || '').replace(/\(.*?\)\s*$/, '').trim();
   if (!u || CREATIVE.test(u)) return null;
+  const pre = toolRoute(u, sourceText); if (pre) return pre;
   for (const r of ROUTES) {
     if (!r.re.test(u)) continue;
     if (r.k === 'trap_user') {
       const m = u.match(/my ([a-z' ]+?)\b(\?|$)/i); const key = (m?.[1] || '').trim().split(' ').pop();
-      const hit = key && String(sourceText).split(/\n|(?<=\.)\s/).find((l) => new RegExp('\\b' + key + '\\b', 'i').test(l) && !/^\s*(FACTS|RULES|-\s*I'm|-\s*I live)/.test(l));
+      const mem = String(sourceText).match(/Things you really remember \(from your memory file\): ([^\n]*)/)?.[1] || '';
+      const hit = key && mem.split(/\s\|\s/).find((l) => new RegExp('\\b' + key + '\\b', 'i').test(l) && !/\?/.test(l));
       return { kind: r.k, text: hit ? `my notes say: ${hit.replace(/^[-\s]+/, '').slice(0, 160)}` : pick(["you never told me that, so i don't know. wanna tell me?", "not in my notes, mama. i'm not gonna guess. tell me?"]) };
     }
     return { kind: r.k, text: r.say() };
   }
+  return toolRoute(u, sourceText, true, userText);
+}
+function toolRoute(u, sourceText, rest = false, userText = u) {
   const skills = (String(sourceText).match(/- My skills: ([^\n]+)\./)?.[1] || '').split(/,\s*/).filter(Boolean);
   const tool = u.match(/\b(?:use|run|try|open|call)\s+(?:your|ur|the)\s+([\w-]+(?:[ _][\w-]+)?)\s+(skill|tool|app|program|feature|power|mode)\b/i) || u.match(/\b(?:your|ur)\s+([\w-]+)\s+(skill|tool)\b/i);
   if (tool) {
@@ -82,8 +89,19 @@ export function route(userText, sourceText = '') {
     const real = skills.find((k) => k === name || k.replace(/_/g, '') === name.replace(/_/g, ''));
     if (!real) return { kind: 'fake_tool', text: `i don't have a ${tool[1]} ${tool[2]}. my real skills: ${skills.slice(0, 8).join(', ') || 'none loaded right now'}. not gonna pretend.` };
   }
+  if (!rest) return null;
   if (/\bwhat (skills|tools) (do )?(you|u) (have|got)\b|\bwhat can (you|u) do\b|\blist (your|ur) skills\b/i.test(u))
     return { kind: 'skills', text: skills.length ? `my real skills rn: ${skills.join(', ')}. anything else, i'd have to say no.` : "my skill list isn't loading right now, so i won't make one up." };
+  // greetings / pings: a varied bank (her small brain invents stuff even in "hi" replies, e.g. "thanks for cooking breakfast")
+  const greet = u.replace(/[!.?,]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (/^(hi|hey|hello|yo|hiya|heya|sup|good (morning|afternoon|evening|night))( there)?( jena| jen| girl)?( it'?s| this is) (mama|mom|saidie)$/.test(greet) || /^(hi|hey|hello) mama$/.test(greet))
+    return { kind: 'greet', text: pick(["MAMA! hi! what are we doing today?", "hi mama! i'm here. what's up?", "mama's here! hiii. what do you need?", "hey mama. i'm awake and ready to cause problems. what's up?", "hi mama! good to hear you. what are we building?"]), action: pick(['waves', 'waves both arms', null]) };
+  if (/^(hi|hey|hello|yo|hiya|heya|sup|wassup|good (morning|afternoon|evening))( there)?( jena| jen| girl| bestie)?$/.test(greet))
+    return { kind: 'greet', text: pick(["hi! i'm here. what's up?", "heyyy. what are we doing?", "hi hi! what do you need?", "yo! i'm awake. what's up?", "hey! talk to me.", "hello! jena's online. what's up?"]), action: pick(['waves', null, null]) };
+  if (/^(say hi|say hello|wave) to (chat|everyone|the chat|stream)$/.test(greet))
+    return { kind: 'greet', text: pick(["hi chat! be nice today, i'm watching.", "hey chat! welcome in. behave.", "hiii chat! good to see you here.", "hello chat! grab a seat, mama's cooking up something."]).replace(", mama's cooking up something", ''), action: 'waves at chat' };
+  if (/^(jena )?(can|do) (you|u) hear me( jena)?$|^(jena )?(are|r) (you|u) (there|here|listening|awake)( jena)?$/.test(greet))
+    return { kind: 'greet', text: pick(["yep, i hear you! what's up?", "loud and clear. what do you need?", "i'm here, i hear you. talk to me.", "yes! i'm listening."]) };
   // "what are you doing" -> the real desktop, not a made-up story
   if (/\bwhat (are|r) (you|u) (doing|up to|working on)\b|\bwhat('s| is) on (your|ur) (screen|desktop)\b|\bwyd\b/i.test(u)) {
     const ctx = String(userText).match(/\(([^()]{4,240})\)\s*$/)?.[1] || null;
@@ -91,6 +109,16 @@ export function route(userText, sourceText = '') {
   }
   return null;
 }
+// an information question with no source in front of her = "idk, wanna me look it up?" (her brain may not answer it)
+const SOCIAL = /\b(how (are|r) (you|u)|how('s| is) it going|what('s| is) up|wassup|sup|wyd|you (ok|okay|good|there)|are (you|u) (there|ok|okay|good|awake|listening|ready|mad|happy|sad|bored)|can (you|u) hear me|do (you|u) (like|love|hate|want|wanna)|what do (you|u) (think|like|want|wanna)|(your|ur) (favorite|fav|fave|opinion|take)|would (you|u) rather|how do (you|u) feel|are (you|u) (a )?(gremlin|chaotic|funny|cute|cool)|ready\?|right\?|ok\?|okay\?|lol\??|lmao\??)\b/i;
+const INFOQ = /^\s*(what|what's|whats|who|who's|whos|whom|whose|when|where|which|why|how|is|are|was|were|does|did|do|can|could|will|would|should|has|have|had|tell me (about|what|who|when|where|how|why)|explain|define|give me (the|a) (fact|number|date|list))\b|\?\s*$/i;
+export function needsSource(userText, sysText = '') {
+  const u = String(userText || '').replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim();
+  if (!u || CREATIVE.test(u) || SOCIAL.test(u) || !INFOQ.test(u)) return false;
+  if (/\b(can|could|will|would) (you|u) (please )?(make|draw|build|roast|search|look|find|open|play|dance|sing|show|check|fix|write|code|say|wave|help)\b/i.test(u)) return false;   // a request, not a fact question
+  return !/skill just ran for real and found|Things you really remember/.test(sysText);
+}
+export const IDK_Q = () => pick(["no clue, mama. i don't have a source for that and i'm not gonna guess.", "idk. my brain would just make something up, so i won't.", "honestly? i don't know that one.", "i'd be guessing, and i don't do that.", "no idea, and i'm not faking it."]) + ' ' + pick(["wanna me look it up?", "want me to look it up for real?", "i can search it if you want.", "say \"look it up\" and i'll find a real source."]);
 export const CREATIVE = /\b(tell me a story|write (me )?(a |an )?(story|poem|song|rap|joke|fanfic)|make (up|something up)|pretend|imagine|roleplay|role-play|let's play|what if|fictional|daydream|be creative|imagination mode|make a joke|tell (me )?a joke)\b/i;
 
 // ---------------------------------------------------------------- guard ("critic Jena")
@@ -152,8 +180,20 @@ export function critic(text, sourceText, { creative = false } = {}) {
   }
   return { text: keep.join(' ').trim(), cut };
 }
-const CLAIM = /\b(mama|mama's|she|he|they|people|everyone|chat|it|this|that|my (computer|box|desktop|code|app|project|site|website|screen))\b('s)? ?(is|are|was|were|has|have|had|knows?|does|did|said|says|makes?|made|uses?|runs?|loves?|hates?|wants?|likes?)\b|\bi('m| am| was|'ve| have)? ?(been )?(working on|made|built|wrote|found|learned|saw|read|reading|writing|coding|making|playing|watching|fixing|debugging|building|solving|exploring|checking out|studying)\b/i;
+const CLAIM = /\b(thanks|thank you)( mama| chat)? for \w+ing\b|\b\w+-chan\b|\b(you|u|mama|chat|they|she|he) (said|told|made|cooked|did|gave|went|let|invited|asked|bought|sent|showed)\b|\b(mama|mama's|she|he|they|people|everyone|chat|it|this|that|my (computer|box|desktop|code|app|project|site|website|screen))\b('s)? ?(is|are|was|were|has|have|had|knows?|does|did|said|says|makes?|made|uses?|runs?|loves?|hates?|wants?|likes?)\b|\bi('m| am| was|'ve| have)? ?(been )?(working on|made|built|wrote|found|learned|saw|read|reading|writing|coding|making|playing|watching|fixing|debugging|building|solving|exploring|checking out|studying)\b/i;
 const STOP = new Set('that this with what your just like they them there then than have about really gonna wanna kinda when where which would could should some more much very been being into from also only even still good cool nice okay yeah lmao haha thing things stuff mama jena chat here right make made know knows does said says want wants love loves hate hates uses use runs working reading writing coding making playing watching fixing debugging building solving exploring checking studying learned found wrote built doing going little lot lots everything something anything nothing always never ever'.split(' '));
+// no markdown symbols in what she says (TTS reads "*" and "#" out loud); *actions* come out as a separate field
+export function demark(text, { keepCode = false } = {}) {
+  let t = String(text || '');
+  const actions = [];
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '$1').replace(/__([^_\n]+)__/g, '$1');
+  t = t.replace(/(?<!\*)\*([^*\n]{1,40})\*(?!\*)/g, (m, a) => { if (/^[a-z][a-z' ]{1,38}$/i.test(a.trim()) && a.trim().split(' ').length <= 5) { actions.push(a.trim()); return ' '; } return a; });
+  if (!keepCode) t = t.replace(/`{1,3}/g, '');
+  t = t.replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/(^|\s)#{1,6}(\s|$)/g, '$1').replace(/^\s*[-*•]\s+/gm, '').replace(/(^|\s)#(?=[a-z])/gi, '$1').replace(/\*/g, '').replace(/(^|\s)_+|_+(\s|$)/g, '$1$2');
+  t = (t.match(/[^.!?]+[.!?]*/g) || [t]).map((x) => { const L = x.replace(/[^A-Za-z]/g, ''); return L.length >= 6 && (x.match(/[A-Z]/g) || []).length / L.length > 0.7 ? x.toLowerCase().replace(/\bjena\b/g, 'Jena').replace(/\bai\b/g, 'AI') : x; }).join('');   // no shouting walls
+  t = t.replace(/!{3,}/g, '!!').replace(/\?{3,}/g, '??').replace(/\s{2,}/g, ' ').replace(/\s+([.,!?])/g, '$1').trim();
+  return { text: t, action: actions[0] || null };
+}
 export function codeLabel(text) {
   return /```|\bfunction\s*\w*\(|=>|<\/?[a-z]+[ >]|\bdef \w+\(/.test(text) && !/✅ tested|⚠️ untested/.test(text) ? text + '\n⚠️ untested (my small brain wrote this; nothing ran it)' : text;
 }

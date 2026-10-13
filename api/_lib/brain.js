@@ -258,6 +258,7 @@ export async function* thinkEvents(input) {
   }
   yield { type: 'step', kind: 'tool', text: info?.routed ? `answered from her facts on her box (truth code, the model didn't guess)` : `${info?.model || model} answered on her box in ${((info?.ms ?? Date.now() - t0) / 1000).toFixed(1)} s${info?.usage ? ` · ${info.usage.completion_tokens} tokens` : ''}${info?.guarded ? ' · safety guard replaced the reply' : ''}` };
   if (reasoning.trim()) yield { type: 'step', kind: 'think', text: reasoning.trim().slice(0, 400) };
+  if (info?.action) yield { type: 'step', kind: 'feel', text: `*${String(info.action).slice(0, 40)}*` };   // her gesture: shown, never spoken
   // her truth code (box/jena-truth.mjs): answered from facts, or caught herself making something up and cut it
   if (info?.routed) yield { type: 'step', kind: 'think', text: `answered from what i actually know (${String(info.routed).replace(/_/g, ' ')}), not a guess` };
   for (const c of (info?.caught || []).slice(0, 3)) yield { type: 'step', kind: 'feel', text: `${info.oops || 'wait… that\'s not right'}: "${String(c.s).slice(0, 120)}" (${c.why})` };
