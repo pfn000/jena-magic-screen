@@ -282,7 +282,7 @@ async function think(req) {
     const bx = await boxLink().catch(() => null);
     if (bx) {
       const [sk, mem] = await Promise.all([
-        fetch(bx.url + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null),
+        fetch(bx.url + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(input.mama ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null),
         recall(bx, input.message, input.user),
       ]);
       if (mem?.length) input.memories = mem;
