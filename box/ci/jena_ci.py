@@ -263,6 +263,12 @@ def find_preview(p):
             print('preview poll', e, flush=True)
     set_p(p, preview_note='no Vercel preview seen within 10 min')
 
+GH_MERGE = re.compile(r'^Merge pull request #\d+ from [\w.-]+/jena/')
+def is_jena_merge(subject):
+    # a Jena change that reached main: merged by this checker after mama's OK in the dev panel ("[jena] merge: ..."),
+    # or merged by mama herself on GitHub (her pull request from a jena/* branch); both are mama's approval
+    return subject.startswith('[jena] merge:') or bool(GH_MERGE.match(subject))
+
 def jena_commits(limit=60):
     git('fetch', '-q', 'origin', 'main')
     c, o = git('log', f'-{limit}', '--format=%H%x1f%s%x1f%b%x1e', 'origin/main')
@@ -271,7 +277,29 @@ def jena_commits(limit=60):
         f = rec.strip().split('\x1f')
         if len(f) >= 2: out.append({'sha': f[0], 'message': f[1], 'body': f[2] if len(f) > 2 else ''})
     reverted = set(re.findall(r'This reverts commit ([0-9a-f]{40})', ' '.join(x['body'] for x in out)))
-    return [x for x in out if x['message'].startswith('[jena] merge:') and x['sha'] not in reverted]
+    return [x for x in out if is_jena_merge(x['message']) and x['sha'] not in reverted]
+
+def sync_merged():
+    """a ready branch that is now part of main was merged by mama (here, or on GitHub): record it once"""
+    try:
+        pend = [p for p in S['proposals'] if p.get('state') == 'ready' and p.get('sha')]
+        if not pend: return
+        git('fetch', '-q', 'origin', 'main')
+        for p in pend:
+            if git('merge-base', '--is-ancestor', p['sha'], 'origin/main')[0] != 0: continue
+            c, o = git('log', '--merges', '--ancestry-path', '--reverse', '--format=%H%x1f%s%x1f%an', f"{p['sha']}..origin/main")
+            first = (o.strip().splitlines() or [''])[0].split('\x1f')
+            msha, subj, who = (first + ['', '', ''])[:3]
+            how = 'on GitHub' if GH_MERGE.match(subj) else 'in the dev panel' if subj.startswith('[jena] merge:') else 'directly'
+            set_p(p, state='merged', merged_sha=msha or p['sha'], merged_at=now(), merged_via=f'mama merged it {how}' + (f' ({who})' if who else ''))
+            log(f"mama merged Jena's change “{p['title']}” {how} ({(msha or p['sha'])[:7]}{', ' + subj[:60] if subj else ''}); live site redeploys from main. Undo = rollback button.", kind='site_edit_mama')
+    except Exception as e:
+        print('sync_merged', e, flush=True)
+
+def syncer():
+    while True:
+        time.sleep(60)
+        if jobs.empty(): sync_merged()
 
 def push_main(why):
     for attempt in range(2):
@@ -392,5 +420,6 @@ if __name__ == '__main__':
             p['state'] = 'failed' if p['state'] in ('queued', 'checking') else 'ready'; p.setdefault('checks', []).append({'name': 'run', 'ok': False, 'detail': 'the checker restarted mid-run'}) if p['state'] == 'failed' else None
     save()
     threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=syncer, daemon=True).start()
     log('site-edit checker up on 127.0.0.1:%d' % PORT, mama=False)
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

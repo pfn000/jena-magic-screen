@@ -252,7 +252,7 @@ export class DevPanel {
     }
     if (this.tab === 'edits') {
       const E = d.edits?.data;
-      h += `<h3>Site edits Jena proposes · branch → checks → Vercel preview → <u>only mama merges</u></h3><p><small>She never pushes to main herself. Each change gets its own branch in a sandbox copy, then build + lint + a headless smoke test (page loads, no console errors, key parts present, 390 px phone has no sideways scroll, OBS view intact). Only a passing branch is pushed for a Vercel preview. Merge and undo need your passcode.</small></p>`;
+      h += `<h3>Site edits Jena proposes · branch → checks → Vercel preview → <u>only mama merges</u></h3><p><small>She never pushes to main herself. Each change gets its own branch in a sandbox copy, then build + lint + a headless smoke test (page loads, no console errors, key parts present, 390 px phone has no sideways scroll, OBS view intact). Only a passing branch is pushed for a Vercel preview. Merge and undo need your passcode. Merging its pull request on GitHub yourself counts as your approval too, and shows up here as merged.</small></p>`;
       if (!E) h += d.edits ? `<p class="dp-warn">${esc(d.edits.error || d.edits.data?.error || 'her site-edit checker is not answering')}</p>` : '<p>reading…</p>';
       else {
         h += `<p><button data-edit="rollback">↶ undo Jena's last change on the live site</button> <small>${E.last_jena_commit ? 'last Jena commit on main: ' + esc(E.last_jena_commit.sha.slice(0, 7)) + ' “' + esc(E.last_jena_commit.message) + '”' : 'no Jena commit on main yet'}</small></p>`;
