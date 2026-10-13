@@ -1,0 +1,20 @@
+{
+ "name": "roast_critique",
+ "description": "Critic Jena: roasts a web page (rendered for real at phone + desktop width), an image (incl. AI-slop signs and AI metadata), code (a repo file or pasted) or text (AI-slop copy). Every point is a real measurement with a concrete fix and a citation from her library. Roasts the work, never the person.",
+ "triggers": [
+  "\\b(roast|critique|critic|tear apart|rip apart|drag|rate|judge|review)\\b.{0,80}\\b(ui|ux|site|website|page|design|code|css|html|js|javascript|python|image|picture|pic|logo|icon|font|typography|colors?|layout|this|that|it|text|copy|slop|desktop|screen|app|button|thumbnail|file)\\b",
+  "\\broast\\b",
+  "\\bai slop\\b",
+  "\\b(is|does) (this|that|it) (look|feel) (like )?(ai|ai slop|cheap|bad|ugly|sloppy)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 180,
+ "needs": [
+  "headless chromium (one at a time)",
+  "her library"
+ ],
+ "example": {
+  "text": "jena roast https://example.com"
+ }
+}

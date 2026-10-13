@@ -4,6 +4,7 @@ import json, os, re, sqlite3
 LIB = os.environ.get('JENA_LIBRARY', os.path.expanduser('~/library'))
 STOP = set('the a an and or of to in on for with is are be it this that what how why does do my your me you can i jena please about from by as at'.split())
 _cat = None
+SHORT = {'mdn': 'MDN', 'webdev': 'web.dev', 'wcag': 'W3C WCAG 2.2', 'eloquent': 'Eloquent JavaScript', 'ydkjs': "You Don't Know JS", 'odin': 'The Odin Project', 'fso': 'Full Stack Open', 'react': 'react.dev', 'progit': 'Pro Git', 'mweb': 'Material Web', 'wikipedia': 'Wikipedia', 'opencolor': 'Open Color'}
 
 def catalog():
     global _cat
@@ -36,7 +37,7 @@ def lookup(q, n=3, sources=None):
         if seen.get(title, 0) >= 1: continue   # one passage per document, so answers cite different books
         seen[title] = seen.get(title, 0) + 1
         c = catalog().get(src, {})
-        out.append({'title': title, 'section': sec, 'book': c.get('title', src), 'license': c.get('license', '?'), 'url': url,
+        out.append({'title': title, 'section': sec, 'book': c.get('title', src), 'short': SHORT.get(src, src), 'license_short': c.get('license', '?').split(' (')[0].split(';')[0], 'license': c.get('license', '?'), 'url': url,
                     'passage': re.sub(r'\s+', ' ', body).strip()[:700], 'score': round(-score, 2)})
         if len(out) >= n: break
     return out

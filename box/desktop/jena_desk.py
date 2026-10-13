@@ -1040,6 +1040,17 @@ async def client(reader, writer):
             elif spec.get('kind') == 'desktop':
                 with lock: events_in.append({'text': text, 'user': b.get('user'), 'ts': time.time(), 'skill': name})
                 out = json.dumps({'name': name, 'queued': True, 'ok': True, 'summary': 'queued on her desktop'}).encode()
+            elif name == 'roast_critique' and (u or re.search(r"\b(your|ur|her) (own )?(site|website|web ?page|page|ui|stage)\b", text, re.I)) and not re.search(r'\.(png|jpe?g|webp|gif)(\?|$)', u or '', re.I):
+                # rendering a real page at 2 widths takes 30-70 s on this box, longer than the site waits: run it in
+                # the background and post the roast (every finding + fix + source) into her log -> site thought chain
+                def roast_bg(text=text, u=u):
+                    res = skills.run(name, {'text': text, 'query': text, 'url': u or ''})
+                    did(f'roast_critique: {res.get("summary", "")[:200]}{"" if res.get("ok") else " (failed)"}', 'skill')
+                    for s_ in (res.get('steps') or [])[:7]: did(s_[:300], 'skill')
+                    if res.get('say'): did('my verdict: ' + res['say'][:500], 'skill')
+                threading.Thread(target=roast_bg, daemon=True).start()
+                did(f'using skill: {name} on {u or "my own site"} (rendering it for real, ~1 min)', 'skill')
+                out = json.dumps({'name': name, 'queued': True, 'ok': True, 'summary': f'rendering {u or "my own site"} at phone + desktop width on my box (~1 min); every finding + fix + source lands in my thought chain'}).encode()
             else:
                 did(f'using skill: {name}', 'skill')
                 res = await asyncio.get_running_loop().run_in_executor(None, skills.run, name, {'text': text, 'query': text, 'question': text, 'url': u or ''})

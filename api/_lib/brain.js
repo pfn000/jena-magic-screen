@@ -198,9 +198,21 @@ export async function* thinkEvents(input) {
   }
   // multi-model routing, as it actually happened for this message (run side by side where they can)
   const routes = [input.skill ? `${input.skill.name} skill (${input.skill.queued ? 'on her desktop' : 'ran on her box'})` : null, input.memories ? `memory (${input.memories.length} recalled)` : null].filter(Boolean);
-  yield { type: 'step', kind: 'plan', text: `routing: ${routes.length ? routes.join(' + ') + ' in parallel → ' : ''}JenaXI-chat answers (JenaXI-0 is the backup)${input.skill?.name === 'ask_grok' ? ' · Grok is asked on her desktop, labelled as Grok' : ''}` };
+  yield { type: 'step', kind: 'plan', text: `routing: ${routes.length ? routes.join(' + ') + ' in parallel → ' : ''}${input.skill?.ok && input.skill.say ? input.skill.name + ' writes the answer' : 'JenaXI-chat answers (JenaXI-0 is the backup)'}${input.skill?.name === 'ask_grok' ? ' · Grok is asked on her desktop, labelled as Grok' : ''}` };
   if (input.memories?.length) yield { type: 'step', kind: 'think', text: `remembered: ${input.memories.map((x) => x.fact).join(' · ').slice(0, 220)}` };
-  if (input.skill) yield { type: 'step', kind: 'tool', text: input.skill.queued ? `using skill: ${input.skill.name} (on her desktop, results show there)` : `using skill: ${input.skill.name} → ${input.skill.ok ? input.skill.summary : 'failed: ' + input.skill.summary}` };
+  if (input.skill) yield { type: 'step', kind: 'tool', text: input.skill.queued ? `using skill: ${input.skill.name} (${input.skill.summary && input.skill.summary !== 'queued on her desktop' ? input.skill.summary : 'on her desktop, results show there'})` : `using skill: ${input.skill.name} → ${input.skill.ok ? input.skill.summary : 'failed: ' + input.skill.summary}` };
+  // critic / library skills write her answer themselves from real measurements and real passages (her 0.5B brain
+  // garbles citations and numbers), so the chain shows every finding + fix + source and she says the skill's words
+  if (input.skill?.ok && input.skill.say) {
+    for (const s of input.skill.steps || []) yield { type: 'step', kind: 'think', text: s };
+    yield { type: 'step', kind: 'status', text: `${input.skill.name} wrote this answer from real ${input.skill.name === 'library_lookup' ? 'passages in her library' : 'measurements + her library'} (her small brain is not trusted with numbers and citations yet)` };
+    yield { type: 'meta', brain: 'jenaxi', model: `skill:${input.skill.name}`, online: true };
+    yield { type: 'mood', value: input.skill.name === 'roast_critique' ? (/Score: (10|9|8)\//.test(input.skill.say) ? 'surprised' : 'angry') : 'happy' };
+    const t = String(input.skill.say).slice(0, 600);
+    yield { type: 'say', text: t, voice: ttsToken(t) };
+    yield { type: 'done' };
+    return;
+  }
   const chatMode = p.format === 'chat';
   const ask = (base, model) => fetch(`${base}/${chatMode ? 'chat/completions' : 'completions'}`, {
     method: 'POST',
