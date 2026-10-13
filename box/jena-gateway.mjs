@@ -76,7 +76,8 @@ function desktopSay(ctx, box) {
 // ---------------------------------------------------------------- mama corrections: verified facts (persist across restarts)
 const MAMA_FACTS = `${STATE}/mama_facts.jsonl`;
 const CORR_TRAIN = E('JENA_CORRECTIONS', '/home/user/tab/files/jenaxi/data/persona_corrections.jsonl');
-const MAMA_QUEUE = E('JENA_MAMA_QUEUE', '/home/jena/.jena-mama/mama_queue.jsonl');   // her desktop agent reads this between steps (not in ~/.jena: jena_desk.py chmods that 700 on every start)
+const MAMA_DIR = E('JENA_MAMA_DIR', '/home/jena/.jena-mama');
+const MAMA_QUEUE = E('JENA_MAMA_QUEUE', `${MAMA_DIR}/mama_queue.jsonl`);   // her desktop agent reads this between steps (not in ~/.jena: jena_desk.py chmods that 700 on every start)
 // facts file: one JSON line per fact; a {"revoke": ts} line takes one back ("forget that")
 function mamaFacts() {
   let L = []; try { L = fs.readFileSync(MAMA_FACTS, 'utf8').trim().split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch {}
@@ -236,6 +237,7 @@ async function brain(req, res, url, base, modelName) {
     const users = messages.filter((m) => m.role === 'user');
     const prevQ = users.length > 1 ? strip(users[users.length - 2].content).slice(0, 400) : (fresh ? last.q : null);
     const lastJena = [...messages].reverse().find((m) => m.role === 'assistant')?.content || (fresh ? last.a : null);
+    if (isMama && /^\s*(?:hail\s*\||~!!)/i.test(strip(userText))) { rec.routed = 'ncom'; rec.user = '(NCOM_Sys, private)'; throw Object.assign(new Error('NCOM_Sys message: not for her brain'), { status: 409 }); }
     const parsed = T.parseCorrection(userText, { afterReply: !!lastJena });
     const corr = isMama ? parsed : null;
     const pubTry = isMama ? null : T.parseCorrection(userText, { afterReply: true });
@@ -453,6 +455,25 @@ const server = http.createServer(async (req, res) => {
       if (!site && !rateOk(ip, path)) { authStats.limited++; return sendJSON(res, 429, { error: { message: 'too many requests, slow down' } }); }
       const open = path === '/health' || path.startsWith('/box/') || path.startsWith('/japi/');
       if (!open && !site) { authStats.refused++; return sendJSON(res, 401, { error: { message: 'Jena\'s brain only answers her own site. For apps, use her keyed API: /api/v1/chat/completions on her site.' } }); }
+    }
+    // NCOM_Sys: mama's back-channel to Tab ("Hail |" / "~!!" in her chat). Her brain never sees these.
+    // In: only her signed site (after the passcode check) or this box. Replies: Tab's CLI on this box (or her signed site).
+    if (path.startsWith('/box/ncom/')) {
+      const local = /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '') && !req.headers['cf-ray'];
+      if (!local && !siteAuthOk(req.headers['x-jena-auth'])) return sendJSON(res, 401, { error: 'mama only' });
+      const NC_IN = `${MAMA_DIR}/ncom_inbox.jsonl`, NC_OUT = `${MAMA_DIR}/ncom_outbox.jsonl`;
+      const rd = (f) => { try { return fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
+      if (req.method === 'POST' && (path === '/box/ncom/in' || path === '/box/ncom/reply')) {
+        let b = {}; try { b = JSON.parse((await readBody(req)).toString() || '{}'); } catch {}
+        const text = String(b.text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+        if (!text) return sendJSON(res, 400, { error: 'text needed' });
+        const row = { ts: Date.now(), text, ...(path === '/box/ncom/in' ? { from: 'mama' } : { from: 'NCOM_Sys' }) };
+        fs.appendFileSync(path === '/box/ncom/in' ? NC_IN : NC_OUT, JSON.stringify(row) + '\n');
+        return sendJSON(res, 200, { ok: true, ts: row.ts, file: path === '/box/ncom/in' ? NC_IN : NC_OUT });
+      }
+      if (path === '/box/ncom/outbox') { const since = +(new URLSearchParams(qs).get('since') || 0); return sendJSON(res, 200, { now: Date.now(), replies: rd(NC_OUT).filter((r) => r.ts > since).slice(-20) }); }
+      if (path === '/box/ncom/inbox' && local) return sendJSON(res, 200, { inbox: rd(NC_IN).slice(-50), replies: rd(NC_OUT).slice(-50) });
+      return sendJSON(res, 404, { error: 'unknown ncom path' });
     }
     // intent layer: her skills + mama's actions from plain speech (the site asks here before her brain answers)
     if (req.method === 'POST' && path === '/box/skills/auto') return await intentSkillsAuto(req, res, await readBody(req));

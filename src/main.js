@@ -364,11 +364,36 @@ $('#talk').addEventListener('submit', (e) => {
   if (!text) return;
   input.value = '';
   const who = localStorage.getItem(KEY_STORE) ? 'mama' : 'guest';
+  if (who === 'mama' && !cfg.obs && NCOM_RE.test(text)) { ncomSend(text); return; }   // to Tab, not to her
   lastAsked = text;
   const el = twitchLive ? null : addChat({ user: who, text: clean(text), cls: 'from-you' });
   if (twitchLive) { chain.self('status', `${who} (off-Twitch): ${text.slice(0, 120)}`); thinkAbout({ message: text, source: 'stage', user: who }); return; }
   send(text, who, el);
 });
+
+// ---------------- NCOM_Sys: mama's back-channel to Tab ("Hail |" / "~!!"). Mama's device only: never spoken, never on OBS or public.
+const NCOM_RE = /^\s*(?:hail\s*\||~!!)/i;
+const NCOM_STYLE = 'background:rgba(20,24,40,.92);color:#9ef0c9;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;border-left:3px solid #39d98a;border-radius:8px;';
+async function ncomSend(text) {
+  const li = addChat({ user: 'mama → NCOM_Sys', text, cls: 'from-you msg-ncom' });
+  const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': localStorage.getItem(KEY_STORE) || '' }, body: JSON.stringify({ action: 'ncom', text }) }).then((x) => x.json()).catch((e) => ({ error: e.message }));
+  const tick = document.createElement('small');
+  tick.style.cssText = 'display:block;opacity:.7;font-size:11px;margin-top:2px';
+  tick.textContent = r.ok ? '→ sent to NCOM_Sys' : `✕ not sent: ${r.error || 'her box did not answer'}`;
+  li.appendChild(tick);
+}
+let ncomSince = +localStorage.getItem('jena.ncomSince') || 0;
+async function ncomPoll() {
+  if (!localStorage.getItem(KEY_STORE) || cfg.obs || !cfg.api) return;
+  const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': localStorage.getItem(KEY_STORE) || '' }, body: JSON.stringify({ action: 'ncom_poll', since: ncomSince }) }).then((x) => x.json()).catch(() => null);
+  for (const m of r?.replies || []) {
+    const li = addChat({ user: 'NCOM_Sys', text: m.text, cls: 'from-ncom' });   // shown, never spoken (no say())
+    li.style.cssText += NCOM_STYLE;
+    ncomSince = Math.max(ncomSince, m.ts);
+  }
+  if (r?.replies?.length) localStorage.setItem('jena.ncomSince', String(ncomSince));
+}
+if (!cfg.obs) { setTimeout(ncomPoll, 2500); setInterval(ncomPoll, 8000); }
 
 // ---------------- 🎤 talk with your voice ----------------
 // First tap explains what happens and asks (opt-in) whether the text may be saved to help her learn how people talk.

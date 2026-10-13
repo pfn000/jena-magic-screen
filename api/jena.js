@@ -104,8 +104,18 @@ async function mamaDo(req) {
   const box = await boxLink();
   if (!box) return json({ error: 'her box is offline' }, 503);
   const b = await body(req);
-  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live', signin: 'signin' }[b.action];
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live', signin: 'signin', ncom: 'ncom', ncom_poll: 'ncom_poll' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
+  if (action === 'ncom' || action === 'ncom_poll') {   // NCOM_Sys: mama's back-channel to Tab; her brain never sees it
+    try {
+      const r = action === 'ncom'
+        ? await fetch(`${box.url}/box/ncom/in`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clip(b.text, 2000) }), signal: AbortSignal.timeout(8000) })
+        : await fetch(`${box.url}/box/ncom/outbox?since=${Math.max(0, +b.since || 0)}`, { headers: boxAuth(), signal: AbortSignal.timeout(8000) });
+      const d = await r.json().catch(() => ({ error: `her box answered ${r.status}` }));
+      delete d.file;
+      return json(d, r.status);
+    } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
+  }
   if (action === 'signin') {   // Jena's asks: sign-in requests (private window on her box) + approve/deny; box re-checks the passcode
     const op = ['list', 'request', 'start', 'done', 'cancel', 'answer'].includes(b.op) ? b.op : null;
     if (!op) return json({ error: 'unknown sign-in op' }, 400);
@@ -273,7 +283,13 @@ async function think(req) {
     user: clip(b.user, 40) || 'someone',
     attachment: b.attachment ? { name: clip(b.attachment.name, 120), type: clip(b.attachment.type, 80), size: +b.attachment.size || 0 } : undefined,
   };
-  input.mama = keyed && input.source !== 'twitch' && input.user === 'mama';   // mama (passcode, her own words, never relayed chat): her corrections become verified facts on her box
+  input.mama = keyed && input.source !== 'twitch' && input.user === 'mama';
+  if (input.mama && /^\s*(?:hail\s*\||~!!)/i.test(input.message || '')) {   // NCOM_Sys: to Tab, never to her brain/desktop/memory/broadcast
+    const bx = await boxLink().catch(() => null);
+    const r = bx ? await fetch(`${bx.url}/box/ncom/in`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message }), signal: AbortSignal.timeout(8000) }).then((x) => x.json()).catch(() => null) : null;
+    const ev = [{ type: 'ncom', ok: !!r?.ok, text: r?.ok ? '→ sent to NCOM_Sys' : '✕ NCOM_Sys did not get it (her box is offline)' }, { type: 'done' }];
+    return new Response(ev.map((e) => JSON.stringify(e)).join('\n') + '\n', { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' } });
+  }   // mama (passcode, her own words, never relayed chat): her corrections become verified facts on her box
   const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
   // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
   // a message that matches one of her skills runs that skill on her box FIRST, and her brain answers from what it found
