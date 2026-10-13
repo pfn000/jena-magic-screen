@@ -305,3 +305,4 @@ body.obs #body-views { display: none; }
 #takeover .to-screen{flex:1;min-height:0}
 #takeover header button{background:#ff7ad9;color:#fff;border:0;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer}
 #soft-toast{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9999;background:rgba(40,20,60,.85);color:#ffeefa;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:800}
+.desk-private[hidden],.desk-flag[hidden]{display:none}

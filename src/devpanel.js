@@ -129,6 +129,8 @@ export class DevPanel {
       h += `<h3>Thought chain on this page (source of each run)</h3><ol class="dp-runs">${runs.map((r) => `<li><b>${esc(r.trigger.user || '')}</b> ${esc((r.trigger.message || r.trigger.text || '').slice(0, 80))} <small>${ago(r.at)} · ${esc(r.events.find((e) => e.type === 'meta')?.model || r.trigger.source || 'her own body')}</small><br>${r.events.filter((e) => e.type !== 'meta' && e.type !== 'done').map((e) => `<code>${esc(e.type)}${e.kind ? ':' + esc(e.kind) : ''}</code> ${esc(e.text || e.value || e.name || '')}`).join('<br>')}</li>`).join('') || '<li>no brain runs on this page yet</li>'}</ol>`;
     }
     if (this.tab === 'sees') {
+      const dt = window.__jenaDualTracking;
+      h += `<h3>Dual tracking (her 3D rig vs MediaPipe on her rendered video)</h3><p>${dt && Date.now() - dt.at < 10000 ? `${dt.joints} joints compared · median ${dt.medianPct}% of her torso length apart · worst: ${esc(dt.worst.joint)} ${dt.worst.pct}%${dt.mediapipeSwappedSides ? ' · MediaPipe swapped her left/right this time' : ''} · ${ago(dt.at)}` : 'not running on this page right now (needs the BODY panel open, front view, and MediaPipe loaded)'}</p>`;
       if (live && box.desktop) {
         const ds = box.desktop;
         h += `<h3>Her desktop right now</h3><img class="dp-shot" src="${esc(d.box.box.url)}/box/shot.jpg?t=${d.at}" alt="her live desktop screenshot"><p><b>she thinks:</b> ${esc(ds.summary)} · active: ${esc(ds.active?.app)} “${esc(ds.active?.title)}” · changed ${ago(ds.changedAt)}</p>

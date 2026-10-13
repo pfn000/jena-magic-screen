@@ -191,6 +191,30 @@ export class SelfVision {
         c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, 7); c.fill();
         c.fillStyle = /^left/.test(n) ? '#0f766e' : /^right/.test(n) ? '#be185d' : '#6d28d9'; c.beginPath(); c.arc(p.x, p.y, 1.3, 0, 7); c.fill();
       }
+      // DUAL TRACKING: what MediaPipe sees in the video (yellow) on top of her real rig (colored), and how far apart
+      if (lm) {
+        const MAP = { 11: 'leftUpperArm', 12: 'rightUpperArm', 13: 'leftLowerArm', 14: 'rightLowerArm', 15: 'leftHand', 16: 'rightHand', 23: 'leftUpperLeg', 24: 'rightUpperLeg', 25: 'leftLowerLeg', 26: 'rightLowerLeg', 27: 'leftFoot', 28: 'rightFoot' };
+        const MP_LINES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [23, 24], [11, 23], [12, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
+        c.strokeStyle = 'rgba(250, 204, 21, 0.9)'; c.lineWidth = 1.2;
+        for (const [a, z] of MP_LINES) { const p = lm[a], q = lm[z]; if (!p || !q || p.visibility < 0.3 || q.visibility < 0.3) continue; c.beginPath(); c.moveTo(p.x * w, p.y * h); c.lineTo(q.x * w, q.y * h); c.stroke(); }
+        const sh = at('leftUpperArm'), hp = at('leftUpperLeg');
+        const torso = sh && hp ? Math.hypot(sh.x - hp.x, sh.y - hp.y) : 0;
+        if (torso > 4) {
+          const errs = (swap) => Object.entries(MAP).map(([i, bone]) => {
+            const m = lm[+i], r = at(swap ? bone.replace(/^left|^right/, (x) => (x === 'left' ? 'right' : 'left')) : bone);
+            return m && r && m.visibility > 0.3 ? { bone, e: Math.hypot(m.x * w - r.x, m.y * h - r.y) / torso } : null;
+          }).filter(Boolean);
+          const direct = errs(false), mirrored = errs(true);
+          const med = (a) => { const s = a.map((x) => x.e).sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 1; };
+          const swapped = med(mirrored) < med(direct) * 0.7;
+          const use = swapped ? mirrored : direct;
+          if (use.length >= 4) {
+            const worst = use.reduce((a, b) => (b.e > a.e ? b : a));
+            this.agree = { at: Date.now(), joints: use.length, medianPct: Math.round(med(use) * 100), worst: { joint: worst.bone, pct: Math.round(worst.e * 100) }, mediapipeSwappedSides: swapped };
+            window.__jenaDualTracking = this.agree;
+          }
+        }
+      }
       // which side is which, from HER point of view
       c.font = '700 10px system-ui, sans-serif';
       const lh = at('leftHand'), rh = at('rightHand');
@@ -202,7 +226,7 @@ export class SelfVision {
       const f = this.felt?.();
       const side = (s) => (f && f[s] !== this.last[s] ? '?' : this.last[s]);
       const ar = (x) => (x === 'up' ? '↑' : x === 'down' ? '↓' : '?');
-      this.label.textContent = `body · eyes L${ar(side('left'))} R${ar(side('right'))}`;
+      this.label.textContent = `body · eyes L${ar(side('left'))} R${ar(side('right'))}${this.agree && Date.now() - this.agree.at < 5000 ? ` · rig↔video ${this.agree.medianPct}% apart` : ''}`;
     }
   }
 }
