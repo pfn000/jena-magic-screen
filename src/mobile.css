@@ -1,0 +1,152 @@
+/* ============ phone app shell (≤480 px) — see files/mobile-design-spec.md ============
+   Only active with body.m-app (set by src/mobile.js on phones, never in OBS). Desktop/tablet/OBS are untouched. */
+@media (max-width: 480px) {
+  body.m-app {
+    --m-ink: #2d2140; --m-ink2: #6f6283; --m-surface: #fff; --m-surface2: #f7f2fb; --m-line: rgba(45, 33, 64, .08);
+    --m-brand: linear-gradient(135deg, #ff5fae, #a66bff); --m-pink: #e8459b;
+    --m-top: calc(56px + env(safe-area-inset-top)); --m-tabs: calc(58px + env(safe-area-inset-bottom));
+    --m-stage: clamp(200px, 34dvh, 320px);
+    color: var(--m-ink); font-family: system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+  }
+  body.m-app * { overflow-wrap: anywhere; }
+  body.m-app button { -webkit-user-select: none; user-select: none; }
+
+  /* ---- top bar ---- */
+  #m-top { position: fixed; z-index: 40; left: 0; right: 0; top: 0; height: var(--m-top); padding: env(safe-area-inset-top) 8px 0 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(255, 250, 253, .88); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-bottom: 1px solid var(--m-line); }
+  #m-top .m-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  #m-top .m-disc { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--m-brand); color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 2px 8px rgba(232, 69, 155, .3); }
+  #m-top .m-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+  #m-top .m-name b { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+  #m-top .m-status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--m-ink2); white-space: nowrap; overflow: hidden; }
+  #m-top .m-status span { overflow: hidden; text-overflow: ellipsis; }
+  #m-top .m-status i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #f0b429; }
+  #m-top .m-status.live i { background: #22c38e; box-shadow: 0 0 0 3px rgba(34, 195, 142, .18); }
+  #m-top .m-actions { display: flex; gap: 4px; flex: none; }
+  body.m-app #m-top #voice-btn, body.m-app #m-top #dm-toggle { position: static; inset: auto; transform: none; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 12px;
+    background: transparent; box-shadow: none; backdrop-filter: none; font-size: 20px; display: grid; place-items: center; cursor: pointer; }
+  body.m-app #m-top #voice-btn:active, body.m-app #m-top #dm-toggle:active { background: var(--m-surface2); }
+
+  /* ---- stage + one panel ---- */
+  body.m-app #bg { bottom: auto; height: calc(var(--m-top) + var(--m-stage) + 24px); }
+  body.m-app:not(.obs) #stage { position: fixed; top: var(--m-top); left: 0; right: 0; bottom: var(--m-tabs); display: flex !important; flex-direction: column;
+    padding: 0 !important; gap: 0 !important; grid-template-rows: none !important; background: transparent; }
+  body.m-app #avatar-panel { flex: none; height: var(--m-stage); border-radius: 0; }
+  body.m-app .nametag, body.m-app #self-toggle, body.m-app #build-stamp, body.m-app .controls { display: none !important; }
+  body.m-app #avatar-status { font-size: 13px; font-weight: 600; padding: 8px 14px; top: 50%; }
+  body.m-app #speech { top: auto; bottom: 26px; left: 50%; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 16px; font-size: 14px; font-weight: 600; line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; box-shadow: 0 6px 20px rgba(80, 40, 110, .18); }
+  body.m-app #speech::after { display: none; }
+
+  body.m-app #stage > .panel { display: none; flex: 1; min-height: 0; margin-top: -16px; z-index: 2; border: 0; border-radius: 20px 20px 0 0;
+    background: var(--m-surface); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: 0 -8px 28px rgba(80, 40, 110, .14); animation: m-in .18s ease-out; }
+  body.m-app[data-tab="chat"] #chat, body.m-app[data-tab="thoughts"] #thoughts, body.m-app[data-tab="desktop"] #desktop, body.m-app[data-tab="body"] #body-panel { display: flex; }
+  @keyframes m-in { from { opacity: 0; transform: translateY(8px); } }
+  body.m-app .panel-head { padding: 16px 16px 8px; gap: 8px; }
+  body.m-app .panel-head h2 { font-size: 17px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.m-app .panel-head h2 .sub { font-weight: 500; color: var(--m-ink2); }
+  body.m-app .chip, body.m-app .desk-badge, body.m-app .brain-badge { font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 4px 9px; max-width: 52%; background: var(--m-surface2); color: var(--m-ink2); border: 0; }
+  body.m-app .brain-badge.is-live { background: #e3f8ef; color: #0b7a55; }
+  body.m-app .brain-badge.is-off { background: #fff4d6; color: #7a5a00; }
+  body.m-app .m-cap { margin: 10px 16px 16px; font-size: 13px; line-height: 1.45; color: var(--m-ink2); }
+
+  /* ---- chat ---- */
+  body.m-app #chat-list { padding: 8px 16px 12px; font-size: 15px; line-height: 1.45; overscroll-behavior: contain; }
+  body.m-app #chat.mode-chat #chat-list .msg { max-width: 80%; margin: 4px 0; padding: 8px 12px; border-radius: 18px 18px 18px 6px; background: var(--m-surface2); box-shadow: none; hyphens: auto; }
+  body.m-app #chat.mode-chat #chat-list .msg b { font-size: 12px; font-weight: 600; color: var(--m-pink); margin: 0 0 2px; }
+  body.m-app #chat.mode-chat #chat-list .from-you { border-radius: 18px 18px 6px 18px; background: var(--m-brand); color: #fff; }
+  body.m-app #chat.mode-chat #chat-list .from-you b { display: none; }
+  body.m-app #chat.mode-chat #chat-list .msg::after { font-size: 11px; opacity: .6; }
+  body.m-app #chat.mode-chat #chat-list .msg + .msg.from-you, body.m-app #chat.mode-chat #chat-list .from-you + .msg:not(.from-you) { margin-top: 10px; }
+  body.m-app #chat-list .chat-empty { padding: 16px 0; gap: 10px; text-align: left; }
+  body.m-app #chat-list .chat-empty > span { display: none; }
+  body.m-app #chat-list .chat-empty b { font-size: 17px; font-weight: 650; }
+  body.m-app #chat-list .chat-empty b::after { content: 'Ask her anything, or tap 🎤 and talk.'; display: block; margin-top: 4px; font-size: 14px; font-weight: 400; color: var(--m-ink2); }
+  body.m-app .m-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  body.m-app .m-chips button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--m-line); background: var(--m-surface); color: var(--m-ink); font-size: 14px; font-weight: 500; cursor: pointer; }
+  body.m-app #talk { flex: none; align-items: center; gap: 8px; padding: 8px 12px 10px; border-top: 1px solid var(--m-line); background: var(--m-surface); }
+  body.m-app #talk input { height: 44px; font-size: 16px; padding: 0 16px; border: 1px solid var(--m-line); border-radius: 22px; background: var(--m-surface2); }
+  body.m-app #talk input:focus { outline: none; border-color: rgba(232, 69, 155, .45); background: #fff; }
+  body.m-app #talk button { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; padding: 0; font-size: 18px; }
+  body.m-app #talk button[type="submit"] { background: var(--m-brand); color: #fff; border: 0; }
+  body.m-app #talk #gift, body.m-app #talk .mic-btn { background: var(--m-surface2); color: var(--m-ink); border: 0; font-size: 19px; }
+  body.m-app #talk #gift { width: 36px; height: 36px; font-size: 17px; background: transparent; }
+  body.m-app #talk .mic-btn.is-rec { background: #ff3d7f; color: #fff; }
+  body.m-app .mic-status { margin: 0; padding: 6px 16px 0; font-size: 13px; font-weight: 600; background: var(--m-surface); }
+  body.m-app .mic-note { margin: 0; padding: 2px 16px 8px; font-size: 12px; line-height: 1.4; color: var(--m-ink2); background: var(--m-surface); }
+
+  /* ---- thoughts ---- */
+  body.m-app .thought-list { padding: 4px 16px 16px; gap: 10px; overscroll-behavior: contain; }
+  body.m-app .run { background: var(--m-surface2); border: 0; border-radius: 14px; padding: 10px 12px; }
+  body.m-app .run.self { background: #f1edfb; }
+  body.m-app .run header { font-size: 12px; font-weight: 600; gap: 6px; flex-wrap: wrap; }
+  body.m-app .run header .src { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+  body.m-app .run .trigger { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  body.m-app .steps { padding-left: 4px; border-left-width: 2px; gap: 6px; }
+  body.m-app .step { font-size: 13.5px; line-height: 1.42; }
+  body.m-app .step .txt { min-width: 0; }
+  body.m-app .step.k-say { font-weight: 600; }
+  body.m-app .run.note .step.k-note .txt { white-space: pre-wrap; font-size: 12.5px; }
+  body.m-app #skills-pub { margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--m-line); font-size: 13px; color: var(--m-ink2); }
+  body.m-app #skills-pub summary { min-height: 32px; display: flex; align-items: center; font-weight: 600; opacity: 1; }
+  body.m-app #skills-pub ul { max-height: 30dvh; }
+
+  /* ---- desktop ---- */
+  body.m-app #desktop .desk-body { flex: none; margin: 0 16px; aspect-ratio: 1600 / 704; height: auto; border-radius: 12px; }
+  body.m-app #desktop .desk-sleep .title { font-size: 17px; }
+  body.m-app #desktop .desk-flag { font-size: 11px; }
+
+  /* ---- body ---- */
+  body.m-app #body-panel { overflow-y: auto; overscroll-behavior: contain; }
+  body.m-app .m-body-wrap { padding: 0 16px; }
+  body.m-app .m-body-wrap #self-eye { display: flex !important; position: static; flex-direction: row; align-items: flex-start; justify-content: center; gap: 12px; max-height: none; }
+  body.m-app .m-body-wrap #self-eye .sp { width: calc(50% - 6px); gap: 6px; }
+  body.m-app .m-body-wrap #self-eye canvas { border-radius: 12px; border: 1px solid var(--m-line); box-shadow: none; background: var(--m-surface2); }
+  body.m-app .m-body-wrap #self-view { max-height: 46dvh; width: auto; margin: 0 auto; }
+  body.m-app .m-body-wrap #self-eye figcaption { font-size: 12px; font-weight: 600; padding: 3px 8px; background: var(--m-surface2); color: var(--m-ink2); }
+  body.m-app .m-body-wrap #self-eye pre { font-size: 10.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--m-surface2); padding: 6px 8px; border-radius: 10px; }
+  body.m-app #body-views { gap: 6px; justify-content: flex-start; }
+  body.m-app #body-views button { min-height: 32px; padding: 0 10px; border-radius: 999px; font: 600 12px system-ui, sans-serif; border: 1px solid var(--m-line); background: var(--m-surface); color: var(--m-ink2); }
+  body.m-app #body-views button.on { background: var(--m-ink); border-color: var(--m-ink); color: #fff; }
+
+  /* ---- tab bar ---- */
+  #m-tabs { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: var(--m-tabs); padding: 0 8px env(safe-area-inset-bottom);
+    display: grid; grid-template-columns: repeat(4, 1fr); background: rgba(255, 255, 255, .94); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--m-line); }
+  #m-tabs button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; border: 0; background: none; color: #8f849f; font-size: 11px; font-weight: 600; cursor: pointer; }
+  #m-tabs button.on { color: var(--m-pink); }
+  #m-tabs button.on::before { content: ''; position: absolute; top: 0; left: 50%; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--m-pink); transform: translateX(-50%); }
+  #m-tabs button.has-new::after { content: ''; position: absolute; top: 8px; left: calc(50% + 9px); width: 8px; height: 8px; border-radius: 50%; background: #ff3d7f; box-shadow: 0 0 0 2px #fff; }
+
+  /* ---- private drawer + sheets: full-width bottom sheet ---- */
+  body.m-app #dm { left: 0; right: 0; bottom: 0; width: 100%; height: calc(100dvh - var(--m-top)); border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom); z-index: 50; }
+  body.m-app #dm input { font-size: 16px; }
+  body.m-app #dm-form .mic-btn { width: 44px; height: 44px; }
+  body.m-app .sheet { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  body.m-app #soft-toast { top: calc(var(--m-top) + 8px); }
+}
+@media (max-width: 480px) and (prefers-reduced-motion: reduce) { body.m-app #stage > .panel { animation: none; } }
+
+@media (max-width: 480px) {
+  body.m-app #m-top #voice-btn, body.m-app #m-top #dm-toggle { font-size: 0; color: var(--m-ink); }
+  body.m-app #m-top #voice-btn::before, body.m-app #m-top #dm-toggle::before { content: ''; width: 24px; height: 24px; background: currentColor; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+  body.m-app #m-top #voice-btn { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z'/%3E%3Cpath d='M16 9l5 6M21 9l-5 6'/%3E%3C/svg%3E"); color: var(--m-ink2); }
+  body.m-app #m-top #voice-btn[data-on="1"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E"); color: var(--m-pink); }
+  body.m-app #m-top #dm-toggle { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5'/%3E%3Ccircle cx='12' cy='15.5' r='1.3'/%3E%3C/svg%3E"); }
+  body.m-app #chat-channel[data-state="off"] { display: none; }
+  body.m-app .m-feed { margin: 4px 16px 16px; padding: 0; list-style: none; display: grid; gap: 8px; }
+  body.m-app .m-feed-h { margin: 6px 16px 0; font-size: 13px; font-weight: 650; color: var(--m-ink); }
+  body.m-app .m-feed li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--m-surface2); font-size: 13.5px; line-height: 1.42; }
+  body.m-app .m-feed li .ico { flex: none; }
+  body.m-app .m-feed li.note .txt { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; white-space: pre-wrap; }
+  body.m-app .m-feed:empty::before { content: 'Nothing from her desktop yet.'; color: var(--m-ink2); font-size: 13px; }
+  body.m-app #desktop { overflow-y: auto; overscroll-behavior: contain; }
+}
+
+@media (max-width: 480px) {
+  body.m-app .m-body-wrap #self-eye { overflow: hidden; }
+  body.m-app .m-body-wrap #self-eye .sp { min-width: 0; overflow: hidden; }
+  body.m-app .m-body-wrap #self-eye canvas { max-width: 100%; }
+  body.m-app #body-views { flex-wrap: wrap; }
+}

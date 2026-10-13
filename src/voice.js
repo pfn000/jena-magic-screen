@@ -17,7 +17,7 @@ export class Voice {
     }
     window.__jenaVoice = this;
   }
-  paint() { if (this.btn) { this.btn.textContent = this.on ? '🔊' : '🔇'; this.btn.title = this.on ? 'her voice is on (tap to mute)' : 'tap to hear her voice'; } }
+  paint() { if (this.btn) { this.btn.dataset.on = this.on ? '1' : '0'; this.btn.textContent = this.on ? '🔊' : '🔇'; this.btn.title = this.on ? 'her voice is on (tap to mute)' : 'tap to hear her voice'; } }
   unlock() {
     if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (this.ctx.state === 'suspended') this.ctx.resume();

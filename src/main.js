@@ -1,4 +1,5 @@
 import './style.css';
+import './mobile.css';
 import { loadConfig } from './config.js';
 import { Avatar } from './avatar.js';
 import { Desktop } from './desktop.js';
@@ -14,6 +15,7 @@ import { DevPanel, deployBar } from './devpanel.js';
 import { softRefresh } from './refresh.js';
 import { Voice } from './voice.js';
 import { Mic } from './mic.js';
+import { mobileShell } from './mobile.js';
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -555,6 +557,8 @@ if (!cfg.obs) {
 }
 
 softRefresh({ obs: cfg.obs });
+
+window.__jenaMobile = mobileShell({ obs: cfg.obs });
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';
