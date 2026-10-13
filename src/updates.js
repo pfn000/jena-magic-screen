@@ -29,17 +29,17 @@ export function busyReason() {
 function css() {
   if (document.getElementById('upd-css')) return;
   const s = document.createElement('style'); s.id = 'upd-css';
-  s.textContent = `#upd-bar{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:100002;
-  display:flex;align-items:center;gap:8px;max-width:calc(100vw - 20px);box-sizing:border-box;padding:9px 10px 9px 14px;border-radius:16px;
+  s.textContent = `#upd-bar{position:fixed;left:10px;right:10px;top:max(10px,env(safe-area-inset-top));margin:0 auto;z-index:100002;
+  display:flex;align-items:center;gap:8px;max-width:460px;box-sizing:border-box;padding:9px 10px 9px 14px;border-radius:16px;
   background:rgba(29,27,46,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #b48cff;color:#fff;
   font:600 14px/1.25 system-ui,-apple-system,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.45);animation:updIn .35s ease-out}
   #upd-bar .t{flex:1;min-width:0}#upd-bar small{display:block;font-weight:500;opacity:.75;font-size:11.5px}
-  #upd-bar button{border:0;border-radius:11px;padding:7px 12px;font:700 13px system-ui,sans-serif;cursor:pointer}
+  #upd-bar button{flex:none;white-space:nowrap;border:0;border-radius:11px;padding:7px 12px;font:700 13px system-ui,sans-serif;cursor:pointer}
   #upd-bar .now{background:#b48cff;color:#1d1b2e}#upd-bar .later{background:none;color:#fff;border:1px solid rgba(255,255,255,.5)}
-  @keyframes updIn{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes updIn{from{opacity:0;translate:0 -10px}to{opacity:1;translate:0 0}}
   #upd-badge{position:fixed;right:8px;bottom:8px;z-index:100002;padding:3px 8px;border-radius:9px;background:rgba(0,0,0,.45);color:#cdb8ff;
   font:600 11px system-ui,sans-serif;pointer-events:none}
-  #brain-pill{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);z-index:100002;padding:6px 12px;
+  #brain-pill{position:fixed;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 64px);transform:translateX(-50%);z-index:100002;padding:6px 12px;
   border-radius:999px;background:rgba(29,27,46,.92);border:1px solid #ffcf6e;color:#ffe9b8;font:600 13px system-ui,sans-serif;
   box-shadow:0 4px 16px rgba(0,0,0,.4);animation:updIn .3s ease-out}
   #brain-pill.obs{top:8px;left:auto;right:8px;transform:none;font-size:11px;padding:3px 8px;box-shadow:none;animation:none}`;
