@@ -5,12 +5,13 @@
 # saves the clip to ~jena/learned/moves/ where her site picks it up. Rejected videos are reported with why.
 import json, os, re, subprocess, sys, time
 REPO = os.environ.get('JENA_REPO', '/home/user/tab/files/jena-magic-screen/repo')
-PIPE = os.path.join(REPO, 'moves-pipeline')
+PIPE = os.environ.get('JENA_PIPE', os.path.join(REPO, 'moves-pipeline'))
 WORK = os.environ.get('MOVES_DIR', '/home/user/tab/files/jena-learn')
 PY = os.environ.get('MOVES_PY', '/home/user/moves-venv/bin/python')
 LEARNED = '/home/jena/learned/moves'
 REQ = '/home/jena/learned/move_requests.jsonl'
 STATUS = os.path.join(LEARNED, 'status.json')
+MIN_FREE = int(os.environ.get('JENA_LEARN_MIN_FREE_MB', '1100'))  # the service itself is capped by MemoryMax
 sys.path.insert(0, PIPE)
 os.environ['MPLBACKEND'] = 'Agg'
 
@@ -23,16 +24,63 @@ def index():
     try: return json.load(open(p))
     except Exception: return {'version': 1, 'note': 'Moves Jena learned by herself on her box from online videos (same pipeline as her first moves).', 'clips': [], 'rejected': []}
 
+# teen-appropriate only: a title blocklist + YouTube's own age gate (age_limit must be 0)
+BAD = re.compile(r"(sex|porn|nude|naked|nsfw|onlyfans|fetish|erotic|hentai|xxx|twerk|strip|lingerie|bikini|sexy|hot girl|"
+                 r"pole dance|lap dance|seductive|kiss|drunk|beer|vodka|weed|vape|gun|knife|fight|gore|horror|prank)", re.I)
+def teen_safe(title): return bool(title) and not BAD.search(title)
+def age_ok(vid):
+    try:
+        s = subprocess.run(['yt-dlp', '--no-warnings', '--skip-download', '--print', '%(age_limit)s', 'https://www.youtube.com/watch?v=' + vid], capture_output=True, text=True, timeout=60)
+        return s.returncode == 0 and s.stdout.strip() in ('0', 'NA', 'None')
+    except Exception: return False
+def used_video_ids():
+    ids = set()
+    for p in (os.path.join(LEARNED, 'index.json'), os.path.join(REPO, 'public/moves/index.json')):
+        try:
+            d = json.load(open(p))
+            for c in d.get('clips', []) + d.get('rejected', []):
+                m = re.search(r'[?&]v=([\w-]{11})', (c.get('source') or {}).get('url', '') or c.get('url') or '')
+                if m: ids.add(m.group(1))
+        except Exception: pass
+    return ids
+
+# idle time: if nobody (mama, chat or her own idle choice) asked for a move in AUTO_MIN minutes, she picks one
+# herself from safe ideas she hasn't tried, so her library keeps growing (~1 new clip per 30 min of idle).
+AUTO_MIN = float(os.environ.get('JENA_LEARN_AUTO_MIN', '30'))
+AUTO_IDEAS = ['just dance kids', 'easy tiktok dance tutorial', 'zumba kids warm up', 'hip hop dance basics for beginners',
+    'shuffle dance tutorial beginner', 'floss dance tutorial', 'cupid shuffle dance', 'electric slide line dance',
+    'cotton eye joe line dance', 'chicken dance kids', 'robot dance tutorial', 'the wobble line dance', 'ymca dance',
+    'stretching routine for kids', 'jumping jacks exercise demo', 'tai chi for beginners short', 'yoga for kids short',
+    'salsa basic step tutorial', 'charleston dance basic step', 'macarena dance kids', 'penguin dance kids',
+    'waving hello reference', 'clapping reference video', 'thinking pose reference', 'excited jump celebration reference',
+    'shrug gesture reference', 'victory pose reference', 'gangnam style dance tutorial', 'kpop dance tutorial easy mirrored', 'moonwalk tutorial']
+def auto_request(reqs):
+    tried = {r.get('id') for r in reqs}
+    last = max([r.get('ts', 0) for r in reqs], default=0) / 1000
+    if time.time() - last < AUTO_MIN * 60: return None
+    ideas = [q for q in AUTO_IDEAS if 'q_' + re.sub(r'\W+', '_', q.lower())[:30] not in tried]
+    if not ideas: return None
+    import random
+    q = random.choice(ideas)
+    kind = 'idle' if 'reference' in q else 'stretch' if re.search(r'stretch|yoga|tai chi|jumping', q) else 'dance'
+    r = {'id': 'q_' + re.sub(r'\W+', '_', q.lower())[:30], 'url': f'ytsearch5:{q}', 'start': 0.0, 'end': 15.0,
+         'what': f'someone doing "{q}" (a video I picked myself)', 'label': q[:30], 'kind': kind, 'asked': 'my own idea (idle time)', 'auto': True, 'ts': int(time.time() * 1000)}
+    with open(REQ, 'a') as f: f.write(json.dumps(r) + '\n')
+    return r
+
 def learn(r):
     import numpy as np, retarget
     cid = re.sub(r'[^\w-]', '_', r['id'])[:40]
     start, end = float(r.get('start', 0)), float(r.get('end', 15))
     if r['url'].startswith('ytsearch'):
         # a search: find the real video first, so the clip always names the exact video it came from
-        status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='searching YouTube')
+        status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='searching YouTube (clean, all-ages only)')
         s = subprocess.run(['yt-dlp', '--no-warnings', '--flat-playlist', '--print', '%(id)s\t%(title)s', r['url']], capture_output=True, text=True, timeout=90)
-        line = (s.stdout.strip().splitlines() or [''])[0].split('\t')
-        if len(line[0]) != 11: return {'ok': False, 'id': cid, 'reasons': ['YouTube search found nothing usable'], 'url': r['url']}
+        line = ['']
+        for cand in s.stdout.strip().splitlines():
+            c = cand.split('\t')
+            if len(c[0]) == 11 and c[0] not in used_video_ids() and teen_safe(c[1] if len(c) > 1 else '') and age_ok(c[0]): line = c; break
+        if len(line[0]) != 11: return {'ok': False, 'id': cid, 'reasons': ['YouTube search found nothing usable (new, clean and all-ages)'], 'url': r['url']}
         r = {**r, 'url': f'https://www.youtube.com/watch?v={line[0]}', 'search': r['url'], 'found_title': line[1] if len(line) > 1 else None}
     status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='downloading + tracking')
     os.makedirs(os.path.join(WORK, 'raw'), exist_ok=True)
@@ -76,9 +124,12 @@ def main():
             idx = index(); done = {c['id'] for c in idx['clips']} | {x['id'] for x in idx.get('rejected', [])}
             reqs = [json.loads(l) for l in open(REQ)] if os.path.exists(REQ) else []
             todo = [r for r in reqs if re.sub(r'[^\w-]', '_', r['id'])[:40] not in done]
+            if not todo:
+                a = auto_request(reqs)
+                if a: todo = [a]
             if todo:
                 avail = int(next(l.split()[1] for l in open('/proc/meminfo') if l.startswith('MemAvailable'))) // 1024
-                if avail < 1800: status(state='waiting for free memory', avail_mb=avail); time.sleep(60); continue
+                if avail < MIN_FREE: status(state='waiting for free memory', avail_mb=avail, need_mb=MIN_FREE, next=todo[0].get('label')); time.sleep(60); continue
                 res = learn(todo[0])
                 idx = index()
                 if res['ok']: idx['clips'].append(res['clip'])

@@ -126,19 +126,44 @@ export class Moves {
   get busy() { return !!this.playing; }
 
   // her choice: which learned move fits right now. context: 'talk' | 'happy' | 'bored' | 'idle' | 'stretch'
+  // Memory: what she played lately is kept in localStorage (survives reloads). A clip doesn't come back until
+  // most of her library has played since; clips she has never done come first; mood/context only rank the fresh ones.
+  history() {
+    try { return JSON.parse(localStorage.getItem('jena.moves.history') || '[]'); } catch { return this._hist || []; }
+  }
+  remember(id) {
+    const h = [{ id, at: Date.now() }, ...this.history().filter((x) => x && x.id)].slice(0, 200);
+    this._hist = h;
+    try { localStorage.setItem('jena.moves.history', JSON.stringify(h)); } catch {}
+  }
   choose(context = 'idle', mood = 'neutral') {
     const want = {
       talk: ['talk'], happy: ['happy', 'dance', 'talk'], bored: ['stretch', 'dance', 'idle', 'weight'],
       stretch: ['stretch'], idle: ['idle', 'weight', 'talk', 'stretch'], dance: ['dance', 'happy'],
     }[context] || ['idle'];
-    let pool = this.library.filter((c) => want.includes(c.kind) && !this.recent.includes(c.id));
-    if (mood && mood !== 'neutral') {
-      const m = pool.filter((c) => (c.moods || []).includes(mood));
-      if (m.length) pool = m;
-    }
-    if (!pool.length) pool = this.library.filter((c) => !this.recent.includes(c.id));
-    if (!pool.length) pool = this.library;
-    return pool.length ? pick(pool) : null;
+    const lib = this.library;
+    if (!lib.length) return null;
+    const hist = this.history();
+    const lastAt = new Map();
+    for (const x of hist) if (!lastAt.has(x.id)) lastAt.set(x.id, x.at);
+    // blocked: the clips played in the last ~75% of the library's worth of plays
+    const block = new Set(hist.slice(0, Math.max(1, Math.ceil(lib.length * 0.75) - 1)).map((x) => x.id));
+    const fresh = lib.filter((c) => !block.has(c.id));
+    const fits = (c) => want.includes(c.kind);
+    const moodOk = (c) => !mood || mood === 'neutral' || (c.moods || []).includes(mood);
+    const tiers = [
+      fresh.filter((c) => fits(c) && !lastAt.has(c.id) && moodOk(c)),
+      fresh.filter((c) => fits(c) && !lastAt.has(c.id)),
+      fresh.filter((c) => fits(c) && moodOk(c)),
+      fresh.filter(fits),
+      fresh.filter((c) => !lastAt.has(c.id)),
+      fresh,
+    ];
+    let pool = tiers.find((t) => t.length);
+    if (!pool) pool = [...lib].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0)).slice(0, 1);
+    // among the candidates, lean toward the ones done longest ago
+    pool = [...pool].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0)).slice(0, Math.max(1, Math.ceil(pool.length / 2)));
+    return pick(pool);
   }
 
   // play a slice of a learned clip; never the same sequence twice (random window, speed, mirror)
@@ -156,7 +181,8 @@ export class Moves {
     const mirror = meta.mirror !== false && Math.random() < 0.4;
     this.guard = { left: 1, right: 1 };
     this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
-    this.recent = [meta.id, ...this.recent].slice(0, Math.min(4, Math.max(1, this.library.length - 2)));
+    this.remember(meta.id);
+    this.recent = this.history().slice(0, 8).map((x) => x.id);
     const what = meta.what || 'someone moving';
     const lines = [
       `learned this from a video of ${what}, trying it`,

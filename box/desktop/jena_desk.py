@@ -18,6 +18,7 @@ Nothing here logs in anywhere or touches anyone's accounts.
 import asyncio, json, os, random, re, subprocess, threading, time, hashlib, urllib.request, urllib.parse
 from collections import deque
 import jena_skills as skills
+import jena_memory as memory
 try: import jena_censor            # public desktop frames are censored before they leave the box (optional module)
 except Exception as _e: jena_censor = None; print('jena_censor not loaded:', _e, flush=True)
 try: import jena_signin            # private one-time sign-in windows for mama (optional module)
@@ -203,7 +204,7 @@ def firefox(url, new_tab=False):
             did(f'already have {MAX_EXTRA_TABS} extra tabs open, so I am reusing this one instead of a new one')
         else:
             key('ctrl+t'); time.sleep(0.6); tabs_opened['n'] += 1
-    key('ctrl+l'); time.sleep(0.3)
+    key('ctrl+l'); time.sleep(0.5); key('ctrl+a'); time.sleep(0.15)   # the whole address bar, even if a page grabbed focus
     type_(url + '\n', delay=35)
     return wid
 
@@ -358,16 +359,17 @@ def fetch_videos():
         if m: local_video(m.group(1)); time.sleep(5)
 
 def act_watch(video=None):
-    vids = my_videos()
+    vids = all_videos()
     if not vids and not video: return act_read()
-    url, title, label = video or random.choice(vids)
+    url, title, label = video or fresh_video(vids)
+    memory.record('video', f'watched "{(title or label or url)[:80]}"', key='video:' + url, action='watch', note=f'the video i learned my {label} move from')
     vid = re.search(r'[?&]v=([\w-]{11})', url)
     path = local_video(vid.group(1)) if vid else None
     with lock:
         watching['video'] = {'url': url, 'title': title, 'label': label, 'since': int(time.time() * 1000), 'player': 'ffplay (local copy)' if path else 'firefox'}
     log_activity('watch', url, f'"{title[:80]}" (learned my {label} move from it)')
     if path:
-        did(f'watching "{title[:70]}" again, the video I learned my {label} move from')
+        did(f'watching "{title[:70]}", the video I learned my {label} move from')
         W, H = screen_size()
         vw, vh = min(960, W - 80), min(540, H - 90)
         p = subprocess.Popen(['ffplay', '-loglevel', 'quiet', '-an', '-autoexit', '-x', str(vw), '-y', str(vh), '-left', str((W - vw) // 2), '-top', '30',
@@ -387,7 +389,8 @@ def act_watch(video=None):
 def act_hot():
     lst = [h for h in hot_urls() if safe(h[0])]
     if not lst: return act_read()
-    u, note = random.choice(lst)
+    u, note = memory.pick_fresh(lst, lambda x: 'site:' + x[0], kind='site')
+    memory.record('site', f'opened {u} from my hot list', key='site:' + u, action='hot')
     did(f'opened {u} from my hot list' + (f' ({note})' if note else ''))
     log_activity('open', u, 'hot list')
     firefox(u); time.sleep(4); scroll_some()
@@ -738,7 +741,8 @@ def act_fetch():
 
 def act_python():
     if not terminal(): return
-    s = random.choice(['matrix.py', 'fib.py', 'hearts.py', 'life.py', 'bones.py'])
+    s = memory.pick_fresh(['matrix.py', 'fib.py', 'hearts.py', 'life.py', 'bones.py'], lambda x: 'python:' + x, kind='skill')
+    memory.record('skill', f'practiced python: ran {s}', key='python:' + s, action='python')
     did(f'ran my little python script {s}')
     type_(f'python3 ~/projects/scripts/{s}\n'); time.sleep(random.uniform(9, 14))
     key('ctrl+c'); type_('clear\n', 30)
@@ -756,7 +760,11 @@ def act_read(topic=None):
             did(f'looked up "{title}" because people were talking about it')
             log_activity('open', url, f'looked up "{title}"')
             firefox(url); time.sleep(3); scroll_some(); return
-    name, url = random.choice(PAGES)
+    name, url = memory.pick_fresh(PAGES, lambda x: 'read:' + x[1], kind='read')
+    if memory.seen('read:' + url, 24) and random.random() < 0.7:
+        hit = wiki_random()
+        if hit: name, url = hit[0], hit[1]
+    memory.record('read', f'read about {name}', key='read:' + url, action='read')
     did(f'opened Firefox to read about {name}')
     log_activity('open', url, f'reading about {name}')
     firefox(url); time.sleep(3); scroll_some()
@@ -808,6 +816,150 @@ def act_tidy():
     elif 'xterm' in w['cls']:
         focus(w['id']); type_('exit\n'); did('closed my terminal')
 
+
+# ---------------------------------------------------------------- her memory + novelty (jena_memory.py)
+# What she did lately lives in ~/.jena/memory; every idle choice reads it, so she doesn't loop the same
+# videos / pages / scripts. Still her own choice: mood + context weights, then a novelty penalty.
+LEARNED_IDX = os.path.join(HOME, 'learned', 'moves', 'index.json')
+MOVE_REQ = os.path.join(HOME, 'learned', 'move_requests.jsonl')
+last_chat = {'at': 0}
+
+def all_videos():
+    """every real video she learned a move from: the site's library + moves she learned herself on her box"""
+    vids = list(my_videos())
+    try:
+        for c in json.load(open(LEARNED_IDX)).get('clips', []):
+            u = (c.get('source') or {}).get('url', '')
+            if u.startswith('http') and not any(v[0] == u for v in vids):
+                vids.append((u, (c.get('source') or {}).get('title') or c.get('what'), c.get('label')))
+    except Exception:
+        pass
+    return vids
+
+def fresh_video(pool=None):
+    pool = pool if pool is not None else all_videos()
+    return memory.pick_fresh(pool, lambda v: 'video:' + v[0], kind='video')
+
+def my_mood():
+    quiet = time.time() - last_chat['at']
+    h = time.localtime().tm_hour
+    if 0 <= h < 6: return 'sleepy'
+    if quiet < 120: return 'social'
+    if quiet > 900: return 'bored'
+    return 'curious'
+
+# safe, teen-appropriate things to learn moves from (searches, family-friendly by construction + title check below)
+LEARN_IDEAS = ['just dance kids', 'easy tiktok dance tutorial', 'zumba kids warm up', 'hip hop dance basics for beginners',
+    'shuffle dance tutorial beginner', 'kpop dance tutorial easy mirrored', 'floss dance tutorial', 'cupid shuffle dance',
+    'electric slide line dance', 'cotton eye joe line dance', 'chicken dance kids', 'irish dance basic steps',
+    'robot dance tutorial', 'moonwalk tutorial', 'the wobble line dance', 'gangnam style dance tutorial', 'ymca dance',
+    'happy dance kids song', 'stretching routine for kids', 'jumping jacks exercise demo', 'tai chi for beginners short',
+    'yoga for kids short', 'cheer motions tutorial', 'salsa basic step tutorial', 'charleston dance basic step',
+    'hand jive dance', 'macarena dance kids', 'baby shark dance', 'penguin dance kids', 'wave arms dance tutorial',
+    'idle standing pose reference', 'waving hello reference', 'clapping reference video', 'thinking pose reference',
+    'excited jump celebration reference', 'shrug gesture reference', 'victory pose reference']
+
+def act_learn():
+    """she picks something new to learn a move from (her learn_move pipeline does the rest, one at a time)"""
+    tried = set()
+    try:
+        for l in open(MOVE_REQ): tried.add(json.loads(l).get('id'))
+    except Exception: pass
+    try:
+        li = json.load(open(LEARNED_IDX)); done = {c['id'] for c in li.get('clips', []) + li.get('rejected', [])}
+    except Exception: done = set()
+    if len(tried - done) >= 2: return act_summarise()      # already two moves waiting in her queue: do something else
+    ideas = [q for q in LEARN_IDEAS if 'q_' + re.sub(r'\W+', '_', q.lower())[:30] not in tried]
+    if not ideas: return act_summarise()
+    q = random.choice(ideas)
+    vid = 'q_' + re.sub(r'\W+', '_', q.lower())[:30]
+    kind = 'idle' if 'reference' in q else 'stretch' if re.search(r'stretch|yoga|tai chi|jumping', q) else 'dance'
+    req = {'id': vid, 'url': f'ytsearch5:{q}', 'start': 0.0, 'end': 15.0, 'what': f'someone doing "{q}" (a video I picked myself)',
+           'label': q[:30], 'kind': kind, 'asked': 'my own idea (idle time)', 'auto': True, 'ts': int(time.time() * 1000)}
+    try:
+        with open(MOVE_REQ, 'a') as f: f.write(json.dumps(req) + '\n')
+    except Exception as e:
+        print('learn queue failed', e, flush=True); return
+    did(f'queued a new move to learn: "{q}" (my box finds a clean video, tracks it and checks the quality)')
+    log_activity('learn', q, 'my own idea')
+    memory.record('learn', f'started learning a new move: "{q}"', key='learn:' + vid, action='learn', note='queued for my move pipeline')
+
+def wiki_random():
+    """a random Wikipedia article summary that passes her safety filter (title + text)"""
+    for _ in range(4):
+        try:
+            d = json.loads(_get('https://en.wikipedia.org/api/rest_v1/page/random/summary'))
+            t, x = d.get('title', ''), d.get('extract', '')
+            u = (d.get('content_urls') or {}).get('desktop', {}).get('page')
+            if u and len(x) > 120 and safe(t + ' ' + x) and not FLAG.search(t + ' ' + x) and d.get('type') == 'standard':
+                return t, u, x
+        except Exception:
+            pass
+    return None
+
+def act_summarise():
+    """she reads something new and writes a short summary for mama in her notes"""
+    hit = wiki_random()
+    if not hit: return act_read()
+    title, url, extract = hit
+    did(f'reading about "{title}" so i can tell mama about it')
+    log_activity('open', url, f'reading about {title} (to summarise for mama)')
+    firefox(url); time.sleep(3); scroll_some()
+    line = brain_line(f'Summarise this for mama in one short casual sentence, your own words: {extract[:600]}')
+    if not line:
+        line = re.split(r'(?<=[.!?])\s', extract.strip())[0][:200]
+    try:
+        with open(os.path.join(HOME, 'notes', 'for_mama.md'), 'a', encoding='utf-8') as f:
+            f.write(f'\n- {time.strftime("%Y-%m-%d %H:%M")} **{title}**: {line} ({url})')
+    except Exception: pass
+    did(f'wrote a little summary of "{title}" for mama in my notes')
+    memory.record('read', f'read about "{title}" and summarised it for mama', key='read:' + url, action='summarise', note=line)
+
+# brand-new places to explore (kid-safe, mostly learning + making stuff); her hot list is added on top
+EXPLORE_SITES = [('https://scratch.mit.edu/explore/projects/all', 'scratch projects'), ('https://www.khanacademy.org/computing', 'khan academy computing'),
+    ('https://threejs.org/examples/', 'three.js examples'), ('https://developer.mozilla.org/en-US/docs/Learn', 'MDN learn'),
+    ('https://www.nasa.gov/image-of-the-day/', 'NASA image of the day'), ('https://xkcd.com/', 'xkcd'), ('https://neal.fun/', 'neal.fun'),
+    ('https://www.codewars.com/', 'codewars'), ('https://picoctf.org/', 'picoCTF'), ('https://overthewire.org/wargames/bandit/', 'bandit wargame'),
+    ('https://lichess.org/training', 'chess puzzles'), ('https://www.geoguessr.com/', 'geoguessr'), ('https://musiclab.chromeexperiments.com/', 'music lab'),
+    ('https://www.duolingo.com/', 'duolingo'), ('https://openprocessing.org/discover/', 'openprocessing sketches'), ('https://www.shadertoy.com/', 'shadertoy'),
+    ('https://pixeljoint.com/', 'pixel art gallery'), ('https://www.typingclub.com/', 'typing practice'), ('https://github.com/explore', 'github explore'),
+    ('https://news.ycombinator.com/', 'hacker news'), ('https://www.wikihow.com/Special:Randomizer', 'a random wikihow'), ('https://vrm.dev/en/', 'VRM avatar docs')]
+
+def act_new_site():
+    lst = [(u, n) for u, n in EXPLORE_SITES + [(u, n or 'hot list') for u, n in hot_urls()] if safe(u)]
+    u, note = memory.pick_fresh(lst, lambda x: 'site:' + x[0], kind='site')
+    did(f'exploring {u} ({note}), never really looked around there')
+    log_activity('open', u, f'exploring ({note})')
+    firefox(u); time.sleep(4); scroll_some()
+    memory.record('site', f'explored {note} ({u})', key='site:' + u, action='new_site')
+
+def idle_menu():
+    m = my_mood()
+    # base weights + mood multipliers: her taste, not a rota. The memory penalty does the rest.
+    return m, [
+        dict(name='watch', fn=act_watch, weight=1.2, moods={'bored': 1.4, 'sleepy': 1.5, 'social': 0.8}),
+        dict(name='learn', fn=act_learn, weight=0.9, moods={'curious': 1.4, 'bored': 1.3}),
+        dict(name='summarise', fn=act_summarise, weight=1.0, moods={'curious': 1.5, 'social': 1.2}),
+        dict(name='read', fn=act_read, weight=0.9, moods={'curious': 1.3, 'sleepy': 1.2}),
+        dict(name='new_site', fn=act_new_site, weight=1.0, moods={'curious': 1.3, 'bored': 1.5}),
+        dict(name='hot', fn=act_hot, weight=0.6),
+        dict(name='note', fn=act_note, weight=0.8, moods={'social': 1.4, 'sleepy': 1.3}),
+        dict(name='python', fn=act_python, weight=0.6, moods={'bored': 1.2}),
+        dict(name='fetch', fn=act_fetch, weight=0.4),
+        dict(name='htop', fn=act_htop, weight=0.4),
+        dict(name='explore_box', fn=act_explore, weight=0.5, moods={'curious': 1.2}),
+        dict(name='tidy', fn=act_tidy, weight=0.3),
+    ]
+
+def idle_choice():
+    mood, menu = idle_menu()
+    o = memory.choose(menu, mood=mood)
+    before = len(memory.rows(1))
+    o['fn']()
+    rs = memory.rows(1)
+    if len(rs) == before or rs[-1].get('action') != o['name']:
+        memory.record('task', f'{o["name"].replace("_", " ")} ({mood})', key='task:' + o['name'], action=o['name'])
+
 ROTATION = [act_htop, act_fetch, act_python, act_read, act_hot, act_watch, act_watch, act_note, act_tidy, act_explore]
 
 def hands():
@@ -820,6 +972,7 @@ def hands():
                 time.sleep(2); continue          # mama has her desktop: hands off
             with lock:
                 if events_in: ev = events_in.popleft()
+            if ev: last_chat['at'] = time.time()
             unstick()
             if after_private['tidy']:
                 after_private['tidy'] = False
@@ -841,15 +994,14 @@ def hands():
                     firefox(u, new_tab=wants_new_tab(text)); time.sleep(4); scroll_some()
                 elif re.search(r'\b(video|watch|dance|dancing|move|moves)\b', text, re.I) and my_videos():
                     dances = [v for v in my_videos() if re.search(r'dance|macarena|zumba|jerusalema', (v[1] + ' ' + v[2]), re.I)]
-                    act_watch(random.choice(dances) if dances and re.search(r'danc', text, re.I) else None)
+                    act_watch(fresh_video(dances) if dances and re.search(r'danc', text, re.I) else None)
                 elif re.search(r'\b(search|look up|lookup|google|find|github|repo|what is|who is|how (do|does|to))\b', text, re.I) or wiki_for(text):
                     act_search(text)
                     if random.random() < 0.5: act_note(' '.join(text.split()[:8]))
                 else:
-                    random.choice([act_python, act_fetch, act_note])()
+                    memory.choose([dict(name='python', fn=act_python), dict(name='fetch', fn=act_fetch), dict(name='note', fn=act_note, weight=1.5)], mood=my_mood())['fn']()
             else:
-                a = random.choice([a for a in ROTATION if a is not last]); last = a
-                a()
+                idle_choice()
         except Exception as e:
             print('hands error', e, flush=True)
         for _ in range(int(random.uniform(18, 40) * 2)):   # her own pace; someone talking to her interrupts the idle
@@ -899,7 +1051,7 @@ def eyes():
     global shot_jpg
     lasthash = None
     while True:
-        if private_now():   # mama is driving / signing in somewhere: no screenshot, no OCR, nothing published
+        if private_now() or re.search(r'log[ -]?in|sign[ -]?in|password|authenticat', sh(['xdotool','getactivewindow','getwindowname']), re.I):   # never save a raw login screen
             with lock:
                 screen.update({'ts': int(time.time() * 1000), 'summary': 'private moment on my desktop, so I am not looking', 'text': ''})
             time.sleep(2); continue
@@ -957,7 +1109,7 @@ mama = {'driving': 0, 'private_until': 0}
 after_private = {'tidy': False}   # after mama drove / a sign-in window closed: her hands move Firefox off any private page
 
 def private_now():
-    return bool(mama['driving'] or private_session or time.time() < mama['private_until'] or (signin is not None and signin.active()))
+    return bool(mama['driving'] or private_session or time.time() < mama['private_until'] or time.time() < globals().get('credential_private',{}).get('until',0) or (signin is not None and signin.active()))
 
 # ---- censor: every public frame is OCR'd and redacted on the box before it leaves (jena_censor.py); no raw VNC for the public
 CENSOR = None
@@ -1024,6 +1176,62 @@ def request_signin(site, reason):
         except Exception as e: print('signin.request', e, flush=True)
     ask_mama(f'please sign me in to {site} once (dev panel): {reason}')
     return None
+
+# Private saved-sign-in hook. Values remain in process memory and xdotool's stdin only.
+try:
+    import jena_creds
+except Exception:
+    jena_creds = None
+credential_private = {'until': 0}
+def _saved_signin_loop():
+    last = ('', 0)
+    while True:
+        time.sleep(5)
+        try:
+            if jena_creds is None or hands_blocked(): continue
+            title = sh(['xdotool','getactivewindow','getwindowname'])
+            wins = windows()
+            aid = sh(['xdotool','getactivewindow'])
+            is_firefox = any('firefox' in w['cls'] and int(w['id'],16)==int(aid) for w in wins if aid.isdigit())
+            if not is_firefox:
+                credential_private['until'] = 0; set_private_reason('credential_login', False); continue
+            cred = jena_creds.for_title(title)
+            if not cred:
+                credential_private['until'] = 0; set_private_reason('credential_login', False); continue
+            credential_private['until'] = time.time() + 60
+            set_private_reason('credential_login', True)
+            if last[0] == title and time.time()-last[1] < 120: continue
+            last = (title,time.time())
+            # OCR entirely in memory; no image or text is saved or logged.
+            frame = subprocess.run(['import','-silent','-window','root','png:-'],env=ENV,capture_output=True,timeout=8).stdout
+            if not frame: continue
+            ocr_result = subprocess.run(['tesseract','stdin','stdout','tsv'],input=frame,capture_output=True,timeout=8)
+            words = ocr_result.stdout.decode('utf-8','ignore').lower()
+            if re.search(r'captcha|recaptcha|hcaptcha|i am not a robot|verify (you are|that you)|two.factor|2fa|verification code|one.time code|authenticator|sign up|create account|register',words):
+                request_signin(cred['site'], 'Sign-in needs a verification or account step; please take over')
+                continue
+            # Strictly no guessing field coordinates: use OCR only when a username/email AND password label are visible.
+            rows = []
+            for line in ocr_result.stdout.decode('utf-8','ignore').splitlines()[1:]:
+                cols=line.split('\t')
+                if len(cols)>=12:
+                    try: rows.append((cols[11].strip().lower(),int(cols[6]),int(cols[7]),int(cols[8]),int(cols[9])))
+                    except ValueError: pass
+            user_label = next((r for r in rows if r[0] in ('email','username','e-mail')),None)
+            pass_label = next((r for r in rows if r[0] in ('password','passwort')),None)
+            if not user_label or not pass_label: continue
+            # This path runs only while mama is not driving and no Take over request is active.
+            for label,value in ((user_label,cred['username']),(pass_label,cred['password'])):
+                x = max(240,min(1000,label[1]+160)); y=label[2]+label[4]+28
+                subprocess.run(['xdotool','mousemove',str(x),str(y),'click','1','key','ctrl+a'],env=ENV,capture_output=True,timeout=5)
+                subprocess.run(['xdotool','type','--clearmodifiers','--delay','30','--file','-'],input=value.encode(),env=ENV,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+            credential_private['until'] = time.time()+120
+            did('filled a saved sign-in on her own browser (values redacted)', 'help')
+        except Exception:
+            # Exception strings from typing or site content may contain values. Never log them.
+            pass
+threading.Thread(target=_saved_signin_loop, daemon=True).start()
+
 def is_mama(hdrs):
     try: want = open(MAMA_HASH).read().strip()
     except Exception: return False
