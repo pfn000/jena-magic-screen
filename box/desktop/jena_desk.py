@@ -761,6 +761,57 @@ def mama_popup(text):
            '-bg', '#ffe3f3', '-fg', '#3b1d4a', '-fn', '-*-dejavu sans-bold-r-*-*-20-*-*-*-*-*-*-*', 'mama says: ' + text])
     did('got a private message from mama (popped up on my screen)', 'help')
 
+# ---------------------------------------------------------------- memory service (persistent, on her box)
+# What people tell her to remember, names, favorites; plus what she learned (Grok notes, exploring her box).
+# Stored in ~/memory/memories.jsonl; the site recalls the relevant ones before her brain answers.
+MEMF = os.path.join(HOME, 'memory', 'memories.jsonl')
+MEM_PATTERNS = [
+    (r'\bremember (?:that )?(.{4,160})', 'told me to remember'),
+    (r"\bmy name is ([A-Za-z][\w' -]{1,30})", 'name'),
+    (r'\bcall me ([A-Za-z][\w -]{1,30})', 'name'),
+    (r"\bmy fav(?:ou?rite)? ([\w ]{2,25}?) is ([^.!?]{1,60})", 'favorite'),
+    (r"\bi (?:really )?(?:love|like) ([^.!?]{3,60})", 'likes'),
+]
+def mem_all():
+    try: return [json.loads(l) for l in open(MEMF) if l.strip()]
+    except Exception: return []
+
+def mem_observe(text, user, source):
+    text = re.sub(r'\s+', ' ', str(text))[:300]
+    if not text or not safe(text) or source in ('twitch',): return []
+    saved = []
+    for pat, kind in MEM_PATTERNS:
+        m = re.search(pat, text, re.I)
+        if not m: continue
+        what = (f'{m.group(1).strip()} is {m.group(2).strip()}' if kind == 'favorite' else m.group(1).strip()).rstrip(' .!?')
+        if FLAG.search(what): continue
+        fact = {'told me to remember': f'{user} asked me to remember: {what}', 'name': f"{user}'s name is {what}", 'favorite': f"{user}'s favorite {what}", 'likes': f'{user} likes {what}'}[kind]
+        if any(x.get('fact', '').lower() == fact.lower() for x in mem_all()[-300:]): continue
+        rec = {'ts': int(time.time() * 1000), 'who': user, 'kind': kind, 'fact': fact, 'from': text[:200], 'source': source}
+        os.makedirs(os.path.dirname(MEMF), exist_ok=True)
+        with open(MEMF, 'a') as f: f.write(json.dumps(rec) + '\n')
+        saved.append(fact); break
+    if saved: did(f'saved a memory: {saved[0][:100]}', 'memory')
+    return saved
+
+def mem_learned():
+    out = []
+    try:
+        for l in open(os.path.join(HOME, 'learned', 'grok_notes.jsonl')):
+            r = json.loads(l); out.append({'ts': r['ts'], 'who': 'Grok', 'kind': 'learned', 'fact': f"Grok told me: {r['question']} -> {r['answer'][:200]}", 'source': 'ask_grok'})
+    except Exception: pass
+    return out
+
+def mem_recall(q, user=None, k=5):
+    words = {w for w in re.findall(r'[a-z0-9]{3,}', (q or '').lower()) if w not in ('the', 'and', 'you', 'your', 'what', 'jena', 'are', 'for', 'that', 'this', 'with', 'how', 'can')}
+    scored = []
+    for r in mem_all() + mem_learned():
+        fw = set(re.findall(r'[a-z0-9]{3,}', r['fact'].lower()))
+        s = len(words & fw) + (1.5 if user and r.get('who') == user else 0) + (0.5 if r.get('who') == 'mama' else 0)
+        if s > 0: scored.append((s, r['ts'], r))
+    scored.sort(key=lambda x: (-x[0], -x[1]))
+    return [r for _, _, r in scored[:k]]
+
 def take_event(e):
     text = str(e.get('text') or '')[:300]
     if not text or not safe(text) or str(e.get('source')) in ('private', 'dm') or e.get('private'): return False
@@ -904,6 +955,15 @@ async def client(reader, writer):
     elif p in ('/box/skills/run', '/box/skills/create', '/box/activity') or p.startswith('/box/mama/'):
         if not is_mama(hdrs): status, out = 401, json.dumps({'ok': False, 'summary': "mama's passcode is needed for this"}).encode()
         else: status, out = await mama_door(p, method, body)
+    elif p == '/box/memory/observe' and method == 'POST':
+        try: b = json.loads(body or b'{}'); out = json.dumps({'saved': mem_observe(b.get('text', ''), str(b.get('user') or 'someone')[:40], str(b.get('source') or ''))}).encode()
+        except Exception as e: out = json.dumps({'saved': [], 'error': str(e)[:120]}).encode()
+    elif p == '/box/memory/recall':
+        qs_ = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
+        out = json.dumps({'memories': mem_recall(qs_.get('q', [''])[0][:300], qs_.get('user', [None])[0])}).encode()
+    elif p == '/box/memory':
+        allm = mem_all() + mem_learned()
+        out = json.dumps({'count': len(allm), 'file': '~/memory/memories.jsonl (+ ~/learned/grok_notes.jsonl)', 'memories': sorted(allm, key=lambda r: -r['ts'])[:200]}).encode()
     elif p == '/box/skills/auto' and method == 'POST':
         # the site asks first: does this message need one of her skills? script skills run now so her brain
         # answers from real results; desktop skills (ask_grok, explore_my_box) are queued for her hands

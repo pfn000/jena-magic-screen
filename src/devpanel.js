@@ -90,8 +90,9 @@ export class DevPanel {
     const want = [get('/api/health'), get('/api/box?what=status')];
     if (!this.data.deploysAt || Date.now() - this.data.deploysAt > 15000) want.push(get('/api/deploys')); else want.push(null);
     if (!this.data.moves) want.push(get('/moves/index.json')); else want.push(null);
-    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null);
-    const [health, box, deploys, moves, sk, act, hot] = await Promise.all(want);
+    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null, this.tab === 'memory' ? get('/api/box?what=memory') : null);
+    const [health, box, deploys, moves, sk, act, hot, mem] = await Promise.all(want);
+    if (mem) this.data.mem = mem;
     if (sk) this.data.skills = sk; if (act) this.data.activity = act; if (hot) this.data.hot = hot;
     Object.assign(this.data, { health, box });
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
@@ -163,6 +164,8 @@ export class DevPanel {
       h += `<h3>Moves library: ${clips.length} clips she built from real videos</h3><p>${esc(d.moves?.note || '')}</p><div class="dp-moves">${clips.map((c) => { const v = (c.source?.url || '').match(/[?&]v=([\w-]{11})/)?.[1]; return `<a class="dp-move" href="${esc(c.source?.url || '#')}" target="_blank" rel="noopener">${v ? `<img src="https://i.ytimg.com/vi/${v}/mqdefault.jpg" alt="">` : ''}<b>${esc(c.label)}</b><small>${esc(c.what)} · ${c.duration}s · ${esc(c.kind)}</small><small>${esc(c.source?.title || '')} · ${esc(c.source?.channel || '')}</small></a>`; }).join('')}</div>`;
     }
     if (this.tab === 'memory') {
+      const mm = this.data.mem?.data;
+      h += mm ? `<h3>Persistent memories on her box (${mm.count}) · ${esc(mm.file)}</h3><ol>${mm.memories.map((x) => `<li><small>${ago(x.ts)} · ${esc(x.kind)} · ${esc(x.source || '')}</small> ${esc(x.fact)}</li>`).join('') || '<li>nothing saved yet: she saves when someone says "remember …", tells her their name, or a favorite</li>'}</ol>` : notOn;
       if (live) {
         h += `<h3>Her notes file (her memory on her desktop)</h3><pre>${esc(box.memories?.notesTail || '(could not read her notes)')}</pre>`;
         h += `<h3>Conversations (last brain exchanges on her box)</h3><div class="dp-log" data-src="log">loading…</div>`;

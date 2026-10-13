@@ -128,7 +128,7 @@ async function boxProxy(req) {
   if (!box) return json({ online: false, error: 'her box has not announced itself in the last 30 min (box or tunnel down)' }, 503);
   const what = new URL(req.url).searchParams.get('what') || 'status';
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
-  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity' }[what] || '/status';
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory' }[what] || '/status';
   try {
     const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
@@ -137,6 +137,10 @@ async function boxProxy(req) {
     return json({ online: false, box: { url: box.url, announcedAt: box.ts }, error: `box announced but did not answer: ${e.message}` }, 502);
   }
 }
+
+// her memory service on her box: recall before she answers, save what's worth remembering after
+const recall = (bx, q, user) => fetch(`${bx.url}/box/memory/recall?q=${encodeURIComponent(q.slice(0, 300))}&user=${encodeURIComponent(user || '')}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).then((d) => d.memories || []).catch(() => []);
+const observe = (bx, text, user, source) => fetch(`${bx.url}/box/memory/observe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, user, source }), signal: AbortSignal.timeout(5000) }).then((r) => r.json()).then((d) => d.saved || []).catch(() => []);
 
 async function think(req) {
   const b = await body(req);
@@ -150,11 +154,16 @@ async function think(req) {
   const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
   // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
   // a message that matches one of her skills runs that skill on her box FIRST, and her brain answers from what it found
-  let toDesk = null;
+  let toDesk = null, memSave = null;
   if (input.message) {
     const bx = await boxLink().catch(() => null);
     if (bx) {
-      const sk = await fetch(bx.url + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null);
+      const [sk, mem] = await Promise.all([
+        fetch(bx.url + '/box/skills/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null),
+        recall(bx, input.message, input.user),
+      ]);
+      if (mem?.length) input.memories = mem;
+      memSave = () => observe(bx, input.message, input.user, input.source);
       if (sk?.name) input.skill = sk;
       else toDesk = fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) }).catch(() => null);
     }
@@ -173,6 +182,10 @@ async function think(req) {
         ctrl.enqueue(enc.encode(JSON.stringify({ type: 'done' }) + '\n'));
       }
       if (toDesk) await toDesk;
+      if (memSave) {
+        const saved = await memSave();
+        if (saved?.length) { const e = { type: 'step', kind: 'think', text: `saved to my memory: ${saved[0]}` }; run.push(e); ctrl.enqueue(enc.encode(JSON.stringify(e) + '\n')); }
+      }
       if (broadcast) {
         try {
           await pushItem('events', { type: 'thought_run', origin: clip(b.origin, 40), trigger: { source: input.source, user: input.user, text: clip(input.message, 200), attachment: input.attachment }, events: run }, 50);
@@ -230,7 +243,10 @@ async function dm(req) {
   const mine = await pushItem('dm', { from: 'mama', kind: 'text', text });
   // mama's message also pops up on Jena's own desktop (the site covers the desktop panel for everyone else meanwhile)
   boxLink().then((bx) => bx && fetch(`${bx.url}/box/mama/notify`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(5000) })).catch(() => null);
-  const ev = await thinkAll({ message: text, source: 'dm', user: 'mama' });
+  const bxm = await boxLink().catch(() => null);
+  const memories = bxm ? await recall(bxm, text, 'mama') : [];
+  const ev = await thinkAll({ message: text, source: 'dm', user: 'mama', memories });
+  if (bxm) { const saved = await observe(bxm, text, 'mama', 'dm'); if (saved.length) ev.push({ type: 'step', kind: 'think', text: `saved to my memory: ${saved[0]}` }); }
   // other screens (the OBS page) only learn THAT mama sent something private, never the words
   try {
     await pushItem('events', { type: 'thought_run', origin: clip(b.origin, 40), trigger: { source: 'private', user: 'mama', private: true }, events: ev.filter((e) => ['meta', 'status', 'done', 'say'].includes(e.type)).map((e) => (e.type === 'say' ? { type: 'say', text: '' } : e)) }, 50);

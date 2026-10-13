@@ -139,6 +139,12 @@ function skillNote(s) {
   return `\n\nRIGHT NOW your ${s.name} skill just ran for real and found: ${s.facts}. Answer using ONLY these real results by their exact names and links. Say you found them with your skill. Never invent other names or links.`;
 }
 
+// memories her box recalled for this message (real saved notes, newest/most relevant first)
+function memNote(m) {
+  if (!m?.length) return '';
+  return `\n\nThings you really remember (from your memory file): ${m.map((x) => x.fact).join(' | ')}. Use them only if they fit.`;
+}
+
 function describe(input) {
   if (input.attachment) {
     const a = input.attachment;
@@ -158,7 +164,7 @@ function jenaxiPrompt(input) {
   const msg = input.attachment ? describe(input) : input.message;
   turns.push(`<|mama|>${msg}`);
   // a skill result rides as the system turn (her box's gateway uses it in place of its short default persona)
-  const note = skillNote(input.skill);
+  const note = skillNote(input.skill) + memNote(input.memories);
   if (note) turns.unshift(`<|system|>You are Jena (JenaXI), Saidie's AI: a chaotic, funny teen gremlin hacker girl. Saidie is mama. Never flirty.${note.replace(/\s+/g, ' ')}`);
   return turns.join('\n') + '\n<|jena|>';
 }
@@ -190,13 +196,14 @@ export async function* thinkEvents(input) {
     yield { type: 'done' };
     return;
   }
+  if (input.memories?.length) yield { type: 'step', kind: 'think', text: `remembered: ${input.memories.map((x) => x.fact).join(' · ').slice(0, 220)}` };
   if (input.skill) yield { type: 'step', kind: 'tool', text: input.skill.queued ? `using skill: ${input.skill.name} (on her desktop, results show there)` : `using skill: ${input.skill.name} → ${input.skill.ok ? input.skill.summary : 'failed: ' + input.skill.summary}` };
   const chatMode = p.format === 'chat';
   const ask = (base, model) => fetch(`${base}/${chatMode ? 'chat/completions' : 'completions'}`, {
     method: 'POST',
     headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20) },
     body: JSON.stringify(chatMode
-      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
+      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) + memNote(input.memories) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
       : { model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 160, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
     signal: AbortSignal.timeout(process.env.VERCEL ? 22000 : 45000), // Vercel function limit is 30 s
   });
