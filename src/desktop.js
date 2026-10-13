@@ -94,14 +94,15 @@ export class Desktop {
     if (OBS) return;
     const isMama = () => this.mode === 'mama' || !!localStorage.getItem('jena.dmKey');
     const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ minutes: 60, source: 'double_click' })); };
-    this.screen.addEventListener('dblclick', (e) => { if (e.target === this.mamaBtn) return; e.preventDefault(); go(); });
+    // capture phase: noVNC's own mouse/touch handlers on the canvas stop these events from bubbling
+    this.screen.addEventListener('dblclick', (e) => { if (e.target === this.mamaBtn) return; e.preventDefault(); go(); }, true);
     let last = 0, lx = 0, ly = 0;
     this.screen.addEventListener('touchend', (e) => {
       const t = e.changedTouches[0]; if (!t || e.touches.length) return;
       const now = Date.now();
       if (now - last < 350 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { last = 0; if (e.cancelable) e.preventDefault(); go(); }
       else { last = now; lx = t.clientX; ly = t.clientY; }
-    }, { passive: false });
+    }, { passive: false, capture: true });
     if (isMama()) this.screen.title = 'double-click: take over her desktop for an hour (her hands pause)';
   }
 

@@ -165,8 +165,8 @@ def _changed_files(marker, limit=25):
     files = []
     for l in out.splitlines():
         rel = os.path.relpath(l, HOME)
-        if rel.startswith(SKIP) or '/.git/' in rel or rel.startswith('.') and rel.count('/') == 0 and rel in ('.bash_history', '.lesshst', '.xsession-errors'):
-            continue
+        if rel.startswith(SKIP) or rel.startswith('.') or '/.' in rel or rel.startswith(('jenaos/', 'jena_', 'snap/')):
+            continue   # hidden dirs (browser profiles, caches), her own programs: not "what mama changed"
         files.append(rel)
     return sorted(files)[:limit]
 
