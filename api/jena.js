@@ -83,6 +83,20 @@ async function boxDo(req) {
   } catch (e) { return json({ ok: false, summary: `box did not answer: ${e.message}` }, 502); }
 }
 
+// mama's magic sign-in link (/?signin=<token>): the one-request token is the key (checked on her box), no passcode
+async function signinLink(req) {
+  const box = await boxLink();
+  if (!box) return json({ ok: false, summary: 'her box is offline' }, 503);
+  const b = await body(req);
+  const op = ['start', 'done', 'cancel', 'status'].includes(b.op) ? b.op : 'start';
+  try {
+    const r = await fetch(`${box.url}/box/signin/magic`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link: clip(b.link, 64), op }), signal: AbortSignal.timeout(op === 'done' || op === 'cancel' ? 28000 : 15000) });
+    const d = await r.json().catch(() => ({ ok: false, summary: `her box answered ${r.status}` }));
+    if (op === 'start' && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
+    return json(d, r.status);
+  } catch (e) { return json({ ok: false, summary: `her box did not answer: ${e.message}` }, 502); }
+}
+
 // Mama-only: pop a message up on her desktop, get a one-time token to take over her desktop, see her API key.
 async function mamaDo(req) {
   const k = checkKey(req);
@@ -391,6 +405,7 @@ async function handle(req) {
     if (route === 'incident' && req.method === 'POST') return await incident(req);
     if (route === 'skills') return await publicSkills();
     if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
+    if (route === 'signin' && req.method === 'POST') return await signinLink(req);
     if (route === 'tts') return await tts(req);
     if (route === 'hear' && req.method === 'POST') return await hear(req);
     if (route === 'v1') return await jenaApi(req);

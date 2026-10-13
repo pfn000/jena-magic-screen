@@ -19,6 +19,12 @@ let seen = new Set();
 try { seen = new Set(JSON.parse(localStorage.getItem('jena.asksSeen') || '[]')); } catch {}
 const markSeen = (id) => { seen.add(id); localStorage.setItem('jena.asksSeen', JSON.stringify([...seen].slice(-60))); };
 
+async function linkSignin(op, link) {
+  try {
+    const r = await fetch('/api/signin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, link }) });
+    return await r.json().catch(() => ({ ok: false, summary: `answered ${r.status}` }));
+  } catch (e) { return { ok: false, summary: e.message }; }
+}
 export async function mamaSignin(op, extra = {}, k = key()) {
   try {
     const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': k }, body: JSON.stringify({ action: 'signin', op, ...extra }) });
@@ -46,8 +52,9 @@ export function startAsks({ obs = false } = {}) {
     setTimeout(tick, document.hidden ? 15000 : 6000);
   };
   tick();
-  const want = new URLSearchParams(location.search).get('signin');   // the QR code opens this page with ?dev=1&signin=<id>
-  if (want) { const t = setInterval(() => { if (asks.data) { clearInterval(t); const p = asks.data.pending; if (p && p.id === want) openSignin(p); } }, 500); setTimeout(() => clearInterval(t), 20000); }
+  // the magic link (texted to mama / QR / the card): /?signin=<token> opens the private window straight away, no passcode
+  const want = new URLSearchParams(location.search).get('signin');
+  if (want && want.length >= 16) setTimeout(() => openSignin({ link: want, label: 'the site' }), 300);
 }
 
 function onData(d) {
@@ -97,6 +104,11 @@ function chatBubble(f) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'msg-correct ask-pill'; b.textContent = label; b.style.cssText = PILL;
     b.onclick = () => fn(b); box.appendChild(b);
   }
+  if (f.kind === 'signin' && f.p.link) {
+    const q = document.createElement('button'); q.type = 'button'; q.className = 'msg-correct ask-pill'; q.textContent = '🔗 link / QR'; q.style.cssText = PILL;
+    q.onclick = () => { if (li.querySelector('.ask-qr')) { li.querySelector('.ask-qr').remove(); return; } const d = document.createElement('div'); d.className = 'ask-qr'; d.style.cssText = 'width:100%;margin-top:6px;font-size:11px;word-break:break-all'; d.innerHTML = `<a href="${esc(f.p.link)}" target="_blank" rel="noopener">${esc(f.p.link)}</a><div style="width:130px;background:#fff;padding:5px;border-radius:8px;margin-top:4px">${qrSvg(f.p.link)}</div>`; li.appendChild(d); };
+    box.appendChild(q);
+  }
   li.querySelector('span').after(box);
   list.appendChild(li);
   list.scrollTop = list.scrollHeight;
@@ -106,7 +118,7 @@ function toast(text, f) {
   document.getElementById('ask-toast')?.remove();
   const t = document.createElement('div');
   t.id = 'ask-toast';
-  t.style.cssText = 'position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);z-index:100000;max-width:min(92vw,460px);background:#1d1b2e;color:#fff;border:1px solid #b48cff;border-radius:14px;padding:10px 12px;font:14px/1.35 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.45);display:flex;gap:8px;align-items:center';
+  t.style.cssText = 'position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);z-index:100000;width:min(92vw,460px);box-sizing:border-box;background:#1d1b2e;color:#fff;border:1px solid #b48cff;border-radius:14px;padding:10px 12px;font:14px/1.35 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.45);display:flex;gap:8px;align-items:center';
   t.innerHTML = `<span style="flex:1">${esc(text)}</span>`;
   const go = document.createElement('button');
   go.textContent = f.kind === 'signin' ? 'Open' : 'See';
@@ -133,10 +145,10 @@ export function renderAsks(edits) {
   const p = d.pending, act = d.active || {};
   if (act.active) h += `<div class="dp-card"><b>🔒 Private sign-in open: ${esc(act.site)}</b><p>closes by itself ${act.until ? 'in ' + Math.max(0, Math.round((act.until - Date.now()) / 60000)) + ' min' : ''}</p><button data-ask-signin="${esc(act.id)}">reopen the window</button> <button data-ask-done="${esc(act.id)}">✓ Done</button></div>`;
   if (p && p.status === 'pending') {
-    const link = `${location.origin}/?dev=1&signin=${encodeURIComponent(p.id)}`;
+    const link = p.link || '';
     h += `<div class="dp-card ask-card"><b>🔑 Jena wants you to sign in to ${esc(p.label)}</b><p>${esc(p.reason || '')} · ${ago(p.ts)} · expires in ${Math.max(0, Math.round((p.ts + (d.expires_s || 600) * 1000 - Date.now()) / 60000))} min</p>
       <p><button data-ask-signin="${esc(p.id)}" style="font-weight:700">Open →</button> <button data-ask-cancel="${esc(p.id)}">Not now</button></p>
-      <details><summary>open it on your phone (QR)</summary><div style="width:150px;background:#fff;padding:6px;border-radius:8px;margin-top:6px">${qrSvg(link)}</div><small>scan, then tap Open (passcode again)</small></details></div>`;
+      ${link ? `<p style="word-break:break-all"><small>sign-in link (one use, no passcode): <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a></small></p><details><summary>open it on your phone (QR)</summary><div style="width:150px;background:#fff;padding:6px;border-radius:8px;margin-top:6px">${qrSvg(link)}</div><small>scan it: the private window opens right away</small></details>` : ''}</div>`;
   } else if (!act.active) h += '<p>No sign-in ask right now.</p>';
   const other = (d.asks || []).filter((a) => Date.now() - a.ts < 24 * 3600e3);
   const ready = (edits?.data?.proposals || []).filter((x) => x.state === 'ready');
@@ -175,7 +187,7 @@ export function openSignin(req) {
   w.style.cssText = 'position:fixed;inset:0;z-index:100001;background:#0e0d16;color:#fff;display:flex;flex-direction:column;font:14px system-ui,sans-serif;height:100dvh';
   const label = esc(req.label || 'the site');
   w.innerHTML = `<header style="display:flex;align-items:center;gap:6px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:#1d1b2e;border-bottom:1px solid #b48cff;flex-wrap:wrap">
-      <b style="flex:1;min-width:150px">🔒 Sign Jena in to ${label}</b><span class="si-st" style="font-size:12px;opacity:.8">passcode first</span>
+      <b style="flex:1;min-width:150px">🔒 Sign Jena in to ${label}</b><span class="si-st" style="font-size:12px;opacity:.8">opening…</span>
       <button class="si-kb" hidden style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">⌨️</button>
       <button class="si-done" hidden style="padding:6px 12px;border-radius:9px;border:0;background:#38c172;color:#06200f;font-weight:700">✓ Done</button>
       <button class="si-x" style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">✕</button></header>
@@ -190,14 +202,18 @@ export function openSignin(req) {
   let rfb = null, timer = null, until = 0;
   const close = () => { clearInterval(timer); try { rfb?.disconnect(); } catch {} w.remove(); };
   w.querySelector('.si-x').onclick = close;   // the window on her box keeps running until Done or 10 min; reopen from the card
-  form.querySelector('input').focus();
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const pass = form.querySelector('input').value.trim();
-    if (!pass) return;
+  const call = (op, pass) => (req.link ? linkSignin(op, req.link) : mamaSignin(op, { id: req.id }, pass || key()));
+  const go = async (pass) => {
     form.querySelector('button').disabled = true; st.textContent = 'opening…';
-    const d = await mamaSignin('start', { id: req.id }, pass);
-    if (!d.ok) { form.querySelector('button').disabled = false; form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open'; st.textContent = ''; return; }
+    const d = await call('start', pass);
+    if (!d.ok) {
+      form.querySelector('button').disabled = false; st.textContent = '';
+      form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open';
+      if (req.link) { form.querySelector('input').remove(); form.querySelector('button').remove(); }
+      else { form.querySelector('input').hidden = false; form.querySelector('button').hidden = false; form.querySelector('input').focus(); }
+      return;
+    }
+    if (d.label) w.querySelector('header b').textContent = `🔒 Sign Jena in to ${d.label}`;
     form.remove(); screen.hidden = false; kbBtn.hidden = false; doneBtn.hidden = false;
     until = d.until || Date.now() + 600000;
     rfb = new RFB(screen, d.ws, { shared: true, wsProtocols: [d.protocol, 'binary'] });
@@ -206,6 +222,9 @@ export function openSignin(req) {
     rfb.addEventListener('disconnect', (ev) => { st.textContent = ev.detail?.clean ? 'closed' : 'connection dropped: tap ✕ and Open again'; });
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
+  form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
+  if (req.link || key()) { form.querySelector('p').textContent = 'Opening Jena\'s browser on a private screen only you can see…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
+  else form.querySelector('input').focus();
   // phone keyboard: a hidden input forwards what mama types as key presses (never stored anywhere)
   kbBtn.onclick = () => { kbIn.focus(); };
   const sendChar = (ch) => { const c = ch.codePointAt(0); rfb?.sendKey(c < 256 ? c : 0x01000000 + c, null); };
@@ -220,7 +239,7 @@ export function openSignin(req) {
   doneBtn.onclick = async () => {
     doneBtn.disabled = true; st.textContent = 'saving her session (closing Firefox)…';
     try { rfb?.disconnect(); } catch {}
-    const r = await mamaSignin('done', { id: req.id });
+    const r = await call('done');
     st.textContent = r.ok ? 'done ✓' : (r.summary || r.error || 'failed');
     screen.innerHTML = `<p style="padding:20px;color:#fff">${r.ok ? '✓ Closed. Her browser saved the session and went back to her desktop.<br><small>' + esc(r.request?.note || '') + '</small>' : esc(r.summary || r.error || 'failed')}</p>`;
     clearInterval(timer); setTimeout(close, 6000);

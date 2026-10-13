@@ -32,7 +32,13 @@ SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
 HOME = os.path.expanduser('~')
 STATE = os.path.join(HOME, '.jena')
 os.makedirs(STATE, exist_ok=True)
-try: os.chmod(STATE, 0o700)
+try:
+    os.chmod(STATE, 0o700)
+    # her gateway (runs as 'user') appends to activity.jsonl and reads api_key.sha256 here: chmod resets the ACL mask,
+    # so give it back by ACL every start (nobody else gets in)
+    subprocess.run(['setfacl', '-m', 'u:user:rwx,d:u:user:rw', STATE], timeout=5, capture_output=True)
+    for _f in ('activity.jsonl', 'api_key.sha256'):
+        if os.path.exists(os.path.join(STATE, _f)): subprocess.run(['setfacl', '-m', 'u:user:rw', os.path.join(STATE, _f)], timeout=5, capture_output=True)
 except Exception: pass
 ENV = dict(os.environ, DISPLAY=DISPLAY, HOME=HOME)
 
@@ -49,9 +55,10 @@ input_gate = threading.RLock()
 input_jobs = set()
 private_session = False
 
+mama_stop = {'until': 0}       # mama said 'stop' / 'no, do X instead': her hands drop what they are doing for a moment
 def hands_blocked():
     si = globals().get('signin')
-    return bool(globals().get('mama', {}).get('driving') or private_session or (si is not None and si.active()))
+    return bool(globals().get('mama', {}).get('driving') or private_session or (si is not None and si.active()) or time.time() < mama_stop['until'])
 
 def input_command(cmd):
     words = cmd if isinstance(cmd, (list, tuple)) else str(cmd).split()
@@ -988,6 +995,28 @@ if jena_signin is not None:
     except Exception as _e:
         signin = None; print('signin module could not start:', _e, flush=True)
 
+# ---- mama's mid-action corrections (her gateway queues "stop" / "no, do X instead" from mama only; jena_mama_queue.py)
+try:
+    from jena_mama_queue import MamaQueue
+    MAMA_Q = MamaQueue()
+except Exception as _e:
+    MAMA_Q = None; print('mama queue not loaded:', _e, flush=True)
+def _mama_queue_loop():
+    while MAMA_Q is not None:
+        time.sleep(0.7)
+        try: m = MAMA_Q.poll()
+        except Exception: m = None
+        if not m: continue
+        with input_gate:
+            mama_stop['until'] = time.time() + 3      # the action in progress hits HandsPaused at its next input and stops
+            stop_her_inputs()
+        do = str(m.get('do') or '')[:300] if m.get('kind') == 'instead' else ''
+        with lock:
+            events_in.clear()                          # whatever she was about to do next is dropped too
+            if do: events_in.append({'text': do, 'user': 'mama', 'ts': time.time()})
+        did(f'mama said do this instead: {do[:80]}' if do else 'mama said stop, so I stopped', 'help')
+threading.Thread(target=_mama_queue_loop, daemon=True).start()
+
 def request_signin(site, reason):
     """Jena asks mama to sign her in somewhere (shows as a card in the dev panel; never on stream)"""
     if signin is not None:
@@ -1326,6 +1355,10 @@ async def client(reader, writer):
         try: since = int(qs_.get('since', ['0'])[0]); last = int(qs_.get('last', ['8'])[0])
         except ValueError: since, last = 0, 8
         out = json.dumps(thoughts_since(since, last)).encode()
+    elif p == '/box/signin/magic' and method == 'POST':
+        # mama's magic sign-in link (/?signin=<token>): the one-request token is the key here, no passcode (jena_signin.magic_door)
+        if signin is None: status, out = 503, json.dumps({'ok': False, 'summary': 'the private sign-in module is not on my box yet'}).encode()
+        else: status, out = await signin.magic_door(body)
     elif p == '/box/event' and method == 'POST':
         try: ok = take_event(json.loads(body or b'{}'))
         except Exception: ok = False

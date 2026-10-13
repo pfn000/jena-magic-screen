@@ -26,6 +26,8 @@ W, H = 480, 1040          # phone-shaped; Firefox will not go narrower than ~450
 SESSION_S = 600          # private window lives at most 10 minutes
 PENDING_S = 600          # an unanswered sign-in ask expires after 10 minutes
 TOKEN_S = 60             # a websocket token must be used within 60 s, once
+SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
+LINK_FILE = os.environ.get('JENA_SIGNIN_LINK_FILE', '/home/jena/.jena-mama/signin-link.txt')   # mode 600 (+ACL for Tab, who texts it)
 WS_GUID = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
 
@@ -58,6 +60,7 @@ class SignIn:
         self.sess = None          # {id, site, started, until, procs:{}, phase}
         self.tokens = {}          # token -> (expires, req_id)
         self.viewers = set()
+        self.links = {}           # request id -> magic-link token (memory only; never in signin.json or a log)
         self.reqs = self._load()
         self._cleanup_leftovers()
         threading.Thread(target=self._watchdog, daemon=True).start()
@@ -100,6 +103,9 @@ class SignIn:
             if r['status'] == 'pending' and _now() * 1000 - r['ts'] > PENDING_S * 1000:
                 r['status'] = 'expired'; r['ended'] = int(_now() * 1000); ch = True
         if ch: self._save()
+        live = {r['id'] for r in self.reqs if r['status'] in ('pending', 'open')}
+        for rid in [k for k in self.links if k not in live]: self.links.pop(rid, None)
+        if not self.links: self._write_link(None)
 
     def request(self, site, reason='', by='jena'):
         """ONE pending sign-in ask at a time: a new ask for another site replaces the older pending one."""
@@ -113,17 +119,22 @@ class SignIn:
                     if r['status'] == 'pending': r['ts'] = int(_now() * 1000)   # asked again: the 10 min restart
                     self._save(); return {'ok': True, 'request': self.public_req(r), 'dedup': True}
             for r in self.reqs:
-                if r['status'] == 'pending': r['status'] = 'replaced'; r['ended'] = int(_now() * 1000)
+                if r['status'] == 'pending': r['status'] = 'replaced'; r['ended'] = int(_now() * 1000); self.links.pop(r['id'], None)
             r = {'id': secrets.token_hex(4), 'site': d['key'], 'label': d['label'], 'url': d['url'], 'hosts': d['hosts'],
                  'reason': str(reason)[:200], 'by': by, 'ts': int(_now() * 1000), 'status': 'pending'}
             self.reqs.append(r); self._save()
+            self._mint_link(r)
         self._log(f'asked mama to sign me in to {d["label"]}', r['reason'])
         return {'ok': True, 'request': self.public_req(r)}
 
     def list(self):
         with self.lk:
             self._expire()
-            pend = next((self.public_req(r) for r in reversed(self.reqs) if r['status'] in ('pending', 'open')), None)
+            pr = next((r for r in reversed(self.reqs) if r['status'] in ('pending', 'open')), None)
+            pend = self.public_req(pr) if pr else None
+            if pr:
+                if pr['id'] not in self.links: self._mint_link(pr)     # desk restarted: a fresh link (the old one died with it)
+                pend['link'] = self.link_url(pr['id'])
             return {'ok': True, 'pending': pend, 'requests': [self.public_req(r) for r in reversed(self.reqs[-12:])],
                     'active': self.public_status(), 'asks': self._asks(), 'expires_s': PENDING_S}
 
@@ -194,6 +205,8 @@ class SignIn:
                 r = self._find(rid) if rid else None
                 if r and r['status'] == 'pending' and why == 'cancel':
                     r['status'] = 'cancelled'; r['ended'] = int(_now() * 1000); self._save()
+                    self.links.pop(r['id'], None)
+                    if not self.links: self._write_link(None)
                     return {'ok': True, 'request': self.public_req(r)}
                 return {'ok': False, 'summary': 'no private sign-in is open'}
             if s.get('phase') == 'closing': return {'ok': True, 'closing': True}
@@ -213,6 +226,8 @@ class SignIn:
                 r['note'] = (f'{after} saved cookies for {r["label"]} now (was {b}). This shows a session was stored, not that the sign-in worked: '
                              'ask Jena to use the site to know.') if after is not None else 'could not read the profile'
                 self._save()
+            self.links.pop(s['id'], None)
+            if not self.links: self._write_link(None)
             self.sess = None
         # her Firefox comes back on :99 by her own hands (jena_desk.firefox relaunches it with the same profile on its next use;
         # launching it here too raced it into a 'Firefox is already running' dialog)
@@ -220,6 +235,57 @@ class SignIn:
         try: self.on_end and self.on_end(s['label'], r and self.public_req(r))
         except Exception: pass
         return {'ok': True, 'request': r and self.public_req(r)}
+
+    # ---------- magic link: /?signin=<token> opens the private window with no passcode (one request, 10 min) ----------
+    def _mint_link(self, r):
+        self.links[r['id']] = secrets.token_urlsafe(18)
+        self._write_link(self.link_url(r['id']), r)
+
+    def link_url(self, rid):
+        t = self.links.get(rid)
+        return f'{SITE}/?signin={t}' if t else None
+
+    def _write_link(self, url, r=None):
+        try:
+            if not url:
+                if os.path.exists(LINK_FILE): open(LINK_FILE, 'w').close()
+                return
+            os.makedirs(os.path.dirname(LINK_FILE), exist_ok=True)
+            fd = os.open(LINK_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, 'w') as f:
+                f.write(f"{url}\n{r['label']} · {r['reason']}\nvalid until {time.strftime('%H:%M UTC', time.gmtime(r['ts'] / 1000 + PENDING_S))} or until the sign-in window closes\n")
+            os.chmod(LINK_FILE, 0o600)
+            subprocess.run(['setfacl', '-m', 'u:user:r', LINK_FILE], timeout=5, capture_output=True)
+        except Exception: pass
+
+    def _by_link(self, tok):
+        tok = str(tok or '')
+        if len(tok) < 16: return None
+        with self.lk:
+            self._expire()
+            for rid, t in self.links.items():
+                if secrets.compare_digest(t, tok):
+                    r = self._find(rid)
+                    if r and r['status'] in ('pending', 'open'): return r
+        return None
+
+    async def magic_door(self, b):
+        """NO passcode: the magic-link token itself is the key, for its one request only. Returns (status, bytes)."""
+        if isinstance(b, (bytes, bytearray, str)):
+            try: b = json.loads(b or b'{}')
+            except Exception: b = {}
+        b = b or {}
+        r = self._by_link(b.get('link'))
+        if not r: return 403, json.dumps({'ok': False, 'summary': 'this sign-in link is used up or expired; Jena asks again when she needs it'}).encode()
+        op = str(b.get('op', 'start'))
+        loop = asyncio.get_running_loop()
+        if op == 'start': res = await loop.run_in_executor(None, self.start, r['id'])
+        elif op == 'done': res = await loop.run_in_executor(None, self.done, r['id'], 'done')
+        elif op == 'cancel': res = await loop.run_in_executor(None, self.done, r['id'], 'cancel')
+        elif op == 'status': res = {'ok': True, 'request': self.public_req(r)}
+        else: return 404, json.dumps({'ok': False, 'summary': 'no such op'}).encode()
+        if res.get('ok'): res['request_id'] = r['id']; res['label'] = r['label']
+        return (200 if res.get('ok') else 409), json.dumps(res).encode()
 
     async def mama_door(self, p, b):
         """Call only behind is_mama. p = '/box/mama/signin/<action>'. Returns (status, bytes)."""
