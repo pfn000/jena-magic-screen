@@ -1,0 +1,12 @@
+[Unit]
+Description=Jena box gateway (brain + desktop + status on 127.0.0.1:8088, announces tunnel)
+After=network.target
+[Service]
+User=user
+SupplementaryGroups=jena
+Environment=PORT=8088 JENA_TOPIC=jena-magic-screen-box-ad4fcbe133af JENA_SITE=https://jena-magic-screen.vercel.app
+ExecStart=/usr/bin/node /home/user/tab/files/jena-magic-screen/repo/box/jena-gateway.mjs
+Restart=always
+RestartSec=2
+[Install]
+WantedBy=multi-user.target

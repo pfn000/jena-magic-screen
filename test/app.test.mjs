@@ -25,10 +25,10 @@ test('brain is honest when JenaXI is not answering', async () => {
   process.env.JENA_LLM_BASE_URL = 'http://127.0.0.1:9/v1';
   const { thinkAll, endpoint } = await import('../api/_lib/brain.js');
   const ev = await thinkAll({ message: 'hi', user: 'mama' });
-  assert.ok(ev.some((e) => e.type === 'status' && /JenaXI-0 is training — brain offline/.test(e.text)));
+  assert.ok(ev.some((e) => e.type === 'status' && /brain offline/.test(e.text)));
   assert.ok(!ev.some((e) => e.type === 'say'));
   delete process.env.JENA_LLM_BASE_URL;
-  assert.equal(endpoint().base, 'http://127.0.0.1:8088/v1');
+  assert.equal((await endpoint()).base, 'http://127.0.0.1:8088/v1');
 });
 
 test('her action tags become her own moves and are stripped from speech', async () => {

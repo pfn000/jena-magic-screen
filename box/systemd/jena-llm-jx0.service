@@ -1,0 +1,11 @@
+[Unit]
+Description=Jena brain: JenaXI-0 from-scratch (llama-server, 127.0.0.1:8089)
+After=network.target
+[Service]
+User=user
+ExecStart=/home/user/tab/files/jenaxi/build/llamacpp/llama-b11574/llama-server -m /home/user/tab/files/jenaxi/JenaXI.gguf --alias JenaXI-0 --host 127.0.0.1 --port 8089 -c 1024 -np 1 -t 1 --jinja --chat-template-file /home/user/tab/files/jenaxi/chat_template.jinja --temp 0.8 --top-k 40 --top-p 0.95 --repeat-penalty 1.15 -n 160
+Restart=always
+RestartSec=3
+Nice=10
+[Install]
+WantedBy=multi-user.target

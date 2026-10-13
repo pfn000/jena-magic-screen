@@ -1,0 +1,11 @@
+[Unit]
+Description=Jena brain: JenaXI-chat (llama-server, 127.0.0.1:8091)
+After=network.target
+[Service]
+User=user
+ExecStart=/home/user/tab/files/jenaxi/build/llamacpp/llama-b11574/llama-server -m /home/user/tab/files/jenaxi/chat/JenaXI-chat.gguf --alias JenaXI-chat --host 127.0.0.1 --port 8091 -c 4096 -np 2 -t 3 --jinja --chat-template-file /home/user/tab/files/jenaxi/chat/chat_template.jinja --temp 0.7 --top-k 40 --top-p 0.9 --repeat-penalty 1.1 -n 256 --cache-reuse 256
+Restart=always
+RestartSec=3
+Nice=5
+[Install]
+WantedBy=multi-user.target

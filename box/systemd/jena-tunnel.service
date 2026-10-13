@@ -1,0 +1,11 @@
+[Unit]
+Description=Jena public tunnel (cloudflared quick tunnel -> gateway 8088)
+After=network-online.target jena-gateway.service
+[Service]
+User=user
+ExecStartPre=/bin/sh -c ': > /home/user/tab/state/jena-box/cloudflared.log'
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8088 --logfile /home/user/tab/state/jena-box/cloudflared.log
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

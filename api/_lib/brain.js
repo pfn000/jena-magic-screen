@@ -17,14 +17,18 @@
 //   {type:"status", text}                     brain state, e.g. offline
 //   {type:"done"}
 import { PERSONA } from './persona.js';
+import { boxLink } from './boxlink.js';
 
 const env = (k) => (process.env[k] || '').trim();
 export const DEFAULT_BASE = 'http://127.0.0.1:8088/v1';
-export const OFFLINE = 'JenaXI-0 is training — brain offline';
+export const OFFLINE = 'brain offline: her box is not reachable right now';
 
-export function endpoint() {
+// The announced box (signed, fresh) wins; JENA_LLM_BASE_URL is only a fallback for other setups.
+export async function endpoint() {
+  const box = process.env.VERCEL || process.env.JENA_USE_BOX ? await boxLink() : null;
   return {
-    base: (env('JENA_LLM_BASE_URL') || DEFAULT_BASE).replace(/\/+$/, ''),
+    box,
+    base: (box ? box.url + '/v1' : env('JENA_LLM_BASE_URL') || DEFAULT_BASE).replace(/\/+$/, ''),
     key: env('JENA_LLM_API_KEY'),
     model: env('JENA_LLM_MODEL') || 'JenaXI',
     format: env('JENA_LLM_FORMAT') || 'jenaxi',
@@ -40,8 +44,12 @@ let inflight = null;
 export async function checkHealth() {
   if (inflight) return inflight;
   inflight = (async () => {
-    const p = endpoint();
+    const p = await endpoint();
     const root = p.base.replace(/\/v1$/, '');
+    if (process.env.VERCEL && !p.box && !env('JENA_LLM_BASE_URL')) {
+      health = { online: false, checkedAt: Date.now(), detail: 'her box has not announced itself (box offline or tunnel down)', model: null, box: null };
+      return health;
+    }
     let online = false, detail = '', model = null;
     try {
       // llama-server: /health is 200 once the model is loaded, 503 while loading
@@ -61,9 +69,9 @@ export async function checkHealth() {
         } catch {}
       }
     } catch (e) {
-      detail = 'unreachable';
+      detail = p.box ? 'box announced but not answering' : 'unreachable';
     }
-    health = { online, checkedAt: Date.now(), detail: online ? 'answering' : detail || 'offline', model };
+    health = { online, checkedAt: Date.now(), detail: online ? 'answering' : detail || 'offline', model, box: p.box ? { url: p.box.url, announcedAt: p.box.ts, via: p.box.via } : null };
     return health;
   })().finally(() => { inflight = null; });
   return inflight;
@@ -86,7 +94,7 @@ export function brainName() {
 }
 
 export function brainChain() {
-  return ['JenaXI'];
+  return ['JenaXI-chat', 'JenaXI-0'];
 }
 
 // ---------------- her own action tags ----------------
@@ -162,39 +170,41 @@ async function* sse(body) {
 }
 
 export async function* thinkEvents(input) {
-  const p = endpoint();
+  const p = await endpoint();
   let h = await brainHealth();
   if (!h.online) h = await checkHealth(); // fresh look before saying she's offline
   if (!h.online) {
-    yield { type: 'meta', brain: 'jenaxi', model: 'JenaXI', online: false };
-    yield { type: 'status', text: h.detail === 'JenaXI is loading' ? 'JenaXI is waking up (model loading) — brain offline for a moment' : OFFLINE };
+    yield { type: 'meta', brain: 'jenaxi', model: null, online: false };
+    yield { type: 'status', text: h.detail === 'JenaXI is loading' ? 'JenaXI is waking up (model loading) — brain offline for a moment' : `brain offline: ${h.detail}` };
     yield { type: 'done' };
     return;
   }
-  yield { type: 'meta', brain: 'jenaxi', model: 'JenaXI', online: true };
-
   const chatMode = p.format === 'chat';
-  let r;
-  try {
-    r = await fetch(`${p.base}/${chatMode ? 'chat/completions' : 'completions'}`, {
-      method: 'POST',
-      headers: headers(p),
-      body: JSON.stringify(chatMode
-        ? { model: p.model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
-        : { model: p.model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 120, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
-      signal: AbortSignal.timeout(process.env.VERCEL ? 25000 : 45000), // Vercel function limit is 30 s
-    });
-  } catch (e) {
-    r = null;
+  const ask = (base, model) => fetch(`${base}/${chatMode ? 'chat/completions' : 'completions'}`, {
+    method: 'POST',
+    headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20) },
+    body: JSON.stringify(chatMode
+      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
+      : { model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 160, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
+    signal: AbortSignal.timeout(process.env.VERCEL ? 22000 : 45000), // Vercel function limit is 30 s
+  });
+  const t0 = Date.now();
+  let model = h.model || 'JenaXI-chat', r = null, why = '';
+  try { r = await ask(p.base, model); } catch (e) { why = e.name === 'TimeoutError' ? 'timed out' : e.message; }
+  if ((!r || !r.ok || !r.body) && p.box) {
+    // JenaXI-chat failed: her small from-scratch JenaXI-0 answers instead (honestly labelled)
+    yield { type: 'step', kind: 'feel', text: `JenaXI-chat ${r ? 'answered ' + r.status : why}; asking JenaXI-0 instead` };
+    model = 'JenaXI-0';
+    try { r = await ask(p.box.url + '/jx0/v1', model); } catch (e) { r = null; }
   }
+  yield { type: 'meta', brain: 'jenaxi', model, online: true };
   if (!r || !r.ok || !r.body) {
     checkHealth();
-    yield { type: 'status', text: r ? `JenaXI answered ${r.status} — no reply this time` : OFFLINE };
+    yield { type: 'status', text: r ? `${model} answered ${r.status} — no reply this time` : OFFLINE };
     yield { type: 'done' };
     return;
   }
-
-  let content = '', reasoning = '';
+  let content = '', reasoning = '', info = null;
   for await (const j of sse(r.body)) {
     const c = j.choices?.[0] || {};
     const d = c.delta || {};
@@ -208,7 +218,9 @@ export async function* thinkEvents(input) {
       }
     }
     content += d.content ?? c.text ?? '';
+    if (j.jena) info = j.jena;
   }
+  yield { type: 'step', kind: 'tool', text: `${info?.model || model} answered on her box in ${((info?.ms ?? Date.now() - t0) / 1000).toFixed(1)} s${info?.usage ? ` · ${info.usage.completion_tokens} tokens` : ''}${info?.guarded ? ' · safety guard replaced the reply' : ''}` };
   if (reasoning.trim()) yield { type: 'step', kind: 'think', text: reasoning.trim().slice(0, 400) };
 
   // Bigger JenaXI (chat format) may write THINK:/MOOD:/ACTION:/SAY: lines; JenaXI-0 just talks.

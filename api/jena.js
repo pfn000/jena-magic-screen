@@ -11,7 +11,9 @@
 //   POST /api/dm                (passcode) {text} -> Jena answers privately; never shown on stream
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
-import { thinkEvents, thinkAll, brainName, brainChain, brainHealth } from './_lib/brain.js';
+import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
+import { boxLink, accept as acceptBox } from './_lib/boxlink.js';
+import { multiSearch } from './_lib/search.js';
 
 function routeOf(req) {
   const u = new URL(req.url);
@@ -22,9 +24,12 @@ function routeOf(req) {
 async function config() {
   let announced = null;
   try { announced = (await listItems('desktop', { limit: 1 })).pop() || null; } catch {}
+  const box = await boxLink();
   return {
-    desktopUrl: announced?.url || process.env.JENA_DESKTOP_URL || null,
-    desktopAnnouncedAt: announced?.ts || null,
+    desktopUrl: box ? box.url.replace(/^https:/, 'wss:') + '/websockify' : announced?.url || process.env.JENA_DESKTOP_URL || null,
+    desktopAnnouncedAt: box?.ts || announced?.ts || null,
+    box: box ? { url: box.url, announcedAt: box.ts, via: box.via } : null,
+    build: buildInfo(),
     twitch: process.env.TWITCH_CHANNEL || process.env.JENA_TWITCH_CHANNEL || null,
     vrmUrl: process.env.JENA_VRM_URL || null,
     brain: brainName(),
@@ -37,6 +42,46 @@ async function config() {
 }
 
 const clip = (s, n = 500) => String(s || '').slice(0, n);
+
+function buildInfo() {
+  const e = process.env;
+  return { commit: e.VERCEL_GIT_COMMIT_SHA || null, message: clip(e.VERCEL_GIT_COMMIT_MESSAGE, 160) || null, env: e.VERCEL_ENV || null, region: e.VERCEL_REGION || null, deploymentUrl: e.VERCEL_URL || null };
+}
+
+// Live deploy progress for the dev panel: Vercel's own status on each commit of the public repo (GitHub API).
+let deploysCache = { at: 0, data: null };
+async function deploys() {
+  if (Date.now() - deploysCache.at < 20000 && deploysCache.data) return json(deploysCache.data);
+  const repo = process.env.JENA_REPO || 'pfn000/jena-magic-screen';
+  const gh = (p) => fetch(`https://api.github.com/repos/${repo}${p}`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'jena-magic-screen' }, signal: AbortSignal.timeout(6000) }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`GitHub answered ${r.status}`))));
+  try {
+    const commits = await gh('/commits?per_page=6');
+    const rows = await Promise.all(commits.map(async (c) => {
+      let st = null; try { st = await gh(`/commits/${c.sha}/status`); } catch {}
+      const v = st?.statuses?.find((s) => /vercel/i.test(s.context));
+      return { sha: c.sha, message: clip(c.commit.message.split('\n')[0], 140), author: c.commit.author.name, date: c.commit.author.date, deploy: v ? { state: v.state, description: v.description, updatedAt: v.updated_at } : null };
+    }));
+    deploysCache = { at: Date.now(), data: { now: Date.now(), live: buildInfo(), commits: rows } };
+    return json(deploysCache.data);
+  } catch (e) {
+    return json({ now: Date.now(), live: buildInfo(), error: e.message, commits: deploysCache.data?.commits || [] }, 200);
+  }
+}
+
+// Her box's own live facts (models, last raw request/response, desktop, training) through the tunnel.
+async function boxProxy(req) {
+  const box = await boxLink();
+  if (!box) return json({ online: false, error: 'her box has not announced itself in the last 30 min (box or tunnel down)' }, 503);
+  const what = new URL(req.url).searchParams.get('what') || 'status';
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json' }[what] || '/status';
+  try {
+    const r = await fetch(box.url + path, { signal: AbortSignal.timeout(8000) });
+    const d = await r.json();
+    return json({ online: true, box: { url: box.url, announcedAt: box.ts, via: box.via }, data: d });
+  } catch (e) {
+    return json({ online: false, box: { url: box.url, announcedAt: box.ts }, error: `box announced but did not answer: ${e.message}` }, 502);
+  }
+}
 
 async function think(req) {
   const b = await body(req);
@@ -146,13 +191,17 @@ async function handle(req) {
   const route = routeOf(req);
   try {
     if (route === 'config') return json(await config());
+    if (route === 'box' && req.method === 'POST') { const p = acceptBox(await body(req)); if (p) checkHealth(); return p ? json({ ok: true, url: p.url }) : json({ error: 'bad signature' }, 401); }
+    if (route === 'box') return await boxProxy(req);
+    if (route === 'deploys') return await deploys();
+    if (route === 'search') { const u = new URL(req.url); return json(await multiSearch(clip(u.searchParams.get('q'), 200), clip(u.searchParams.get('src'), 60))); }
     if (route === 'desktop' && req.method === 'POST') return await announceDesktop(req);
     if (route === 'think' && req.method === 'POST') return await think(req);
     if (route === 'chat' && req.method === 'POST') return await chat(req);
     if (route === 'events') return await events(req);
     if (route === 'upload') return await upload(req);
     if (route === 'dm') return await dm(req);
-    if (route === 'health') { const h = await brainHealth(); return json({ ok: true, brain: { name: 'JenaXI', online: h.online, detail: h.detail, checkedAt: h.checkedAt }, stores: backends() }); }
+    if (route === 'health') { const h = await brainHealth(); return json({ ok: true, brain: { name: h.model || 'JenaXI', online: h.online, detail: h.detail, checkedAt: h.checkedAt, box: h.box }, stores: backends(), build: buildInfo() }); }
     return json({ error: `no route ${route}` }, 404);
   } catch (e) {
     return json({ error: e.message }, 500);
