@@ -2,9 +2,10 @@
 // into an offscreen target, with her eyes and where they look marked from her real eye bones / lookAt.
 // Live expression, blink, mouth and gaze values sit underneath (filled by her self-sense).
 import * as THREE from 'three';
+import { canReadAsync, shown, flipInto } from './snapshot.js';
 
 export class FacePanel {
-  constructor(avatar, canvas, { hz = 5, size = 144 } = {}) {
+  constructor(avatar, canvas, { hz = 24, size = 144 } = {}) {
     this.avatar = avatar;
     this.canvas = canvas;
     this.size = size;
@@ -23,7 +24,10 @@ export class FacePanel {
 
   frame(vrm) {
     const now = performance.now();
-    if (now - this.last < this.every || document.hidden || !this.canvas.isConnected) return;
+    if (this.reading || !shown(this.canvas)) return;
+    // async GPU read: smooth ~24 Hz without stalling the stage; old browsers: blocking read, 5 Hz like before
+    const async = canReadAsync(this.avatar.renderer);
+    if (now - this.last < (async ? this.every : 200)) return;
     this.last = now;
     const H = vrm.humanoid, head = H.getNormalizedBoneNode('head');
     if (!head) return;
@@ -46,25 +50,40 @@ export class FacePanel {
     r.setClearColor(0xece6f6, 1);
     r.clear();
     r.render(this.avatar.scene, this.cam);
-    r.readRenderTargetPixels(this.rt, 0, 0, this.size, this.size, this.pixels);
     r.setRenderTarget(prev);
     r.setClearColor(0x000000, 0);
     if (floor) floor.visible = true;
-    // GL rows are bottom-up
-    const S = this.size, d = this.img.data, p = this.pixels;
-    for (let y = 0; y < S; y++) d.set(p.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
-    for (let i = 3; i < d.length; i += 4) d[i] = 255;
+    // where her eyes are and where they look, as of THIS render (painted when the pixels arrive)
+    const eyes = [];
+    if (le && re) {
+      const yaw = vrm.lookAt?.yaw || 0, pitch = vrm.lookAt?.pitch || 0; // degrees; +yaw = her left (screen right), +pitch = down
+      const S = this.size;
+      for (const [node, col] of [[le, '#14b8a6'], [re, '#ec4899']]) {
+        const q = new THREE.Vector3().setFromMatrixPosition(node.matrixWorld).project(this.cam);
+        eyes.push({ x: (q.x + 1) / 2 * S, y: (1 - q.y) / 2 * S, yaw, pitch, col });
+      }
+    }
+    if (async) {
+      this.reading = true;
+      r.readRenderTargetPixelsAsync(this.rt, 0, 0, this.size, this.size, this.pixels)
+        .then(() => this.paint(eyes)).catch(() => {}).finally(() => { this.reading = false; });
+    } else {
+      r.readRenderTargetPixels(this.rt, 0, 0, this.size, this.size, this.pixels);
+      this.paint(eyes);
+    }
+  }
+
+  paint(eyes) {
+    const S = this.size;
+    flipInto(this.pixels, this.img, S, S, true); // GL rows are bottom-up
     const c = this.canvas;
     if (c.width !== S) { c.width = c.height = S; }
     const g = c.getContext('2d');
     g.putImageData(this.img, 0, 0);
     // her eyes + where they're looking (from her real eye bones and lookAt)
-    if (le && re) {
-      const yaw = vrm.lookAt?.yaw || 0, pitch = vrm.lookAt?.pitch || 0; // degrees; +yaw = her left (screen right), +pitch = down
+    if (eyes.length) {
       g.lineWidth = 1.2; g.lineCap = 'round';
-      for (const [node, col] of [[le, '#14b8a6'], [re, '#ec4899']]) {
-        const q = new THREE.Vector3().setFromMatrixPosition(node.matrixWorld).project(this.cam);
-        const x = (q.x + 1) / 2 * S, y = (1 - q.y) / 2 * S;
+      for (const { x, y, yaw, pitch, col } of eyes) {
         g.strokeStyle = col; g.beginPath(); g.arc(x, y, 6, 0, 7); g.stroke();
         g.beginPath(); g.moveTo(x, y); g.lineTo(x + yaw * 0.6, y + pitch * 0.6); g.stroke();
         g.fillStyle = col; g.beginPath(); g.arc(x + yaw * 0.6, y + pitch * 0.6, 1.6, 0, 7); g.fill();

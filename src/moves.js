@@ -7,6 +7,57 @@
 // idle so her breathing and drift never stop. Left/right always mean HER left/right.
 import * as THREE from 'three';
 
+// Her clips were tracked from video at 15 fps, and a pose tracker shakes a little on every frame. Played
+// back with plain frame-to-frame slerp, that shows as tiny kinks 15 times a second. On load each clip is
+// (1) smoothed with a zero-phase Gaussian (forward and backward, so no lag; sigma ~1 source frame) to take
+// out tracker jitter, then (2) resampled to 60 fps with Catmull-Rom curves (continuous velocity), so her
+// motion is as smooth as the screen. Quaternions are kept in one hemisphere first so nothing flips.
+export function resampleClip({ fps, frames, tracks, hips }, { outFps = 60, sigma = 1.0 } = {}) {
+  if (!(fps > 0) || frames < 3 || fps >= outFps) return { fps, frames, tracks, hips };
+  const R = Math.max(1, Math.ceil(sigma * 2.5)), K = [];
+  for (let i = -R; i <= R; i++) K.push(Math.exp(-(i * i) / (2 * sigma * sigma)));
+  const smooth = (src, dim) => {
+    const out = new Float32Array(src.length);
+    for (let f = 0; f < frames; f++) {
+      for (let d = 0; d < dim; d++) {
+        let s = 0, ws = 0;
+        for (let k = -R; k <= R; k++) { const g = Math.min(frames - 1, Math.max(0, f + k)); const w = K[k + R]; s += src[g * dim + d] * w; ws += w; }
+        out[f * dim + d] = s / ws;
+      }
+    }
+    return out;
+  };
+  const n = Math.max(2, Math.round((frames - 1) * outFps / fps) + 1);
+  const cr = (src, dim, norm) => {
+    const out = new Float32Array(n * dim);
+    for (let o = 0; o < n; o++) {
+      const f = o * (frames - 1) / (n - 1), i1 = Math.min(frames - 2, Math.floor(f)), t = f - i1;
+      const i0 = Math.max(0, i1 - 1), i2 = i1 + 1, i3 = Math.min(frames - 1, i1 + 2);
+      const t2 = t * t, t3 = t2 * t;
+      let len = 0;
+      for (let d = 0; d < dim; d++) {
+        const p0 = src[i0 * dim + d], p1 = src[i1 * dim + d], p2 = src[i2 * dim + d], p3 = src[i3 * dim + d];
+        const v = 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+        out[o * dim + d] = v; len += v * v;
+      }
+      if (norm) { len = Math.sqrt(len) || 1; for (let d = 0; d < dim; d++) out[o * dim + d] /= len; }
+    }
+    return out;
+  };
+  const outTracks = {};
+  for (const [b, tr] of Object.entries(tracks)) {
+    const q = Float32Array.from(tr);
+    for (let f = 1; f < frames; f++) { // same hemisphere as the previous frame
+      let dot = 0; for (let d = 0; d < 4; d++) dot += q[f * 4 + d] * q[(f - 1) * 4 + d];
+      if (dot < 0) for (let d = 0; d < 4; d++) q[f * 4 + d] = -q[f * 4 + d];
+    }
+    const s = smooth(q, 4);
+    for (let f = 0; f < frames; f++) { let l = 0; for (let d = 0; d < 4; d++) l += s[f * 4 + d] ** 2; l = Math.sqrt(l) || 1; for (let d = 0; d < 4; d++) s[f * 4 + d] /= l; }
+    outTracks[b] = cr(s, 4, true);
+  }
+  return { fps: (n - 1) * fps / (frames - 1), frames: n, tracks: outTracks, hips: hips ? cr(smooth(hips, 3), 3, false) : null, sourceFps: fps, sourceFrames: frames };
+}
+
 const BODY = ['hips', 'spine', 'chest', 'upperChest', 'neck', 'head'];
 const ARMS = ['leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'rightLowerArm', 'rightHand'];
 // how much of each bone the learned motion takes over (the rest stays her own procedural idle)
@@ -64,7 +115,8 @@ export class Moves {
     const s = 1 / (j.scale || 1000);
     const tracks = {};
     for (const [b, arr] of Object.entries(j.bones)) tracks[b] = Float32Array.from(arr, (v) => v * s);
-    const clip = { ...meta, fps: j.fps, frames: j.frames, tracks, hips: j.hips_offset ? Float32Array.from(j.hips_offset, (v) => v * s) : null };
+    const smooth = resampleClip({ fps: j.fps, frames: j.frames, tracks, hips: j.hips_offset ? Float32Array.from(j.hips_offset, (v) => v * s) : null });
+    const clip = { ...meta, ...smooth };
     this.cache.set(meta.id, clip);
     return clip;
   }

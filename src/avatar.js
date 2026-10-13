@@ -41,9 +41,17 @@ export class Avatar {
   constructor(canvas, { onStatus } = {}) {
     this.canvas = canvas;
     this.onStatus = onStatus || (() => {});
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+    // preserveDrawingBuffer makes the GPU keep a copy of every frame (costly on phones); only browsers
+    // without WebGL2 still need it (their self-view crops the stage canvas directly)
+    const gl2 = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
+    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: !gl2 });
     this.renderer.setClearColor(0x000000, 0);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // sharpness vs speed: phones top out at 1.5x pixels (a 3x screen draws 4x fewer pixels than full res),
+    // computers at 2x; ?dpr=<n> pins it. If frames still run slow, frame() steps it down (never below 1x).
+    const q = new URLSearchParams(location.search), pin = parseFloat(q.get('dpr'));
+    const phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
+    this.dprPinned = pin > 0;
+    this.renderer.setPixelRatio(pin > 0 ? pin : Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2));
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(22, 1, 0.1, 50);
     // lights matched to her room (bg-room.jpg): pink-lavender room bounce, the warm bedside lamp on the
@@ -238,6 +246,20 @@ export class Avatar {
     if (lift) F.rotateX(-lift); // toes up (heel stays down) for a foot tap
     if (free) F.rotateX(0.45 * free); // toes stay on the floor while the heel is up
     F.updateMatrixWorld(true);
+  }
+
+  // GPU-bound (frames averaging slower than ~42 fps for 3 s): draw fewer pixels, a quarter step at a time
+  adaptPixels(raw) {
+    if (this.dprPinned || !(raw > 0) || raw > 0.25 || document.hidden) return;
+    const now = performance.now(), P = (this.perf ||= { ms: 16.7, cool: now + 4000 });
+    P.ms = P.ms * 0.96 + raw * 1000 * 0.04;
+    const pr = this.renderer.getPixelRatio();
+    if (now > P.cool && P.ms > 24 && pr > 1) {
+      this.renderer.setPixelRatio(Math.max(1, Math.round((pr - 0.25) * 4) / 4));
+      this.resize();
+      P.cool = now + 3000; P.ms = 16.7;
+      this.pixelSteps = (this.pixelSteps || 0) + 1;
+    }
   }
 
   resize() {
@@ -451,7 +473,8 @@ export class Avatar {
   // ---------- per frame ----------
   frame() {
     this.clock.update();
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const raw = this.clock.getDelta(), dt = Math.min(raw, 0.1);
+    this.adaptPixels(raw);
     const t = this.clock.getElapsed() + (this.timeOffset || 0);
     const now = performance.now();
     const vrm = this.vrm;

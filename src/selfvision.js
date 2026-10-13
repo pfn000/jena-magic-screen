@@ -4,9 +4,11 @@
 // Left/right are HER sides: she faces the camera, so her left side is on the right of the image.
 const WASM = '/mediapipe/wasm';
 const q = new URLSearchParams(location.search);
-const VARIANT = q.get('vision') === 'lite' ? 'lite' : 'full';
+// phones get the lite pose model (about 3x cheaper on CPU); ?vision=full|lite overrides
+const VARIANT = q.get('vision') === 'full' ? 'full' : q.get('vision') === 'lite' || matchMedia('(pointer: coarse)').matches ? 'lite' : 'full';
 const MODELS = [`/mediapipe/pose_landmarker_${VARIANT}.task`, `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${VARIANT}/float16/1/pose_landmarker_${VARIANT}.task`];
-import { Vector3 } from 'three';
+import { Vector3, Color, PerspectiveCamera, WebGLRenderTarget, SRGBColorSpace } from 'three';
+import { canReadAsync, shown, flipInto, OneEuro } from './snapshot.js';
 // her real skeleton, drawn from her own bones (so it always lines up): [from, to] humanoid bone names
 const SKELETON = [
   ['hips', 'spine'], ['spine', 'chest'], ['chest', 'upperChest'], ['upperChest', 'neck'], ['chest', 'neck'], ['neck', 'head'],
@@ -18,9 +20,10 @@ const SKELETON = [
 ];
 const JOINTS = ['head', 'neck', 'chest', 'hips', ...['left', 'right'].flatMap((s) => ['UpperArm', 'LowerArm', 'Hand', 'UpperLeg', 'LowerLeg', 'Foot', 'Toes'].map((b) => s + b))];
 const _p = new Vector3();
+const SNAP = [...new Set([...SKELETON.flat(), ...JOINTS])];
 
 export class SelfVision {
-  constructor(sourceCanvas, { log, view, label, intent, felt, avatar, fps = 3 }) {
+  constructor(sourceCanvas, { log, view, label, intent, felt, avatar, fps = 3, viewHz = 24 }) {
     this.avatar = avatar; // for her real joint positions (the skeleton overlay)
     this.felt = felt; // () => {left:'up'|'down', right} from her own body sense, to check her eyes against
     this.src = sourceCanvas;
@@ -28,7 +31,9 @@ export class SelfVision {
     this.view = view; // optional <canvas> to show what she sees
     this.label = label;
     this.intent = intent; // () => {left, right} from her own skeleton, to compare with what she sees
-    this.fps = fps;
+    this.fps = fps; // pose-model looks per second (backs off on slow devices, see lookEvery)
+    this.viewHz = viewHz; // her BODY view redraws (render + async read, no stall)
+    this.frameSeq = 0; this.lookedSeq = -1; this.lmF = [];
     this.work = document.createElement('canvas');
     this.state = null;
     this.pending = null;
@@ -63,33 +68,101 @@ export class SelfVision {
   }
 
   loop() {
+    // her BODY view: re-rendered from her real scene ~24x a second, read back async (no stall on the stage)
+    this.avatar?.frameHooks?.push(() => { try { this.tick(); } catch (e) { console.warn('self-vision view', e); } });
+    // her EYES (the pose model): a few looks a second at the latest frame, run when the page is idle
     const run = () => {
-      try { this.frame(); } catch (e) { console.warn('self-vision frame', e); }
-      setTimeout(run, 1000 / this.fps);
+      const go = () => { try { this.frame(); } catch (e) { console.warn('self-vision frame', e); } setTimeout(run, this.lookEvery()); };
+      if (window.requestIdleCallback && canReadAsync(this.avatar?.renderer)) requestIdleCallback(go, { timeout: 300 }); else go();
     };
     run();
   }
 
-  frame() {
+  // the pose model blocks the page while it looks, so it never takes more than ~8% of the time
+  lookEvery() { return Math.min(2000, Math.max(1000 / this.fps, (this.detectMs || 0) / 0.08)); }
+
+  tick() {
     const m = this.intent?.();
     if (m) { const k = `${m.left ? 'up' : 'down'}|${m.right ? 'up' : 'down'}`; if (k !== this.intentKey) { this.intentKey = k; this.intentSince = performance.now(); } }
-    if (document.hidden || !this.src.width) return;
-    // look at ALL of her, head to feet, from the front (the box comes from where her joints really are)
+    const A = this.avatar, r = A?.renderer;
+    if (this.reading || document.hidden || !this.src.width || !canReadAsync(r)) return;
+    const now = performance.now();
+    if (now - (this.lastView || 0) < 1000 / this.viewHz) return;
+    // nobody sees the panel (collapsed on phones): only render when her eyes are due a look
+    if (!shown(this.view) && !(this.pose && now - (this.lastCapture || 0) > this.lookEvery() * 0.8)) return;
     const box = this.bodyBox();
     if (!box) return;
-    const { x0, y0, cw, ch } = box;
+    this.lastView = now;
     const w = 160, h = 320;
-    if (this.work.width !== w) { this.work.width = w; this.work.height = h; }
-    this.crop = box;
-    const ctx = this.work.getContext('2d', { willReadFrequently: true });
-    ctx.fillStyle = '#ece6f6'; // her canvas is transparent; give her eyes a plain wall behind her
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(this.src, x0, y0, cw, ch, 0, 0, w, h);
-    if (!this.pose) return this.draw(null);
+    if (!this.rt) {
+      this.rt = new WebGLRenderTarget(w, h); this.rt.texture.colorSpace = SRGBColorSpace;
+      this.px = new Uint8Array(w * h * 4); this.img = new ImageData(w, h); this.cam = new PerspectiveCamera(); this.wall = new Color(0xece6f6);
+    }
+    // the same view as her stage camera, cropped to her body box (what the old canvas crop showed)
+    const cam = this.cam;
+    cam.copy(A.camera);
+    cam.setViewOffset(this.src.width, this.src.height, box.x0, box.y0, box.cw, box.ch);
+    cam.updateProjectionMatrix();
+    const prev = r.getRenderTarget(), bg = A.scene.background;
+    A.scene.background = this.wall; // her canvas is transparent; give her eyes a plain wall behind her
+    r.setRenderTarget(this.rt); r.clear(); r.render(A.scene, cam); r.setRenderTarget(prev);
+    A.scene.background = bg;
+    // her joints as of THIS render, so the skeleton lines up with the pixels when they arrive
+    const snap = {};
+    for (const n of SNAP) snap[n] = this.project(n);
+    this.reading = true;
+    r.readRenderTargetPixelsAsync(this.rt, 0, 0, w, h, this.px).then(() => {
+      if (this.work.width !== w) { this.work.width = w; this.work.height = h; }
+      flipInto(this.px, this.img, w, h, true);
+      this.work.getContext('2d', { willReadFrequently: true }).putImageData(this.img, 0, 0);
+      this.crop = box; this.snap = snap; this.frameSeq++; this.lastCapture = now;
+      const dt = this.lastPaint ? (now - this.lastPaint) / 1000 : 0; this.lastPaint = now;
+      this.draw(this.smoothLm(dt));
+    }).catch(() => {}).finally(() => { this.reading = false; });
+  }
+
+  // her eyes look a few times a second; in between, the yellow (video) skeleton glides to each new look
+  // through a one-euro filter instead of jumping, so the overlay moves at the view's frame rate
+  smoothLm(dt) {
+    const lm = this.lm;
+    if (!lm) { this.lmF = []; return null; }
+    return lm.map((p, i) => {
+      const f = (this.lmF[i] ||= [new OneEuro(2.0, 0.5), new OneEuro(2.0, 0.5)]);
+      return { x: f[0].f(p.x, dt), y: f[1].f(p.y, dt), visibility: p.visibility };
+    });
+  }
+
+  frame() {
+    const async = canReadAsync(this.avatar?.renderer);
+    if (!async) { // old browsers (no WebGL2): blocking crop of the stage canvas, like before
+      const m = this.intent?.();
+      if (m) { const k = `${m.left ? 'up' : 'down'}|${m.right ? 'up' : 'down'}`; if (k !== this.intentKey) { this.intentKey = k; this.intentSince = performance.now(); } }
+    }
+    if (document.hidden || !this.src.width) return;
+    if (async) {
+      if (!this.pose || this.frameSeq === this.lookedSeq) return; // nothing new to look at yet
+      this.lookedSeq = this.frameSeq;
+    } else {
+      // look at ALL of her, head to feet, from the front (the box comes from where her joints really are)
+      const box = this.bodyBox();
+      if (!box) return;
+      const { x0, y0, cw, ch } = box;
+      const w = 160, h = 320;
+      if (this.work.width !== w) { this.work.width = w; this.work.height = h; }
+      this.crop = box; this.snap = null;
+      const ctx = this.work.getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = '#ece6f6'; // her canvas is transparent; give her eyes a plain wall behind her
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(this.src, x0, y0, cw, ch, 0, 0, w, h);
+      if (!this.pose) return this.draw(null);
+    }
+    const t0 = performance.now();
     const res = this.pose.detect(this.work); // each look is fresh: no tracking carried over from the last one
+    const ms = performance.now() - t0;
+    this.detectMs = this.detectMs == null ? ms : this.detectMs * 0.8 + ms * 0.2;
     const lm = res?.landmarks?.[0];
     this.lm = lm;
-    this.draw(lm);
+    this.draw(lm, { fresh: true, paint: !async }); // fresh look: measure rig vs video now; the view paints on its own clock
     if (!lm) return this.lost();
     this.lostSince = 0;
     if (this.saidLost) { this.saidLost = false; this.log('see', 'I can see myself again'); }
@@ -165,18 +238,21 @@ export class SelfVision {
     return { x0: hips.x - cw / 2, y0: top, cw, ch };
   }
 
-  draw(lm) {
+  draw(lm, { fresh = false, paint = true } = {}) {
     const v = this.view;
     if (!v || (window.__jenaBodyView && window.__jenaBodyView !== 'front')) return; // another angle is being shown
 
     const w = this.work.width, h = this.work.height;
-    if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
-    const c = v.getContext('2d');
-    c.drawImage(this.work, 0, 0);
+    let c;
+    if (paint) {
+      if (v.width !== w || v.height !== h) { v.width = w; v.height = h; }
+      c = v.getContext('2d');
+      c.drawImage(this.work, 0, 0);
+    } else c = (this.scratch ||= document.createElement('canvas').getContext('2d')); // measuring only
     const b = this.crop;
     if (b) {
       const P = {};
-      const at = (n) => (P[n] ??= (() => { const p = this.project(n); return p && { x: (p.x - b.x0) / b.cw * w, y: (p.y - b.y0) / b.ch * h }; })());
+      const at = (n) => (P[n] ??= (() => { const p = this.snap ? this.snap[n] : this.project(n); return p && { x: (p.x - b.x0) / b.cw * w, y: (p.y - b.y0) / b.ch * h }; })());
       c.lineWidth = 1.5; c.lineCap = 'round';
       for (const [a, z] of SKELETON) {
         const p = at(a), q = at(z);
@@ -199,7 +275,7 @@ export class SelfVision {
         for (const [a, z] of MP_LINES) { const p = lm[a], q = lm[z]; if (!p || !q || p.visibility < 0.3 || q.visibility < 0.3) continue; c.beginPath(); c.moveTo(p.x * w, p.y * h); c.lineTo(q.x * w, q.y * h); c.stroke(); }
         const sh = at('leftUpperArm'), hp = at('leftUpperLeg');
         const torso = sh && hp ? Math.hypot(sh.x - hp.x, sh.y - hp.y) : 0;
-        if (torso > 4) {
+        if (fresh && torso > 4) {
           const errs = (swap) => Object.entries(MAP).map(([i, bone]) => {
             const m = lm[+i], r = at(swap ? bone.replace(/^left|^right/, (x) => (x === 'left' ? 'right' : 'left')) : bone);
             return m && r && m.visibility > 0.3 ? { bone, e: Math.hypot(m.x * w - r.x, m.y * h - r.y) / torso } : null;
