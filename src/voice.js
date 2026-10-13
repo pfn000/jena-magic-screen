@@ -53,6 +53,8 @@ export class Voice {
     };
     this.status = 'speaking';
     this.avatar.talk.until = performance.now() + buf.duration * 1000;
+    // the words she's saying, time-aligned to this audio, pick her mouth shapes (avatar.viseme)
+    Object.assign(this.avatar.talk, { text: String(text), t0: performance.now(), ms: buf.duration * 1000 });
     await new Promise((res) => { src.onended = res; src.start(); tick(); });
     live = false; this.avatar.voice = null; this.status = 'idle';
     // what the lip-sync actually did (dev panel + tests read this): mouth-open level per frame from the audio

@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Jena's own animation clips. Each one she built herself by watching a short public video of a real person moving, tracking their body (MediaPipe Pose, world landmarks), smoothing it and retargeting it onto her VRM bones. Bones are quaternions (x,y,z,w)*scale per frame in VRM 1.0 normalized space; hips_offset is her hips' travel over her planted feet, in leg lengths.",
+ "note": "Jena's own animation clips. Each one she built herself by watching a short public video of a real person moving, tracking their body (MediaPipe Pose, world landmarks), smoothing it and retargeting it onto her VRM bones. Bones are quaternions (x,y,z,w)*scale per frame in VRM 1.0 normalized space; hips_offset is her hips' travel over her planted feet, in leg lengths. Clips with has.fingers/has.face were tracked whole-body (moves-pipeline/holistic.py + retarget_full.py): 21 points per hand and face blendshapes, true performer left/right; the rest are being re-tracked.",
  "clips": [
   {
    "id": "CNHJ72oDG_s",
@@ -12,8 +12,8 @@
     "neutral",
     "happy"
    ],
-   "duration": 15.67,
-   "mirror": true,
+   "duration": 16.47,
+   "mirror": false,
    "source": {
     "url": "https://www.youtube.com/watch?v=CNHJ72oDG_s",
     "title": "3D people animation : Casual Donna Standing and speaking \u00a9cg-people.com",
@@ -25,7 +25,13 @@
     "jitter": 0.0021,
     "legs_visible": 0.984,
     "limb_stability": 0.853
-   }
+   },
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "DRyaRp3COvE",
@@ -51,6 +57,11 @@
     "jitter": 0.0018,
     "legs_visible": 0.962,
     "limb_stability": 0.948
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -76,6 +87,11 @@
     "jitter": 0.0097,
     "legs_visible": 0.976,
     "limb_stability": 0.876
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -101,6 +117,11 @@
     "jitter": 0.0122,
     "legs_visible": 0.977,
     "limb_stability": 0.834
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -126,6 +147,11 @@
     "jitter": 0.0032,
     "legs_visible": 0.987,
     "limb_stability": 0.939
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -138,8 +164,8 @@
     "neutral",
     "relaxed"
    ],
-   "duration": 15.67,
-   "mirror": true,
+   "duration": 16.47,
+   "mirror": false,
    "source": {
     "url": "https://www.youtube.com/watch?v=WrJsrsVWkGA",
     "title": "3D people animation : Casual Sharon standing and speaking \u00a9cg-people.com",
@@ -151,7 +177,13 @@
     "jitter": 0.0028,
     "legs_visible": 0.985,
     "limb_stability": 0.839
-   }
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "cIdMN8szJps",
@@ -176,6 +208,11 @@
     "jitter": 0.0021,
     "legs_visible": 0.954,
     "limb_stability": 0.94
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -202,6 +239,11 @@
     "jitter": 0.0014,
     "legs_visible": 0.985,
     "limb_stability": 0.85
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -227,6 +269,11 @@
     "jitter": 0.0031,
     "legs_visible": 0.955,
     "limb_stability": 0.944
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -252,6 +299,11 @@
     "jitter": 0.0017,
     "legs_visible": 0.985,
     "limb_stability": 0.894
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -276,6 +328,11 @@
     "jitter": 0.0324,
     "legs_visible": 0.837,
     "limb_stability": 0.773
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -301,6 +358,11 @@
     "jitter": 0.0038,
     "legs_visible": 0.95,
     "limb_stability": 0.857
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -325,6 +387,11 @@
     "jitter": 0.0236,
     "legs_visible": 0.989,
     "limb_stability": 0.833
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
    }
   },
   {
@@ -349,6 +416,127 @@
     "jitter": 0.0351,
     "legs_visible": 0.882,
     "limb_stability": 0.799
+   },
+   "has": {
+    "body": true,
+    "fingers": false,
+    "face": false
+   }
+  },
+  {
+   "id": "macarena",
+   "file": "macarena.json",
+   "label": "macarena",
+   "what": "someone dancing the Macarena",
+   "kind": "dance",
+   "moods": [
+    "happy",
+    "neutral"
+   ],
+   "duration": 15.0,
+   "mirror": false,
+   "sides": "performer",
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "source": null
+  },
+  {
+   "id": "hip_hop_warmup",
+   "file": "hip_hop_warmup.json",
+   "label": "hip hop warm-up",
+   "what": "someone doing a hip hop warm-up",
+   "kind": "dance",
+   "moods": [
+    "happy",
+    "neutral"
+   ],
+   "duration": 15.0,
+   "mirror": false,
+   "sides": "performer",
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "source": null
+  },
+  {
+   "id": "q_cha_cha_slide",
+   "file": "q_cha_cha_slide.json",
+   "label": "cha cha slide",
+   "what": "someone doing \"The Cha Cha Slide Dance\"",
+   "kind": "dance",
+   "moods": [
+    "happy"
+   ],
+   "duration": 14.2,
+   "mirror": false,
+   "sides": "performer",
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "source": {
+    "url": "https://www.youtube.com/watch?v=I1gMUbEAUFw",
+    "title": "The Cha Cha Slide Dance",
+    "channel": "DJ Raphi",
+    "start": 0.0,
+    "end": 15.0
+   }
+  },
+  {
+   "id": "q_cheer_motions_tutorial",
+   "file": "q_cheer_motions_tutorial.json",
+   "label": "cheer motions",
+   "what": "someone doing \"Cheerleading Tips - Learn All The Motions - Coach Audra Scofield\"",
+   "kind": "happy",
+   "moods": [
+    "happy"
+   ],
+   "duration": 14.2,
+   "mirror": false,
+   "sides": "performer",
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "source": {
+    "url": "https://www.youtube.com/watch?v=pZ81oIlinEI",
+    "title": "Cheerleading Tips - Learn All The Motions - Coach Audra Scofield",
+    "channel": "SportVideos",
+    "start": 0.0,
+    "end": 15.0
+   }
+  },
+  {
+   "id": "q_easy_tiktok_dance_tutorial",
+   "file": "q_easy_tiktok_dance_tutorial.json",
+   "label": "tiktok dance",
+   "what": "someone doing \"15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment\"",
+   "kind": "dance",
+   "moods": [
+    "happy",
+    "neutral"
+   ],
+   "duration": 14.2,
+   "mirror": false,
+   "sides": "performer",
+   "has": {
+    "body": true,
+    "fingers": true,
+    "face": true
+   },
+   "source": {
+    "url": "https://www.youtube.com/watch?v=SoRmqE7A_IE",
+    "title": "15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment",
+    "channel": "MadFit",
+    "start": 0.0,
+    "end": 15.0
    }
   }
  ]

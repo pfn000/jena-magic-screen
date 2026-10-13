@@ -143,7 +143,9 @@ export class Moves {
   history() {
     try { return JSON.parse(localStorage.getItem('jena.moves.history') || '[]'); } catch { return this._hist || []; }
   }
-  remember(id) {
+  // (named rememberPlay: the constructor's `remember` option, her memory, used to shadow a method called remember(),
+  // so on the site the play history was never written and the no-repeat rule saw an empty history every time)
+  rememberPlay(id) {
     const h = [{ id, at: Date.now() }, ...this.history().filter((x) => x && x.id)].slice(0, 200);
     this._hist = h;
     try { localStorage.setItem('jena.moves.history', JSON.stringify(h)); } catch {}
@@ -171,11 +173,29 @@ export class Moves {
       fresh.filter((c) => !lastAt.has(c.id)),
       fresh,
     ];
-    let pool = tiers.find((t) => t.length);
-    if (!pool) pool = [...lib].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0)).slice(0, 1);
-    // among the candidates, lean toward the ones done longest ago
-    pool = [...pool].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0)).slice(0, Math.max(1, Math.ceil(pool.length / 2)));
+    // never the same move twice in a row (whatever tier it came from), unless she only knows one
+    const prev = hist[0]?.id;
+    let pool = tiers.map((t) => (lib.length > 1 ? t.filter((c) => c.id !== prev) : t)).find((t) => t.length);
+    if (!pool) pool = [...lib].filter((c) => lib.length < 2 || c.id !== prev).sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0)).slice(0, 1);
+    // among the candidates, lean toward the ones done longest ago; whole-body ones (fingers + face) first on ties
+    const whole = (c) => (c.has?.fingers ? 1 : 0) + (c.has?.face ? 1 : 0);
+    pool = [...pool].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0) || whole(b) - whole(a)).slice(0, Math.max(1, Math.ceil(pool.length / 2)));
     return pick(pool);
+  }
+
+  // how varied her moves have been: plays in the window, distinct moves, back-to-back repeats, and how
+  // much of her library she's been through (dev panel + tests read this)
+  variety(windowMs = 20 * 60000) {
+    const since = Date.now() - windowMs;
+    const h = this.history().filter((x) => x.at >= since).reverse();
+    let backToBack = 0;
+    for (let i = 1; i < h.length; i++) if (h[i].id === h[i - 1].id) backToBack++;
+    const counts = {};
+    for (const x of h) counts[x.id] = (counts[x.id] || 0) + 1;
+    const distinct = Object.keys(counts).length;
+    return { windowMin: Math.round(windowMs / 60000), played: h.length, distinct, repeats: h.length - distinct, backToBack, library: this.library.length,
+      coverage: this.library.length ? +(distinct / this.library.length).toFixed(2) : 0, maxPlaysOfOne: Math.max(0, ...Object.values(counts)),
+      wholeBody: h.filter((x) => this.library.find((c) => c.id === x.id)?.has?.fingers).length };
   }
 
   // play a slice of a learned clip; never the same sequence twice (random window, speed, mirror)
@@ -194,8 +214,9 @@ export class Moves {
     const mirror = c.sides !== 'performer' && meta.sides !== 'performer' && meta.mirror !== false && Math.random() < 0.4;
     this.guard = { left: 1, right: 1 };
     this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
-    this.remember(meta.id);
+    this.rememberPlay(meta.id);
     this.recent = this.history().slice(0, 8).map((x) => x.id);
+    if ((this.plays = (this.plays || 0) + 1) % 10 === 0) { try { console.log('jena move variety', JSON.stringify(this.variety())); } catch {} }
     const what = meta.what || 'someone moving';
     const lines = [
       `learned this from a video of ${what}, trying it`,
@@ -349,9 +370,13 @@ export class Moves {
     const w = Math.min(1, p.w * conf);
     if (w < 0.02) return;
     const talking = this.avatar.talk && performance.now() < this.avatar.talk.until;
+    const have = this._exprNames ||= new Set(em.expressions.map((e) => e.expressionName));
     F.names.forEach((name, j) => {
+      if (!have.has(name)) { (this._unmapped ||= new Set()).has(name) || (this._unmapped.add(name), console.warn('jena face: her model has no expression', name)); return; }
       if (talking && ['aa', 'ih', 'ou', 'ee', 'oh'].includes(name)) return; // her own voice drives her mouth while she talks
-      const arr = F.w[j], v = arr[i] * (1 - a) + (arr[i + 1] ?? arr[i]) * a;
+      const arr = F.w[j], raw = arr[i] * (1 - a) + (arr[i + 1] ?? arr[i]) * a;
+      // performers' faces are subtle on camera; her anime face reads them a bit bigger (gaze stays as tracked)
+      const v = name.startsWith('look') || name.startsWith('blink') ? raw : Math.min(1, raw * 1.6);
       const cur = em.getValue(name) || 0;
       em.setValue(name, name.startsWith('blink') ? Math.max(cur, v * w) : cur + (v - cur) * w * 0.9);
     });

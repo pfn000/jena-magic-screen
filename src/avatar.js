@@ -91,7 +91,11 @@ export class Avatar {
     this.target = structuredClone(REST);
     this.mood = { name: 'neutral', weights: Object.fromEntries(MOODS.map((m) => [m, 0])), until: 0 };
     this.blink = { next: 2, t: -1, double: false };
-    this.talk = { until: 0, shape: 'aa', next: 0 };
+    this.talk = { until: 0, shape: 'aa', next: 0, text: '', t0: 0, ms: 0 };
+    // talking hands: a hand shape per hand while she talks (point, open palm, two fingers, soft fist…), eased per finger
+    this.gesture = { left: { v: [0, 0, 0, 0, 0], t: [0, 0, 0, 0, 0], next: 0 }, right: { v: [0, 0, 0, 0, 0], t: [0, 0, 0, 0, 0], next: 0 } };
+    // little face life when nothing else is going on: a soft smile, a brow lift, a squint (never flirty)
+    this.micro = { name: null, w: 0, peak: 0, until: 0, next: 4 };
     this.wave = null;
     this.armTimers = {};
     this.look = { y: 0, x: 0, ty: 0, tx: 0, until: 0 }; // head/eye turn she chooses (radians; +y = toward HER left)
@@ -131,6 +135,7 @@ export class Avatar {
     vrm.scene.traverse((o) => (o.frustumCulled = false));
     if (this.vrm) { this.scene.remove(this.vrm.scene); VRMUtils.deepDispose(this.vrm.scene); }
     this.vrm = vrm;
+    try { this.checkRig(vrm); } catch (e) { console.warn('rig check', e); }
     this.scene.add(vrm.scene);
     this.scene.add(this.gaze);
     if (vrm.lookAt) vrm.lookAt.target = this.gaze;
@@ -387,7 +392,26 @@ export class Avatar {
   talkFor(text) {
     const ms = Math.min(9000, 600 + String(text || '').length * 55);
     this.talk.until = performance.now() + ms;
+    this.talk.text = String(text || ''); this.talk.t0 = performance.now(); this.talk.ms = ms;
     return ms;
+  }
+  // the mouth shape for the sound she's on right now, read off the words she's saying (time-aligned to the
+  // audio when her voice is playing): vowels -> aa / ih / ou / ee / oh, m b p close the lips, others half-open
+  viseme(now) {
+    const T = this.talk;
+    if (!T.text || !T.ms) return null;
+    const x = (now - T.t0) / T.ms;
+    if (x < 0 || x > 1) return null;
+    const txt = T.text.toLowerCase();
+    const ch = txt[Math.min(txt.length - 1, Math.floor(x * txt.length))] || ' ';
+    if ('a'.includes(ch)) return 'aa';
+    if ('iy'.includes(ch)) return 'ih';
+    if ('uwq'.includes(ch)) return 'ou';
+    if ('e'.includes(ch)) return 'ee';
+    if ('o'.includes(ch)) return 'oh';
+    if ('mbp'.includes(ch)) return 'closed';
+    if (' .,!?;:\n'.includes(ch)) return 'rest';
+    return 'half';
   }
 
   // Turn head and eyes toward HER left/right (or up/down), for ms, then back to the camera.
@@ -569,7 +593,14 @@ export class Avatar {
         if (c.until && now > c.until) { c.t = 0.3; c.until = 0; }
         c.v = damp(c.v, c.t, 8, dt);
         const relaxed = c.t > 0.15 && c.t < 0.55;
-        const g = talking && relaxed ? 0.18 : 0.07; // talking hands move more
+        const g = talking && relaxed ? 0.3 : 0.15; // talking hands move more (idle fingers still drift, each its own way)
+        // talking gestures: every 1-2.5 s each hand takes a shape (point, open palm, two up, soft fist, relaxed)
+        const G = this.gesture[s];
+        if (talking && relaxed && now > G.next) {
+          const shapes = [[0, 0, 0, 0, 0], [0.5, -0.25, 0.45, 0.5, 0.55], [0.3, -0.2, -0.2, 0.5, 0.55], [0.35, 0.35, 0.4, 0.45, 0.5], [0, -0.2, 0.05, 0.15, 0.25], [0.2, 0.15, -0.15, 0.1, 0.3]];
+          G.t = shapes[Math.floor(Math.random() * shapes.length)]; G.next = now + 1000 + Math.random() * 1500;
+        } else if (!talking && G.next && now > G.next) { G.t = [0, 0, 0, 0, 0]; G.next = 0; }
+        for (let j = 0; j < 5; j++) G.v[j] = damp(G.v[j], G.t[j], 7, dt);
         const sg = s === 'left' ? -1 : 1; // her left fingers point +x in bone space, so they curl with -z
         const k = { Index: 0.8, Middle: 0.95, Ring: 1.06, Little: 1.18 };
         const spread = relaxed ? 0.06 + this.FN[s + 'Spread'](t * 0.31) * 0.06 : c.v > 0.7 ? 0 : 0.03;
@@ -577,13 +608,13 @@ export class Avatar {
         let fi = 0;
         for (const f of ['Index', 'Middle', 'Ring', 'Little']) {
           const own = relaxed ? this.FN[s + f](t * (0.23 + fi * 0.04) + fi * 13) * g : 0;
-          const w = Math.max(0, Math.min(1.05, c.v * (c.v > 0.7 ? 1 : k[f]) + own));
+          const w = Math.max(0, Math.min(1.05, c.v * (c.v > 0.7 ? 1 : k[f]) + own + G.v[fi + 1]));
           set(`${s}${f}Proximal`, 0, sg * -spread * sp[f], sg * w * 1.2);
           set(`${s}${f}Intermediate`, 0, 0, sg * w * 1.45);
           set(`${s}${f}Distal`, 0, 0, sg * w * 0.95);
           fi++;
         }
-        const th = Math.max(0, Math.min(1, c.v + (relaxed ? this.FN[s + 'Thumb'](t * 0.27) * g : 0)));
+        const th = Math.max(0, Math.min(1, c.v + (relaxed ? this.FN[s + 'Thumb'](t * 0.27) * g : 0) + G.v[0]));
         set(`${s}ThumbMetacarpal`, 0, -sg * th * 0.35, sg * th * 0.12);
         set(`${s}ThumbProximal`, 0, -sg * th * 0.5, sg * th * 0.28);
         set(`${s}ThumbDistal`, 0, -sg * th * 0.65, 0);
@@ -662,20 +693,63 @@ export class Avatar {
     }
     // happy eyes already squint; keep blink from overshooting
     em.setValue('blink', b * (1 - this.mood.weights.happy * 0.6));
-    // mouth
-    let aa = 0, oh = 0;
-    if (this.voice) {
-      // real lip-sync: driven by her actual voice audio (loudness opens the mouth; low-band energy rounds it)
-      const v = this.voice.level, round = this.voice.round > 0.62;
-      if (round) { oh = v; aa = v * 0.25; } else { aa = v; oh = v * 0.15; }
-    } else if (now < this.talk.until) {
-      if (now > this.talk.next) { this.talk.shape = Math.random() < 0.65 ? 'aa' : 'oh'; this.talk.amp = 0.3 + Math.random() * 0.6; this.talk.next = now + 70 + Math.random() * 90; }
-      const v = this.talk.amp * (0.6 + 0.4 * Math.sin(t * 30));
-      if (this.talk.shape === 'aa') aa = v; else oh = v;
+    this.blinkNow = b;
+    // face life between moods: a soft smile, a little brow lift or a relaxed squint now and then
+    const M = this.micro;
+    M.next -= dt;
+    if (this.mood.name === 'neutral' && !M.name && M.next <= 0) {
+      const r = Math.random();
+      M.name = r < 0.45 ? 'happy' : r < 0.75 ? 'relaxed' : 'surprised';
+      M.peak = M.name === 'surprised' ? 0.25 : M.name === 'happy' ? 0.45 : 0.4;
+      M.until = now + (M.name === 'surprised' ? 700 : 1500 + Math.random() * 2000);
+      M.next = 5 + Math.random() * 8;
     }
-    this._aa = damp(this._aa || 0, aa, 20, dt);
-    this._oh = damp(this._oh || 0, oh, 20, dt);
-    em.setValue('aa', this._aa);
-    em.setValue('oh', this._oh);
+    const microGoal = M.name && now <= M.until && this.mood.name === 'neutral' ? M.peak : 0;
+    M.w = damp(M.w, microGoal, 5, dt);
+    if (M.name) { em.setValue(M.name, Math.max(em.getValue(M.name) || 0, M.w)); if (microGoal === 0 && M.w < 0.01) { M.name = null; M.w = 0; } }
+    // mouth: five vowel shapes (aa ih ou ee oh) from the words she's saying, opened by her real voice level
+    // when the audio is playing (else a speech-like rhythm), lips closed on m/b/p
+    const V = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+    const talking = now < this.talk.until;
+    if (this.voice || talking) {
+      const vis = this.viseme(now);
+      let open;
+      if (this.voice) open = Math.min(1, this.voice.level * 1.25);
+      else { if (now > this.talk.next) { this.talk.amp = 0.45 + Math.random() * 0.5; this.talk.next = now + 70 + Math.random() * 90; } open = this.talk.amp * (0.65 + 0.35 * Math.sin(t * 30)); }
+      if (vis === 'closed') open *= 0.08; else if (vis === 'rest') open *= 0.25; else if (vis === 'half') open *= 0.55;
+      const shape = vis && V[vis] !== undefined ? vis : this.voice ? (this.voice.round > 0.62 ? 'oh' : 'aa') : (this.talk.shape = now > (this.talk.shapeNext || 0) ? (this.talk.shapeNext = now + 120, ['aa', 'ih', 'ou', 'ee', 'oh'][Math.floor(Math.random() * 5)]) : this.talk.shape);
+      V[shape] = open; if (shape !== 'aa') V.aa = open * 0.2;
+    }
+    this._vis ||= { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+    for (const k of Object.keys(V)) { this._vis[k] = damp(this._vis[k], V[k], 22, dt); em.setValue(k, this._vis[k]); }
+    this._aa = this._vis.aa; this._oh = this._vis.oh;
+  }
+
+  // what her face and fingers are doing right now (dev panel, proof, tests)
+  faceState() {
+    const em = this.vrm?.expressionManager, H = this.vrm?.humanoid;
+    if (!em || !H) return null;
+    const ex = {};
+    for (const e of em.expressions) ex[e.expressionName] = +(em.getValue(e.expressionName) || 0).toFixed(3);
+    const fing = {};
+    for (const s of ['left', 'right']) for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Little']) {
+      const n = H.getNormalizedBoneNode(s + f + (f === 'Thumb' ? 'Proximal' : 'Intermediate'));
+      if (n) fing[s + f] = +((f === 'Thumb' ? n.rotation.y : n.rotation.z) * (s === 'left' ? -1 : 1)).toFixed(3);
+    }
+    return { expressions: ex, fingers: fing, talking: performance.now() < this.talk.until, viseme: this.viseme(performance.now()), micro: this.micro.name, rig: this.rigCheck || null };
+  }
+
+  // does her model have every bone and expression her face/finger code drives? logged once per model
+  checkRig(vrm) {
+    const want = ['Thumb', 'Index', 'Middle', 'Ring', 'Little'].flatMap((f) => ['left', 'right'].flatMap((s) => (f === 'Thumb' ? ['Metacarpal', 'Proximal', 'Distal'] : ['Proximal', 'Intermediate', 'Distal']).map((j) => s + f + j)));
+    const missingBones = want.filter((b) => !vrm.humanoid?.getNormalizedBoneNode(b));
+    const have = new Set((vrm.expressionManager?.expressions || []).map((e) => e.expressionName));
+    const missingExpressions = ['aa', 'ih', 'ou', 'ee', 'oh', 'blink', 'blinkLeft', 'blinkRight', 'happy', 'angry', 'sad', 'relaxed', 'surprised', 'neutral'].filter((n) => !have.has(n));
+    this.rigCheck = { fingerBones: want.length - missingBones.length, of: want.length, missingBones, expressions: have.size, missingExpressions };
+    (missingBones.length || missingExpressions.length ? console.warn : console.log)('jena rig check', JSON.stringify(this.rigCheck));
+    return this.rigCheck;
   }
 }
+
+// for the Node harnesses (moves-pipeline/fingers_face_harness.mjs): her finger/face code without a GPU
+export const _internals = { damp, noise };
