@@ -3,6 +3,7 @@
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
 import RFB from '@novnc/novnc';
+import { asks, startAsks, renderAsks, handleAskClick, pendingCount } from './signin.js';
 // styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
 const STUDIO_CSS = `#devpanel .dp-card{border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.04)}
 #devpanel .dp-card p{margin:6px 0 0;font-size:12px;line-height:1.45}
@@ -26,11 +27,14 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)' }[t]}</button>`).join('')}</nav>
+      <nav>${['asks', 'live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
-    this.tab = 'live';
+    this.tab = 'asks';
+    // Jena's asks (sign in somewhere / approve something): mama only, badge + toast + inline chat pills (src/signin.js)
+    startAsks({ obs: cfg?.obs });
+    asks.listeners.add(() => { const n = pendingCount(), b = this.el.querySelector('nav [data-tab="asks"]'); if (b) b.textContent = `🙋 Ask mama${n ? ` (${n})` : ''}`; if (!this.el.hidden && this.tab === 'asks' && !(this.body.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) this.render(); });
     this.el.querySelector('.dp-close').onclick = () => this.close();
     this.el.querySelector('nav').onclick = (e) => { const t = e.target.dataset?.tab; if (!t) return; this.tab = t; this.el.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t)); this.render(); };
     this.data = {};
@@ -42,6 +46,7 @@ export class DevPanel {
     this.body.addEventListener('input', (e) => { if (e.target.id === 'dp-lib-q') this.libQ = e.target.value; });
     this.body.addEventListener('keydown', (e) => { if (e.target.id === 'dp-lib-q' && e.key === 'Enter') this.body.querySelector('[data-libsearch]')?.click(); });
     this.body.addEventListener('click', async (e) => {
+      if (await handleAskClick(e, () => this.render())) return;
       const key = localStorage.getItem('jena.dmKey');
       const out = this.body.querySelector('#dp-skill-out');
       const post = async (b) => { const r = await fetch('/api/boxdo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key || '' }, body: JSON.stringify(b) }); return r.json(); };
@@ -114,6 +119,7 @@ export class DevPanel {
     rfb.addEventListener('disconnect', (ev) => (st.textContent = ev.detail?.clean ? 'disconnected' : 'connection dropped (token used or expired? press take over again)'));
     box.querySelector('button').onclick = () => { try { rfb.disconnect(); } catch {} box.remove(); };
   }
+  showAsks() { this.tab = 'asks'; this.el.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === 'asks')); if (this.el.hidden) this.open(); else this.render(); }
   open() { this.el.hidden = false; this.refresh(); this.timer = setInterval(() => this.refresh(), 4000); }
   close() { this.el.hidden = true; clearInterval(this.timer); }
   async refresh() {
@@ -121,7 +127,7 @@ export class DevPanel {
     const want = [get('/api/health'), get('/api/box?what=status')];
     if (!this.data.deploysAt || Date.now() - this.data.deploysAt > 15000) want.push(get('/api/deploys')); else want.push(null);
     if (!this.data.moves) want.push(get('/moves/index.json')); else want.push(null);
-    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null, this.tab === 'memory' ? get('/api/box?what=memory') : null, this.tab === 'library' && !this.data.lib ? get('/api/box?what=library') : null, this.tab === 'assets' ? get('/api/box?what=assets') : null, this.tab === 'edits' ? get('/api/box?what=edits') : null);
+    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null, this.tab === 'memory' ? get('/api/box?what=memory') : null, this.tab === 'library' && !this.data.lib ? get('/api/box?what=library') : null, this.tab === 'assets' ? get('/api/box?what=assets') : null, (this.tab === 'edits' || this.tab === 'asks') ? get('/api/box?what=edits') : null);
     const [health, box, deploys, moves, sk, act, hot, mem, lib, assets, edits] = await Promise.all(want);
     if (lib?.online) this.data.lib = lib; if (assets) this.data.assets = assets; if (edits) this.data.edits = edits;
     if (mem) this.data.mem = mem;
@@ -130,7 +136,7 @@ export class DevPanel {
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
     if (moves && !moves.error) this.data.moves = moves;
     this.data.at = Date.now();
-    if (!this.el.hidden && document.activeElement?.id !== 'dp-lib-q') this.render();
+    if (!this.el.hidden && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
   }
   render() {
     const d = this.data, box = d.box?.data, live = box && d.box.online;
@@ -251,6 +257,7 @@ export class DevPanel {
       else if (!A.count) h += '<p>She has not made any assets yet. Ask her in chat: "jena make an icon of a rocket" or "jena make a button that says Follow".</p>';
       else h += `<h3>Assets she made (${A.count}) · saved on her box in ~/assets · real SVG + PNG files</h3><div class="dp-gallery">${A.assets.map((a) => `<figure class="dp-asset"><img src="/api/asset?name=${encodeURIComponent(a.png || a.svg)}" alt="${esc(a.title || a.svg)}" loading="lazy"><figcaption><b>${esc(a.title || a.kind)}</b><br><small>${esc(a.kind)} · ${esc(a.base || 'drawn by her')}${a.license ? ' (' + esc(a.license) + ')' : ''} · ${ago(a.ts * 1000)}</small><br><a href="/api/asset?name=${encodeURIComponent(a.svg)}" target="_blank" rel="noopener">svg</a>${a.png ? ` · <a href="/api/asset?name=${encodeURIComponent(a.png)}" target="_blank" rel="noopener">png ${a.png_px || ''}</a>` : ''}</figcaption></figure>`).join('')}</div>`;
     }
+    if (this.tab === 'asks') h += renderAsks(d.edits);
     if (this.tab === 'edits') {
       const E = d.edits?.data;
       h += `<h3>Site edits Jena proposes · branch → checks → Vercel preview → <u>only mama merges</u></h3><p><small>She never pushes to main herself. Each change gets its own branch in a sandbox copy, then build + lint + a headless smoke test (page loads, no console errors, key parts present, 390 px phone has no sideways scroll, OBS view intact). Only a passing branch is pushed for a Vercel preview. Merge and undo need your passcode. Merging its pull request on GitHub yourself counts as your approval too, and shows up here as merged.</small></p>`;

@@ -92,6 +92,16 @@ async function mamaDo(req) {
   const b = await body(req);
   const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
+  if (action === 'signin') {   // Jena's asks: sign-in requests (private window on her box) + approve/deny; box re-checks the passcode
+    const op = ['list', 'request', 'start', 'done', 'cancel', 'answer'].includes(b.op) ? b.op : null;
+    if (!op) return json({ error: 'unknown sign-in op' }, 400);
+    try {
+      const r = await fetch(`${box.url}/box/mama/signin/${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify({ id: clip(b.id, 20), site: clip(b.site, 200), reason: clip(b.reason, 200), ts: +b.ts || 0, answer: clip(b.answer, 10) }), signal: AbortSignal.timeout(op === 'done' || op === 'cancel' ? 28000 : 15000) });
+      const d = await r.json().catch(() => ({ ok: false, summary: `her box answered ${r.status}` }));
+      if (op === 'start' && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
+      return json(d, r.status);
+    } catch (e) { return json({ ok: false, summary: `her box did not answer: ${e.message}` }, 502); }
+  }
   if (action === 'correct') {   // mama's ✎ correct on a reply -> verified fact + corrections training chat (her gateway)
     try {
       const r = await fetch(`${box.url}/truth/correct`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ q: clip(b.q, 400), wrong: clip(b.wrong, 600), right: clip(b.right, 300) }), signal: AbortSignal.timeout(10000) });
