@@ -9,7 +9,12 @@ const PREFIX = 'jmt1.';
 const OBS = new URLSearchParams(location.search).get('obs') === '1';
 const nativeFetch = window.fetch.bind(window);
 const get = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
-const set = (v) => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} };
+const set = (v) => {
+  const had = get();
+  try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {}
+  // open views (desktop panel, private drawer, dev panel) switch to mama right away: no reload, no prompt
+  if (v && v !== had) setTimeout(() => { try { window.dispatchEvent(new CustomEvent('jena-trusted', { detail: { token: v } })); } catch {} }, 0);
+};
 
 export const trust = { state: null, listeners: new Set() };
 const emit = () => trust.listeners.forEach((f) => { try { f(trust.state); } catch {} });
@@ -18,7 +23,9 @@ function deviceLabel() {
   const ua = navigator.userAgent;
   const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'device';
   const br = /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'browser';
-  return `${os} · ${br}`;
+  // a test/automation browser (Playwright, the site watcher) says so; mama's real phone never sets navigator.webdriver,
+  // so cleaning up test devices can never revoke hers again (13 Oct: 3 'iPhone · Safari' devices were revoked as tests)
+  return `${os} · ${br}${navigator.webdriver ? ' · test' : ''}`;
 }
 
 // a passcode (typed into ANY of the existing unlock boxes) becomes a trusted-device token right away
@@ -62,10 +69,32 @@ async function sync(first = false) {
   } finally { upgrading = false; }
 }
 
-// ---------------- the passcode prompt (only for step-ups) ----------------
+// ---------------- the ONE trusted check (every mama button calls this; no feature has its own prompt) ----------------
+// 1. a token on this device -> done, nothing shown.  2. an old saved passcode -> upgraded silently.
+// 3. the HttpOnly cookie remembers this device (localStorage wiped by Safari, a home-screen copy, another tab) -> restored silently.
+// 4. only a device that was never trusted gets asked: Face ID / passkey first (one tap), the passcode box as the fallback.
+export async function ensureMama(why = '') {
+  let v = get();
+  if (v.startsWith(PREFIX)) return v;
+  if (v) { const t = await trustWithPasscode(v); if (t.ok) return get(); }
+  const r = await nativeFetch('/api/trust', { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
+  const d = r && r.ok ? await r.json().catch(() => null) : null;
+  if (d?.trusted && d.token) { try { sessionStorage.removeItem('jena.locked'); } catch {} set(d.token); trust.state = d; emit(); return d.token; }
+  const pass = await askPasscode('Unlock mama on this device', `${why ? why + '. ' : ''}Only once: after this, this device is remembered for a year (no more passcode). Tip: Tab can text you a one-tap link instead, or use Face ID if you added it.`, { passkey: true });
+  if (pass === TRUSTED) return get();
+  if (!pass) return '';
+  const t = await trustWithPasscode(pass);
+  if (!t.ok) { askPasscode('Wrong passcode', 'That passcode was not right.'); return ''; }
+  try { sessionStorage.removeItem('jena.locked'); } catch {}
+  return get();
+}
+const TRUSTED = Symbol('trusted');
+
+// ---------------- the passcode prompt (only for step-ups and a never-trusted device) ----------------
 let open = null;
-export function askPasscode(title, detail) {
+export function askPasscode(title, detail, opt = {}) {
   if (open) return open;
+  if (opt.passkey && passkeySupported() && !fresh('login')) preparePasskey('login');
   open = new Promise((resolve) => {
     const w = document.createElement('div');
     w.id = 'mama-stepup';
@@ -78,10 +107,17 @@ export function askPasscode(title, detail) {
       <button style="flex:1;padding:10px;border-radius:12px;border:0;background:#b48cff;color:#1d1b2e;font-weight:700">unlock</button></div></form>`;
     w.querySelector('p').textContent = detail || '';
     const done = (v) => { w.remove(); open = null; resolve(v); };
+    if (opt.passkey && passkeySupported()) {   // Face ID / passkey first: one tap, nothing typed
+      const pk = document.createElement('button'); pk.type = 'button'; pk.dataset.pk = '1';
+      pk.textContent = '🔑 use Face ID / passkey';
+      pk.style.cssText = 'width:100%;margin:0 0 10px;padding:11px;border-radius:12px;border:1px solid #b48cff;background:none;color:#f8eaff;font:600 15px system-ui';
+      pk.onclick = async () => { const d = await loginWithPasskey(); if (d.ok) done(TRUSTED); else w.querySelector('p').textContent = d.error === 'cancelled' ? (detail || '') : `passkey: ${d.error}`; };
+      w.querySelector('input').before(pk);
+    }
     w.querySelector('[data-x]').onclick = () => done('');
     w.querySelector('form').onsubmit = (e) => { e.preventDefault(); done(w.querySelector('input').value.trim()); };
     document.body.appendChild(w);
-    setTimeout(() => w.querySelector('input').focus(), 30);
+    if (!w.querySelector('[data-pk]')) setTimeout(() => w.querySelector('input').focus(), 30);
   });
   return open;
 }
@@ -215,4 +251,4 @@ if (!OBS) {
   setInterval(() => sync(), 10 * 60000);
   window.addEventListener('storage', (e) => { if (e.key === KEY) sync(); });
 }
-window.jenaTrust = { trust, forgetDevice, trustWithPasscode, askPasscode, addPasskey, loginWithPasskey, passkeySupported };
+window.jenaTrust = { trust, forgetDevice, trustWithPasscode, askPasscode, ensureMama, addPasskey, loginWithPasskey, passkeySupported };

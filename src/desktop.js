@@ -92,6 +92,7 @@ export class Desktop {
   // changes stay. A double-tap does the same on a phone (then her desktop turns phone-shaped: phone mode).
   bindTakeover() {
     if (OBS) return;
+    window.addEventListener('jena-trusted', () => { if (this.mode !== 'mama' && this.wantsMama()) { clearTimeout(this.watchRetry); this.startMama(); } });
     const isMama = () => this.mode === 'mama' || !!localStorage.getItem('jena.dmKey');
     const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ minutes: 60, source: 'double_click' })); };
     // capture phase: noVNC's own mouse/touch handlers on the canvas stop these events from bubbling
@@ -143,6 +144,7 @@ export class Desktop {
   // the "🔑 mama view" key. A trusted device never gets a passcode box here: the cookie hands its key back first.
   // Only a device that was never trusted (or was locked on purpose) sees the shared passcode card (trust.js).
   async unlockMama() {
+<<<<<<< HEAD
     const { restoreTrust } = await import('./takeover.js');
     if (await restoreTrust()) { clearTimeout(this.watchRetry); this.startMama(); return; }
     const T = window.jenaTrust;
@@ -155,6 +157,12 @@ export class Desktop {
       if (!c || !c.ok) { window.alert(c && c.error === 'wrong key' ? 'wrong passcode' : `couldn't check it: ${(c && (c.error || c.summary)) || 'no answer'}`); return; }
       localStorage.setItem('jena.dmKey', String(k).trim());   // same key the private DM drawer + dev panel use
     }
+=======
+    // the ONE trusted check (src/trust.js): a trusted device (token or the HttpOnly cookie) goes straight to mama view,
+    // nothing asked; only a never-trusted device sees Face ID / the passcode, once. No prompt of its own here.
+    const k = window.jenaTrust?.ensureMama ? await window.jenaTrust.ensureMama('Mama view of her desktop') : '';
+    if (!k) return;
+>>>>>>> bdad62d (passcode fix (local))
     clearTimeout(this.watchRetry);
     this.startMama();
   }

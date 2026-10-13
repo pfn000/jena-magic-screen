@@ -52,8 +52,20 @@ def trust(b):
         _write(TRUST, t)
         return 200, {'ok': True, 'uses': uses[n]}
     elif op == 'revoke' and dev:
+        # Never auto-revoke mama's real devices (13 Oct 19:45Z a test cleanup revoked 3 'iPhone · Safari' devices,
+        # one likely her phone). Only the device itself ('forget this device' on the site, by=device) or a device
+        # labelled '· test' (navigator.webdriver: Playwright, the site watcher) can be revoked.
+        known = next((d for d in t['devices'] if d.get('id') == dev), None)
+        label = (known or {}).get('label', '')
+        if b.get('by') != 'device' and '· test' not in label:
+            return 409, {'ok': False, 'error': "that's a real device: only mama can forget it, from that device (🔐 tab -> forget this device)", 'label': label}
         if dev not in t['revoked']: t['revoked'] = (t['revoked'] + [dev])[-500:]
         t['devices'] = [d for d in t['devices'] if d.get('id') != dev]
+        t.setdefault('revoke_log', []).append({'device': dev, 'label': label, 'by': str(b.get('by') or 'test-cleanup')[:12], 'at': int(time.time())})
+        t['revoke_log'] = t['revoke_log'][-100:]
+        _write(TRUST, t)
+    elif op == 'unrevoke' and dev:
+        t['revoked'] = [x for x in t['revoked'] if x != dev]
         _write(TRUST, t)
     return 200, {'ok': True, 'devices': t['devices'], 'revoked': t['revoked']}
 

@@ -100,7 +100,7 @@ export async function isRevoked(d) {
 }
 export async function noteDevice(p, op = 'add') {
   if (op === 'revoke') rev.set.add(p.d);
-  return boxTrust(op, { device: p.d, label: p.l, iat: p.iat, via: p.via, ...(p.where ? { where: p.where } : {}) }).catch(() => null);
+  return boxTrust(op, { device: p.d, label: p.l, iat: p.iat, via: p.via, ...(p.where ? { where: p.where } : {}), ...(op === 'revoke' ? { by: 'device' } : {}) }).catch(() => null);
 }
 
 // ---- who is asking: { via: 'passcode' | 'device' | null, device }

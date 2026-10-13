@@ -140,7 +140,7 @@ function qrSvg(text) {
 export function renderAsks(edits) {
   const d = asks.data;
   let h = '<h3>🙋 Ask mama</h3>';
-  if (!key()) return h + '<p>Only mama sees Jena\'s asks. Passcode: <input id="ask-key" type="password" size="10" autocomplete="off"> <button data-ask-unlock>unlock</button></p>';
+  if (!key()) return h + '<p>Only mama sees Jena\'s asks. <button data-ask-unlock>🔓 unlock this device (once)</button></p>';   // the one trusted check (src/trust.js)
   if (!d) return h + `<p>${asks.error ? `<span class="dp-warn">${esc(asks.error)}</span>` : 'reading her asks…'}</p>`;
   const p = d.pending, act = d.active || {};
   if (act.active) h += `<div class="dp-card"><b>🖐 Sign-in window open: ${esc(act.site)}</b><p>closes by itself ${act.until ? 'in ' + Math.max(0, Math.round((act.until - Date.now()) / 60000)) + ' min' : ''}</p><button data-ask-signin="${esc(act.id)}">reopen the window</button> <button data-ask-done="${esc(act.id)}">✓ Done</button></div>`;
@@ -168,7 +168,7 @@ export async function handleAskClick(e, rerender) {
   const t = e.target.closest('button');
   if (!t) return false;
   const ds = t.dataset;
-  if (ds.askUnlock !== undefined) { const v = document.getElementById('ask-key')?.value.trim(); if (v) { localStorage.setItem(KEY, v); asks.out = 'unlocked on this device'; const d = await mamaSignin('list'); if (d.ok) asks.data = d; else asks.out = d.summary || d.error; } rerender(); return true; }
+  if (ds.askUnlock !== undefined) { const v = await (window.jenaTrust?.ensureMama?.('Jena\'s sign-in asks') || ''); if (v) { asks.out = 'unlocked on this device'; const d = await mamaSignin('list'); if (d.ok) asks.data = d; else asks.out = d.summary || d.error; } rerender(); return true; }
   const find = (id) => (asks.data?.pending?.id === id ? asks.data.pending : (asks.data?.requests || []).find((r) => r.id === id));
   if (ds.askSignin) { openSignin(find(ds.askSignin) || { id: ds.askSignin, label: asks.data?.active?.site || 'the site' }); return true; }
   if (ds.askCancel) { asks.out = JSON.stringify(await mamaSignin('cancel', { id: ds.askCancel })).slice(0, 300); rerender(); return true; }
@@ -254,8 +254,12 @@ export function openSignin(req) {
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
   form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); else if (key()) go(); };
-  if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
-  else form.querySelector('input').focus();
+  const auto = () => { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); };
+  if (req.link || key()) auto();
+  else {   // no key in this tab: the one trusted check first (cookie / Face ID); the box below only if that is declined
+    form.querySelector('input').hidden = true;
+    Promise.resolve(window.jenaTrust?.ensureMama?.(`Signing Jena in to ${req.label || 'a site'}`)).then((k) => { if (k) auto(); else { form.querySelector('input').hidden = false; form.querySelector('input').focus(); } });
+  }
   // phone keyboard + key row live in the shared takeover screen (takeover.js)
   kbBtn.onclick = () => ctl?.showKeyboard();
   doneBtn.onclick = async () => {

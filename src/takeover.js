@@ -307,7 +307,7 @@ export function openTakeover({ minutes = 0, source = 'takeover', title } = {}) {
     ${document.fullscreenEnabled ? '<button class="tk-fs" title="fullscreen">⛶</button>' : ''}<button class="tk-done">✓ Done</button></header><div class="tk-body" style="flex:1;min-height:0"></div>`;
   document.body.appendChild(w);
   const st = w.querySelector('.tk-st'), body = w.querySelector('.tk-body');
-  let ctl = null, until = minutes ? Date.now() + minutes * 60000 : 0, closed = false, tries = 0;
+  let ctl = null, until = minutes ? Date.now() + minutes * 60000 : 0, closed = false, tries = 0, authTried = false;
   const phone = isPhoneView();
   w.dataset.phone = phone ? '1' : '0';
   const tick = () => {
@@ -320,6 +320,11 @@ export function openTakeover({ minutes = 0, source = 'takeover', title } = {}) {
     st.textContent = tries ? 'reconnecting…' : 'connecting…';
     const r = await takeoverToken({ minutes, source });
     if (closed) return;
+    if (!r.ok && r.auth && !authTried) {   // key missing in this tab: the one trusted check (cookie / Face ID), then straight back in
+      authTried = true;
+      const k = await window.jenaTrust?.ensureMama?.('Taking over her desktop');
+      if (k && !closed) return connect();
+    }
     if (!r.ok) { st.textContent = r.summary || 'could not connect'; if (!r.auth && tries++ < 5) setTimeout(connect, 3000); return; }
     if (r.phone) w.dataset.portrait = r.phone.join('x');
     ctl?.destroy();
