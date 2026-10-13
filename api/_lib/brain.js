@@ -17,7 +17,7 @@
 //   {type:"status", text}                     brain state, e.g. offline
 //   {type:"done"}
 import { PERSONA } from './persona.js';
-import { boxLink, boxAuth } from './boxlink.js';
+import { boxLink, boxAuth, ttsToken } from './boxlink.js';
 
 const env = (k) => (process.env[k] || '').trim();
 export const DEFAULT_BASE = 'http://127.0.0.1:8088/v1';
@@ -271,7 +271,7 @@ export async function* thinkEvents(input) {
   const top = input.skill?.ok && input.skill.top;
   if (text && top?.url && !text.includes(top.url) && !(top.title && text.toLowerCase().includes(String(top.title).toLowerCase()))) text = `${text} (what my ${input.skill.name} skill really found: ${top.title ? top.title + ' ' : ''}${top.url})`;
   for (const e of events) yield e;
-  if (text) yield { type: 'say', text: text.slice(0, 600) };
+  if (text) { const t = text.slice(0, 600); yield { type: 'say', text: t, voice: ttsToken(t) }; }
   else yield { type: 'status', text: 'JenaXI answered with nothing this time' };
   yield { type: 'done' };
 }

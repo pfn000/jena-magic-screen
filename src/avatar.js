@@ -626,7 +626,11 @@ export class Avatar {
     em.setValue('blink', b * (1 - this.mood.weights.happy * 0.6));
     // mouth
     let aa = 0, oh = 0;
-    if (now < this.talk.until) {
+    if (this.voice) {
+      // real lip-sync: driven by her actual voice audio (loudness opens the mouth; low-band energy rounds it)
+      const v = this.voice.level, round = this.voice.round > 0.62;
+      if (round) { oh = v; aa = v * 0.25; } else { aa = v; oh = v * 0.15; }
+    } else if (now < this.talk.until) {
       if (now > this.talk.next) { this.talk.shape = Math.random() < 0.65 ? 'aa' : 'oh'; this.talk.amp = 0.3 + Math.random() * 0.6; this.talk.next = now + 70 + Math.random() * 90; }
       const v = this.talk.amp * (0.6 + 0.4 * Math.sin(t * 30));
       if (this.talk.shape === 'aa') aa = v; else oh = v;

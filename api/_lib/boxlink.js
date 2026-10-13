@@ -56,3 +56,12 @@ export function boxAuth() {
   const ts = String(Date.now());
   return { 'X-Jena-Auth': `${ts}.${crypto.createHmac('sha256', secret).update(ts).digest('hex')}` };
 }
+
+// Her voice only says what she really said: each line she speaks carries a token the site signed for exactly
+// that text, and /api/tts refuses anything else (nobody can make her voice say arbitrary words).
+export function ttsToken(text) {
+  const k = (process.env.JENA_DM_KEY || '').trim();
+  if (!k) return null;
+  const secret = crypto.createHash('sha256').update('jena-box-auth:' + k).digest('hex');
+  return crypto.createHmac('sha256', secret).update('tts:' + text).digest('hex').slice(0, 32);
+}

@@ -12,6 +12,7 @@ import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
 import { softRefresh } from './refresh.js';
+import { Voice } from './voice.js';
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -42,6 +43,10 @@ const avatar = new Avatar($('#avatar-canvas'), {
   }
   document.body.classList.add('avatar-ready');
 })();
+
+// her voice (Piper on her box) + lip-sync from the real audio
+const voice = new Voice(avatar, { obs: cfg.obs, button: $('#voice-btn') });
+$('#talk')?.addEventListener('submit', () => voice.unlock()); // sending a message counts as the click browsers need
 
 // speech bubble
 const bubble = $('#speech');
@@ -167,10 +172,11 @@ function runEvent(e, run, { privateRun = false } = {}) {
   else if (e.type === 'step') run.step(e.kind, e.text);
   else if (e.type === 'mood' || e.type === 'action') autonomy.fromBrain(e);
   else if (e.type === 'say') {
+    const raw = e;
     e = { ...e, text: tidy(e.text) };
     if (!privateRun) autonomy.onSay(e.text);
     if (privateRun) run.step('private', cfg.obs || !e.text ? 'replied privately' : `replied privately: “${e.text}”`);
-    else { run.step('say', e.text); say(e.text); }
+    else { run.step('say', e.text); say(e.text); voice.speak(raw.text, raw.voice); }
   }
   else if (e.type === 'done') run.done();
 }

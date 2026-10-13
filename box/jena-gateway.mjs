@@ -281,6 +281,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && /^\/jx0\/v1\/(chat\/)?completions$/.test(path)) return await brain(req, res, path, JX0, 'JenaXI-0');
     if (path.startsWith('/jx0/')) return await pass(req, res, JX0, req.url.slice(4));
+    if (path === '/tts' || path === '/voices') return await pass(req, res, E('TTS', 'http://127.0.0.1:8095'), req.url);   // her voice (Piper), signed requests only
     if (path === '/status') return sendJSON(res, 200, await status());
     if (path === '/brain/log') { const n = Math.min(+(new URLSearchParams(qs).get('n') || 20), 50); return sendJSON(res, 200, { stats: { ...stats, outsideRefused: authStats.refused, outsideRateLimited: authStats.limited }, log: ring.slice(-n) }); }
     if (path.startsWith('/box/') || path === '/websockify') return await pass(req, res, `http://${DESK_HOST}:${DESK_PORT}`, req.url);

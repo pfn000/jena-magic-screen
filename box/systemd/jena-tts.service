@@ -1,0 +1,13 @@
+[Unit]
+Description=Jena's voice: Piper TTS kept loaded (127.0.0.1:8095)
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+User=user
+WorkingDirectory=/home/user/tab/files/jena-voice
+ExecStart=/home/user/tab/files/jena-voice/venv/bin/python /home/user/tab/files/jena-voice/tts_server.py
+Environment=JENA_VOICE=hfc_female
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target

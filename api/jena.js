@@ -12,7 +12,7 @@
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
-import { boxLink, boxAuth, accept as acceptBox } from './_lib/boxlink.js';
+import { boxLink, boxAuth, ttsToken, accept as acceptBox } from './_lib/boxlink.js';
 import { multiSearch, hotUrls } from './_lib/search.js';
 
 function routeOf(req) {
@@ -109,6 +109,21 @@ async function jenaApi(req) {
     const r = await fetch(`${box.url}/japi/v1/${sub}`, { method: req.method, headers: { 'Content-Type': 'application/json', Authorization: req.headers.get('authorization') || '' }, body: req.method === 'POST' ? await req.text() : undefined, signal: AbortSignal.timeout(25000) });
     return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') || 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
   } catch (e) { return json({ error: { message: `her box did not answer: ${e.message}` } }, 502); }
+}
+
+// Her voice (Piper TTS on her box). Only for lines she really said (token signed by thinkEvents).
+async function tts(req) {
+  const u = new URL(req.url);
+  const text = (u.searchParams.get('text') || '').slice(0, 600), tok = u.searchParams.get('t') || '';
+  const want = ttsToken(text);
+  if (!text || !want || tok !== want) return json({ error: 'her voice only says what she actually said' }, 403);
+  const box = await boxLink();
+  if (!box) return json({ error: 'her box is offline, so her voice is too' }, 503);
+  try {
+    const r = await fetch(`${box.url}/tts?text=${encodeURIComponent(text.slice(0, 400))}&voice=${encodeURIComponent(u.searchParams.get('voice') || '')}`, { headers: boxAuth(), signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return json({ error: `her voice answered ${r.status}` }, 502);
+    return new Response(r.body, { status: 200, headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400', 'X-Jena-Voice': r.headers.get('x-jena-voice') || 'piper' } });
+  } catch (e) { return json({ error: `her voice did not answer: ${e.message}` }, 502); }
 }
 
 // Public, read-only list of the skills she has (names, what they do, how often they worked). No inputs/outputs.
@@ -281,6 +296,7 @@ async function handle(req) {
     if (route === 'deploys') return await deploys();
     if (route === 'skills') return await publicSkills();
     if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
+    if (route === 'tts') return await tts(req);
     if (route === 'v1') return await jenaApi(req);
     if (route === 'hot') { try { return json({ list: await hotUrls(), source: 'Hot URLS/URLS.md in her repo (read live)' }); } catch (e) { return json({ error: e.message }, 502); } }
     if (route === 'boxdo' && req.method === 'POST') return await boxDo(req);
