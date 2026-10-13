@@ -399,6 +399,7 @@ async function handle(req) {
   const route = routeOf(req);
   try {
     if (route === 'config') return json(await config());
+    if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
     if (route === 'box' && req.method === 'POST') { const p = acceptBox(await body(req)); if (p) checkHealth(); return p ? json({ ok: true, url: p.url }) : json({ error: 'bad signature' }, 401); }
     if (route === 'box') return await boxProxy(req);
     if (route === 'deploys') return await deploys();

@@ -1,11 +1,10 @@
 // Seamless auto-refresh: when a newer version of the site is live, wait for a quiet moment (nobody typing,
 // private drawer + dev panel closed, nothing queued, Jena not mid-sentence), save what's on screen (chat,
 // thought chain, scroll), reload, and put it all back. No interruption, no lost messages.
+import { startUpdates } from './updates.js';
 const KEY = 'jena.softReload';
 export function softRefresh({ obs = false } = {}) {
   restore(obs);
-  if (typeof __COMMIT__ === 'undefined' || !__COMMIT__) return; // local builds don't know their commit
-  let newer = null;
   const quiet = () => {
     const a = document.activeElement;
     if (a && /INPUT|TEXTAREA/.test(a.tagName) && a.value) return false;
@@ -19,23 +18,13 @@ export function softRefresh({ obs = false } = {}) {
     if (document.querySelector('#thoughts .run:not(.is-done):not(.self):not(.desk)')) return false; // she's mid-thought
     return true;
   };
-  const check = async () => {
-    const c = await fetch('/api/config', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-    const live = c?.build?.commit;
-    if (live && live !== __COMMIT__) newer = live;
-  };
-  setInterval(check, 60000);
-  setTimeout(check, 20000);
-  let calm = 0;
-  setInterval(() => {
-    if (!newer) return;
-    calm = quiet() ? calm + 1 : 0;
-    if (calm >= (document.hidden ? 1 : 8)) save(newer); // ~8 s of calm while watched, right away if the tab is hidden
-  }, 1000);
-  window.__jenaRefresh = { get pending() { return newer; }, quiet };
+  // the visible update banner (src/updates.js) owns noticing new versions and when to reload; this file keeps the
+  // chat/thoughts across that reload
+  startUpdates({ obs });
+  window.__jenaRefresh = { quiet, reloadTo: softReloadTo };
 }
 
-function save(to) {
+export function softReloadTo(to) {
   const g = (s) => document.querySelector(s);
   const snap = { at: Date.now(), to, chat: g('#chat-list')?.innerHTML, thoughts: g('#thoughts .thought-list')?.innerHTML,
     chatScroll: g('#chat-list')?.scrollTop, y: window.scrollY };
