@@ -191,17 +191,30 @@ async function boxProxy(req) {
   const box = await boxLink();
   if (!box) return json({ online: false, error: 'her box has not announced itself in the last 30 min (box or tunnel down)' }, 503);
   const what = new URL(req.url).searchParams.get('what') || 'status';
+  if (what === 'watch' && !checkKey(req).ok) return json({ online: true, locked: true, error: 'watchdog details are mama-only' }, 401);
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
   const q = new URL(req.url).searchParams;
   const th = `/box/thoughts?since=${Math.max(0, parseInt(q.get('since') || '0', 10) || 0)}&last=${Math.min(40, Math.max(1, parseInt(q.get('last') || '8', 10) || 8))}`;
-  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory', thoughts: th, library: '/box/studio/library' + (q.get('q') ? '?q=' + encodeURIComponent(q.get('q').slice(0, 200)) : ''), assets: '/box/studio/assets', edits: '/box/studio/edits' }[what] || '/status';
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory', thoughts: th, library: '/box/studio/library' + (q.get('q') ? '?q=' + encodeURIComponent(q.get('q').slice(0, 200)) : ''), assets: '/box/studio/assets', edits: '/box/studio/edits', watch: '/box/watch/health' }[what] || '/status';
   try {
-    const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
+    const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' || what === 'watch' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
     return json({ online: true, box: { url: box.url, announcedAt: box.ts, via: box.via }, data: d });
   } catch (e) {
     return json({ online: false, box: { url: box.url, announcedAt: box.ts }, error: `box announced but did not answer: ${e.message}` }, 502);
   }
+}
+
+// the page's watchdog reporter (src/watch.js): a tiny no-PII report to her box's watchdog (box/watchdog)
+async function incident(req) {
+  const box = await boxLink();
+  if (!box) return json({ ok: false, error: 'her box has not announced itself (box or tunnel down)' }, 503);
+  const b = await body(req), s = (v, n) => String(v ?? '').slice(0, n);
+  const pick = { kind: s(b.kind, 20), panel: s(b.panel, 20), count: +b.count || 0, window_s: +b.window_s || 0, msg: s(b.msg, 200), build: s(b.build, 12), view: s(b.view, 8), device: s(b.device, 8), rid: s(b.rid, 10) };
+  try {
+    const r = await fetch(box.url + '/box/incident', { method: 'POST', headers: { 'Content-Type': 'application/json', ...boxAuth() }, body: JSON.stringify(pick), signal: AbortSignal.timeout(6000) });
+    return json(await r.json(), r.status);
+  } catch (e) { return json({ ok: false, error: `box did not answer: ${e.message}` }, 502); }
 }
 
 // an asset she made on her box (svg/png), passed through so the dev panel gallery can show it
@@ -358,6 +371,7 @@ async function handle(req) {
     if (route === 'box' && req.method === 'POST') { const p = acceptBox(await body(req)); if (p) checkHealth(); return p ? json({ ok: true, url: p.url }) : json({ error: 'bad signature' }, 401); }
     if (route === 'box') return await boxProxy(req);
     if (route === 'deploys') return await deploys();
+    if (route === 'incident' && req.method === 'POST') return await incident(req);
     if (route === 'skills') return await publicSkills();
     if (route === 'mama' && req.method === 'POST') return await mamaDo(req);
     if (route === 'tts') return await tts(req);

@@ -1,0 +1,18 @@
+[Unit]
+Description=Jena watchdog (probes every Jena service, heals flaps: restart -> rollback to known-good -> degraded; records her behavior for Tab; door on 127.0.0.1:6087)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 -u /usr/local/lib/jena-watchdog/jena_watchdog.py run
+Restart=always
+RestartSec=10
+Nice=10
+IOSchedulingClass=idle
+CPUQuota=15%
+MemoryMax=150M
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=multi-user.target
