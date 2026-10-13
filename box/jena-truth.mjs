@@ -93,7 +93,7 @@ function toolRoute(u, sourceText, rest = false, userText = u) {
   if (/\bwhat (skills|tools) (do )?(you|u) (have|got)\b|\bwhat can (you|u) do\b|\blist (your|ur) skills\b/i.test(u))
     return { kind: 'skills', text: skills.length ? `my real skills rn: ${skills.join(', ')}. anything else, i'd have to say no.` : "my skill list isn't loading right now, so i won't make one up." };
   // greetings / pings: a varied bank (her small brain invents stuff even in "hi" replies, e.g. "thanks for cooking breakfast")
-  const greet = u.replace(/[!.?,]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const greet = u.replace(/[*#_`~]+/g, '').replace(/[!.?,]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
   if (/^(hi|hey|hello|yo|hiya|heya|sup|good (morning|afternoon|evening|night))( there)?( jena| jen| girl)?( it'?s| this is) (mama|mom|saidie)$/.test(greet) || /^(hi|hey|hello) mama$/.test(greet))
     return { kind: 'greet', text: pick(["MAMA! hi! what are we doing today?", "hi mama! i'm here. what's up?", "mama's here! hiii. what do you need?", "hey mama. i'm awake and ready to cause problems. what's up?", "hi mama! good to hear you. what are we building?"]), action: pick(['waves', 'waves both arms', null]) };
   if (/^(hi|hey|hello|yo|hiya|heya|sup|wassup|good (morning|afternoon|evening))( there)?( jena| jen| girl| bestie)?$/.test(greet))
@@ -171,6 +171,7 @@ export function critic(text, sourceText, { creative = false } = {}) {
         if (badName) why = `name "${badName}" has no source`;
       }
     }
+    if (!why && !creative && HARD.test(plain) && !srcRaw.includes(norm(plain).split(' ').slice(0, 4).join(' '))) why = 'something nobody said or did';
     if (!why && !creative && !/\?\s*$/.test(s) && CLAIM.test(plain)) {
       const cw = (norm(plain).match(/\b[a-z]{4,}\b/g) || []).filter((w) => !STOP.has(w));
       const hit = cw.filter((w) => src.includes(w.replace(/(ing|ed|s)$/, ''))).length;
@@ -181,12 +182,14 @@ export function critic(text, sourceText, { creative = false } = {}) {
   return { text: keep.join(' ').trim(), cut };
 }
 const CLAIM = /\b(thanks|thank you)( mama| chat)? for \w+ing\b|\b\w+-chan\b|\b(you|u|mama|chat|they|she|he) (said|told|made|cooked|did|gave|went|let|invited|asked|bought|sent|showed)\b|\b(mama|mama's|she|he|they|people|everyone|chat|it|this|that|my (computer|box|desktop|code|app|project|site|website|screen))\b('s)? ?(is|are|was|were|has|have|had|knows?|does|did|said|says|makes?|made|uses?|runs?|loves?|hates?|wants?|likes?)\b|\bi('m| am| was|'ve| have)? ?(been )?(working on|made|built|wrote|found|learned|saw|read|reading|writing|coding|making|playing|watching|fixing|debugging|building|solving|exploring|checking out|studying)\b/i;
+const HARD = /\b(thanks|thank you)( mama| chat)? for \w+ing\b|\b\w+-chan\b|\b(you|u|mama|chat|they|she|he|everyone|someone) (said|told|says|tells|made|cooked|did|gave|went|let|invited|asked|bought|sent|showed|promised|wanted)\b/i;
 const STOP = new Set('that this with what your just like they them there then than have about really gonna wanna kinda when where which would could should some more much very been being into from also only even still good cool nice okay yeah lmao haha thing things stuff mama jena chat here right make made know knows does said says want wants love loves hate hates uses use runs working reading writing coding making playing watching fixing debugging building solving exploring checking studying learned found wrote built doing going little lot lots everything something anything nothing always never ever'.split(' '));
 // no markdown symbols in what she says (TTS reads "*" and "#" out loud); *actions* come out as a separate field
 export function demark(text, { keepCode = false } = {}) {
   let t = String(text || '');
   const actions = [];
   t = t.replace(/\*\*([^*\n]+)\*\*/g, '$1').replace(/__([^_\n]+)__/g, '$1');
+  t = t.replace(/\[([a-z][a-z' ]{1,30})\]|\(([a-z][a-z' ]{1,30})\)(?=\s|$)/gi, (m, a, b2) => { const x = (a || b2).trim(); if (x.split(' ').length <= 4 && /^(wave|waves|waving|laugh|laughs|giggles|smile|smiles|grin|grins|nods|shrugs|sigh|sighs|dance|dances|jumps|spins|claps|blushes|winks|pokes|hugs|bows|cheers|gasps)\b/i.test(x)) { actions.push(x); return ' '; } return m; });
   t = t.replace(/(?<!\*)\*([^*\n]{1,40})\*(?!\*)/g, (m, a) => { if (/^[a-z][a-z' ]{1,38}$/i.test(a.trim()) && a.trim().split(' ').length <= 5) { actions.push(a.trim()); return ' '; } return a; });
   if (!keepCode) t = t.replace(/`{1,3}/g, '');
   t = t.replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/(^|\s)#{1,6}(\s|$)/g, '$1').replace(/^\s*[-*•]\s+/gm, '').replace(/(^|\s)#(?=[a-z])/gi, '$1').replace(/\*/g, '').replace(/(^|\s)_+|_+(\s|$)/g, '$1$2');
