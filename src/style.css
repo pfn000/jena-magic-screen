@@ -292,7 +292,7 @@ body.obs #body-views { display: none; }
 #devpanel .dp-t td,#devpanel .dp-t th{border-bottom:1px solid #2b2448;padding:4px 6px;vertical-align:top;text-align:left}
 #devpanel input{background:#0a0912;color:#e9e6f5;border:1px solid #4d4185;border-radius:6px;padding:4px 6px;font:inherit}
 
-#skills-pub{margin:6px 8px 4px;font-size:12px;color:#cfc6ea}
+#skills-pub{margin:6px 8px 4px;font-size:12px;color:#6b5b95}
 #skills-pub summary{cursor:pointer;opacity:.8}
 #skills-pub ul{margin:4px 0;padding-left:16px;max-height:160px;overflow:auto}
 #skills-pub li{margin:2px 0}
