@@ -10,6 +10,7 @@ import { Moves, rememberMove } from './moves.js';
 import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
+import { DevPanel, deployBar } from './devpanel.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -90,7 +91,10 @@ if (params.get('selfview') !== '0') {
   const wait = setInterval(() => { if (avatar.ready) { clearInterval(wait); startVision(); } }, 500);
 } else $('#self-eye')?.remove();
 
+// every brain run on this page, as it really happened (the dev panel reads these)
+const runs = [];
 function runEvent(e, run, { privateRun = false } = {}) {
+  if (run?._dev) run._dev.events.push(e);
   if (e.type === 'meta') { if (typeof e.online === 'boolean') chain.setHealth({ online: e.online }); }
   else if (e.type === 'status') run.step('status', e.text);
   else if (e.type === 'step') run.step(e.kind, e.text);
@@ -107,6 +111,8 @@ function runEvent(e, run, { privateRun = false } = {}) {
 let busy = Promise.resolve();
 function thinkAbout(input, { broadcast = true, thumb } = {}) {
   const run = chain.start({ ...input, thumb }); // the event itself shows up right away, e.g. "mama: hello"
+  run._dev = { at: Date.now(), trigger: { ...input }, events: [] };
+  runs.push(run._dev); if (runs.length > 30) runs.shift();
   busy = busy.then(async () => {
     const key = localStorage.getItem(KEY_STORE);
     const src = think(cfg.brainUrl, { ...input, origin: ORIGIN, broadcast }, broadcast ? key : null);
@@ -336,6 +342,12 @@ window.jena = {
 };
 // ?debug=1 only: lets a test harness trigger her own autonomy moves to check self-vision left/right
 if (params.get('debug') === '1') window.__jenaDebug = { autonomy, avatar, selfSense };
+
+// ---------------- secret developer panel (top-left corner x5) + deploy progress ----------------
+if (!cfg.obs) {
+  window.__jenaDev = new DevPanel({ getRuns: () => runs, avatar, cfg });
+  deployBar();
+}
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';

@@ -212,3 +212,37 @@ body.obs #build-stamp { display: none; }
 #self-eye figcaption { font-size: 10px; font-weight: 800; color: var(--ink-soft); background: var(--glass-strong); padding: 1px 6px; border-radius: 99px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #self-eye pre { margin: 0; font: 600 clamp(7.5px, .5vw, 9.5px)/1.32 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink-soft); background: var(--glass-strong); padding: 3px 5px; border-radius: 7px; white-space: pre; overflow: hidden; }
 #self-eye pre:empty { display: none; }
+
+/* ---------- secret developer panel ---------- */
+#devpanel{position:fixed;inset:12px;z-index:9999;background:rgba(14,12,22,.96);color:#e9e6f5;border:1px solid #6b5ca8;border-radius:14px;display:flex;flex-direction:column;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#devpanel[hidden]{display:none}
+#devpanel header{display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid #3a3160}
+#devpanel header b{font-size:15px}
+#devpanel .dp-sub{opacity:.6;flex:1}
+#devpanel button{background:#2a2346;color:#e9e6f5;border:1px solid #4d4185;border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit}
+#devpanel nav{display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid #3a3160}
+#devpanel nav button.on{background:#7b5cff;border-color:#7b5cff}
+#devpanel .dp-body{overflow:auto;padding:10px 16px 16px;flex:1}
+#devpanel h3{margin:14px 0 6px;font-size:13px;color:#c5b6ff;text-transform:uppercase;letter-spacing:.04em}
+#devpanel pre{white-space:pre-wrap;word-break:break-word;background:#0a0912;border:1px solid #2b2448;border-radius:8px;padding:8px;max-height:260px;overflow:auto}
+#devpanel code{background:#241e3d;border-radius:4px;padding:0 4px}
+#devpanel small{opacity:.65}
+#devpanel ol,#devpanel ul{padding-left:18px;margin:4px 0}
+#devpanel li{margin:4px 0}
+#devpanel .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+#devpanel .dot.ok{background:#3ddc84}#devpanel .dot.bad{background:#ff5d6c}
+#devpanel .dp-warn{color:#ffb4a8}
+#devpanel .dp-new{color:#9dffb0}
+#devpanel .dp-shot{width:100%;max-width:900px;border-radius:8px;border:1px solid #3a3160;display:block}
+#devpanel .dp-moves{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+#devpanel .dp-move{display:flex;flex-direction:column;gap:2px;color:inherit;text-decoration:none;background:#1b1630;border:1px solid #352c5c;border-radius:10px;padding:6px}
+#devpanel .dp-move img{width:100%;border-radius:6px;aspect-ratio:16/9;object-fit:cover}
+#devpanel .dp-foot{opacity:.5;margin-top:16px}
+.dp-progress,#deploy-bar .bar{height:4px;border-radius:2px;background:linear-gradient(90deg,transparent,#7b5cff,#ff7ad9,transparent);background-size:40% 100%;background-repeat:no-repeat;animation:dpslide 1.2s linear infinite}
+.dp-progress{background-color:#2a2346;margin:8px 0}
+@keyframes dpslide{from{background-position:-40% 0}to{background-position:140% 0}}
+#deploy-bar{position:fixed;left:0;right:0;top:0;z-index:9000;pointer-events:none}
+#deploy-bar[hidden]{display:none}
+#deploy-bar span{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(20,16,34,.85);color:#fff;font:12px system-ui;padding:3px 10px;border-radius:10px;pointer-events:auto;white-space:nowrap}
+#deploy-bar.done .bar{animation:none;background:#3ddc84}
+@media (max-width:700px){#devpanel{inset:0;border-radius:0;font-size:12px}}
