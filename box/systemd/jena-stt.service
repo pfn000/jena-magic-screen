@@ -4,7 +4,7 @@ After=network.target
 StartLimitIntervalSec=0
 [Service]
 User=jena
-Environment=HOME=/home/jena PYTHONUNBUFFERED=1 JENA_STT_MODEL=small OMP_NUM_THREADS=2
+Environment=HOME=/home/jena PYTHONUNBUFFERED=1 JENA_STT_MODEL=small OMP_NUM_THREADS=4
 WorkingDirectory=/home/jena
 ExecStart=/usr/local/bin/python3 /home/jena/.jena_stt.py
 Nice=5

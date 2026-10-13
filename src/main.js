@@ -375,7 +375,7 @@ else {
     button: micBtn,
     status: $('#mic-status'),
     gate: () => { if (localStorage.getItem(MIC_SEEN)) return true; micSheet(() => pubMic.start()); return false; },
-    onStart: () => voice.unlock(),
+    onStart: () => { voice.unlock(); if (!voice.on) { voice.on = true; localStorage.setItem('jena.voice', '1'); voice.paint(); } },   // you talk to her, she talks back
     params: () => ({ user: localStorage.getItem(KEY_STORE) ? 'mama' : 'guest', learn: micLearn() }),
     onText: (text) => {
       const input = $('#talk-input');

@@ -22,7 +22,7 @@ BAD = re.compile(r"\b(sex\w*|porn\w*|nude\w*|naked|nsfw|onlyfans|fetish\w*|eroti
 from faster_whisper import WhisperModel
 from faster_whisper.audio import decode_audio
 t0 = time.time()
-model = WhisperModel(MODEL, device='cpu', compute_type='int8', cpu_threads=2, num_workers=1)
+model = WhisperModel(MODEL, device='cpu', compute_type='int8', cpu_threads=4, num_workers=1)
 print(f'loaded whisper {MODEL} in {time.time() - t0:.1f}s', flush=True)
 busy = threading.Semaphore(1)
 waiting = [0]

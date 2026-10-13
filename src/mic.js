@@ -25,6 +25,7 @@ export class Mic {
       downAt = Date.now();
       if (this.state === 'idle') { if (!this.gate || this.gate()) this.start(); }
       else if (this.state === 'rec') this.stop(true);
+      else if (this.state === 'asking') this.pendingStop = true;   // tapped again before the mic opened: send as soon as it's recording
     });
     button.addEventListener('pointerup', () => {
       // held for a while = push-to-talk: letting go sends it
@@ -40,7 +41,7 @@ export class Mic {
   }
 
   async start() {
-    this.state = 'asking';
+    this.state = 'asking'; this.pendingStop = false;
     this.onStart?.();
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
@@ -65,6 +66,7 @@ export class Mic {
       this.timer = setTimeout(tick, 250);
     };
     tick();
+    if (this.pendingStop) { this.pendingStop = false; setTimeout(() => this.stop(true), 1200); }
   }
 
   stop(send) {
