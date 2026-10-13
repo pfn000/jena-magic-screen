@@ -148,7 +148,9 @@ async function brain(req, res, url, base, modelName) {
 
 async function pass(req, res, target, path) {
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
-  const r = await fetch(target + path, { method: req.method, headers: { 'Content-Type': req.headers['content-type'] || 'application/json' }, body, signal: AbortSignal.timeout(30000) });
+  const hdr = { 'Content-Type': req.headers['content-type'] || 'application/json' };
+  if (req.headers['x-jena-key']) hdr['X-Jena-Key'] = req.headers['x-jena-key'];   // mama-only doors on her desktop agent check it
+  const r = await fetch(target + path, { method: req.method, headers: hdr, body, signal: AbortSignal.timeout(30000) });
   const buf = Buffer.from(await r.arrayBuffer());
   res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/octet-stream', 'Cache-Control': 'no-store', ...cors });
   res.end(buf);
