@@ -90,7 +90,7 @@ async function mamaDo(req) {
   const box = await boxLink();
   if (!box) return json({ error: 'her box is offline' }, 503);
   const b = await body(req);
-  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live' }[b.action];
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live', signin: 'signin' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
   if (action === 'signin') {   // Jena's asks: sign-in requests (private window on her box) + approve/deny; box re-checks the passcode
     const op = ['list', 'request', 'start', 'done', 'cancel', 'answer'].includes(b.op) ? b.op : null;
