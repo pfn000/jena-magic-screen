@@ -32,6 +32,8 @@ SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
 HOME = os.path.expanduser('~')
 STATE = os.path.join(HOME, '.jena')
 os.makedirs(STATE, exist_ok=True)
+try: os.chmod(STATE, 0o700)
+except Exception: pass
 ENV = dict(os.environ, DISPLAY=DISPLAY, HOME=HOME)
 
 BAD = re.compile(r"\b(sex\w*|porn\w*|nude\w*|naked|nsfw|onlyfans|fetish\w*|erotic\w*|hentai|xxx|boob\w*|horny|kiss\w*|"
@@ -161,7 +163,16 @@ def screen_size():
     m = re.search(r'dimensions:\s+(\d+)x(\d+)', sh(['xdpyinfo']))
     return (int(m.group(1)), int(m.group(2))) if m else (1600, 704)
 
-def firefox(url):
+NEW_TAB_WORDS = re.compile(r'\b(in |into )?(a )?new (tab|window)\b', re.I)
+def wants_new_tab(text):
+    return bool(NEW_TAB_WORDS.search(text or ''))
+
+tabs_opened = {'n': 0}   # tabs she opened on top of the first one (hard cap below); the site reuses the current tab otherwise
+MAX_EXTRA_TABS = 2
+
+def firefox(url, new_tab=False):
+    """open url in her Firefox. ALWAYS the current tab (focus, Ctrl+L, type, Enter) unless new_tab=True, which only
+    mama's own words ('open X in a new tab' / 'new window') set; and at most MAX_EXTRA_TABS extra tabs ever."""
     if hands_blocked(): return None     # mama is driving, or her Firefox profile is busy in the private sign-in window
     wid = find('firefox')
     W, H = screen_size()
@@ -169,6 +180,7 @@ def firefox(url):
     if not wid:
         spawn(['firefox-esr', '--new-instance', '--profile', os.path.join(HOME, '.ffprofile'), '--width', str(fw), '--height', str(fh), url])
         wid = wait_for('firefox', 40)
+        tabs_opened['n'] = 0
         if wid:
             time.sleep(4)
             sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{W - fw - 20},8,{fw},{fh}'])
@@ -179,6 +191,11 @@ def firefox(url):
                 pass
         return wid
     focus(wid)
+    if new_tab:
+        if tabs_opened['n'] >= MAX_EXTRA_TABS:
+            did(f'already have {MAX_EXTRA_TABS} extra tabs open, so I am reusing this one instead of a new one')
+        else:
+            key('ctrl+t'); time.sleep(0.6); tabs_opened['n'] += 1
     key('ctrl+l'); time.sleep(0.3)
     type_(url + '\n', delay=35)
     return wid
@@ -493,6 +510,7 @@ skills.desktop_skills['ask_grok'] = skill_ask_grok
 # Mama signs in once (private sign-in window). Jena only READS the inbox list: sender, subject, time, and whether a mail looks
 # like a verification code. She never sends mail. Bodies, addresses and code digits never go to the public site or her thought
 # chain (there it is only "got a code from X ✔"); the details go to mama's activity log (passcode, dev panel).
+email_private = {'ts': 0, 'messages': []}     # only in RAM, mama-only retrieval, expires after 5 minutes
 MAIL_URL = 'https://mail.proton.me/u/0/inbox'
 MAIL_CHROME = re.compile(r'^(inbox|drafts|sent|starred|archive|spam|trash|all mail|folders|labels|more|less|settings|new message|search messages|'
                          r'search|upgrade|proton mail|mail|calendar|drive|vpn|pass|wallet|unread|select all|refresh|jena|\d+ ?(messages?|unread)?|'
@@ -540,11 +558,12 @@ def skill_check_my_email(inp):
             code = CODE_DIGITS.search(subject).group(1) if is_code else None
             msgs.append({'from': sender[:80], 'subject': subject, 'when': when, 'code': code})
         codes = [m for m in msgs if m['code']]
+        email_private.update({'ts': time.time(), 'messages': msgs})
         for m in msgs[:12]:
-            log_activity('email', f"{m['from']} — {m['subject']} ({m['when']})", 'inbox list, read only')
+            log_activity('email', mask_text(f"{m['from']} — {m['subject']} ({m['when']})"), 'inbox metadata, read only')
         for m in codes:
-            log_activity('email_code', f"code from {m['from']}: {m['code']}", 'verification code (only here, never on the site)')
-        public = f'checked my inbox: {len(msgs)} message{"s" if len(msgs) != 1 else ""} in the list' + (', got a code from ' + ', '.join(sorted({m['from'] for m in codes})) + ' ✔' if codes else '') + ' — details are in mama\'s log'
+            log_activity('email_code', 'verification code detected', 'value kept in private result only')
+        public = f'checked my inbox: {len(msgs)} message{"s" if len(msgs) != 1 else ""} in the list' + (', got a code from ' + ', '.join(sorted({mask_text(m['from']) for m in codes})) + ' ✔' if codes else '') + ' — details are in mama\'s log'
         did(public, 'skill')
         return {'ok': True, 'summary': public, 'messages_seen': len(msgs), 'codes_seen': len(codes), 'note': 'senders, subjects and any code digits are in mama\'s activity log only', 'raw_lines': len(lines)}
     except HandsPaused:
@@ -800,7 +819,7 @@ def hands():
                 tidy_private_pages()
             if ev and ev.get('show_url'):
                 log_activity('open', ev['show_url'], ev.get('why', ''))
-                firefox(ev['show_url']); time.sleep(3); scroll_some()
+                firefox(ev['show_url'], new_tab=wants_new_tab(str(ev.get('why', '')) + ' ' + str(ev.get('text', '')))); time.sleep(3); scroll_some()
             elif ev and ev.get('skill'):
                 use_skill(ev['skill'], ev.get('text', ''))
             elif ev:
@@ -812,7 +831,7 @@ def hands():
                 elif u:
                     did(f'{ev.get("user") or "someone"} sent me a link, opening exactly {u[:90]}')
                     log_activity('open', u, f'{ev.get("user") or "someone"} sent the link')
-                    firefox(u); time.sleep(4); scroll_some()
+                    firefox(u, new_tab=wants_new_tab(text)); time.sleep(4); scroll_some()
                 elif re.search(r'\b(video|watch|dance|dancing|move|moves)\b', text, re.I) and my_videos():
                     dances = [v for v in my_videos() if re.search(r'dance|macarena|zumba|jerusalema', (v[1] + ' ' + v[2]), re.I)]
                     act_watch(random.choice(dances) if dances and re.search(r'danc', text, re.I) else None)
@@ -962,7 +981,7 @@ def _signin_ended(site, result):
     with input_gate: private_session = False
     set_private_reason('signin', False)
     after_private['tidy'] = True
-    did(f'sign-in window for {site} closed ({result})', 'help')
+    did(f'sign-in window for {site} closed', 'help')
 
 if jena_signin is not None:
     try: signin = jena_signin.SignIn(home=HOME, on_start=_signin_started, on_end=_signin_ended, log=log_activity)
@@ -1156,6 +1175,9 @@ async def mama_door(p, method, body):
         res = await loop.run_in_executor(None, skills.create, str(b.get('name', '')), str(b.get('goal', ''))[:500])
         did(f'drafted a new skill "{res["name"]}": {res["status"]}', 'skill')
         return 200, json.dumps(res).encode()
+    if p == '/box/mama/email/result':
+        fresh = time.time() - email_private['ts'] < 300
+        return 200, json.dumps({'ok': True, 'messages': email_private['messages'] if fresh else [], 'expired': not fresh}).encode()
     if p == '/box/activity':
         try: lines = open(ACT).read().strip().splitlines()[-200:]
         except Exception: lines = []
@@ -1260,19 +1282,8 @@ async def client(reader, writer):
             writer.write(b'HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         await signin.ws_proxy(reader, writer, head); return
     if p.startswith('/websockify'):
-        if CENSOR is not None:   # no raw public stream any more: the public sees censored frames (/box/shot.jpg) only
-            writer.write(b'HTTP/1.1 410 Gone\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
-        if private_now():   # private while mama drives / signs in; the page's viewer retries by itself afterwards
-            writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
-        try:
-            ur, uw = await asyncio.open_connection(*WS_UPSTREAM)
-        except Exception:
-            writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
-        uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
-        public_viewers.add(writer)
-        try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
-        finally: public_viewers.discard(writer)
-        return
+        # PUBLIC RAW VNC IS GONE. Even if the censor is missing or crashed, no bytes of a raw frame may leave here.
+        writer.write(b'HTTP/1.1 410 Gone\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
     hdrs = {}
     for l in head.decode('latin1').split('\r\n')[1:]:
         if ':' in l:
@@ -1293,15 +1304,13 @@ async def client(reader, writer):
                 if isinstance(extra_h, dict): extra = extra_h
             except Exception as e:
                 status, out = 503, json.dumps({'error': 'censor: ' + str(e)[:80]}).encode()
-        elif private_now(): status, out = 403, b'{"error":"private moment"}'
-        else: ctype, out = 'image/jpeg', shot_jpg
+        else: status, out = 503, b'{"error":"censor unavailable; public screen locked"}'
     elif p == '/box/censor.json':
         try: out = (CENSOR.status_json() if CENSOR is not None else json.dumps({'state': 'off', 'reason': 'censor module not loaded; public stream is private-gated only'}))
         except Exception as e: out = json.dumps({'state': 'error', 'reason': str(e)[:80]})
         if isinstance(out, str): out = out.encode()
     elif p in ('/box/desktop.json', '/box', '/box/'):
-        if CENSOR is not None: out = json.dumps({'websockify': None, 'mode': 'censored', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg', 'censor': '/box/censor.json'}).encode()
-        else: out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
+        out = json.dumps({'websockify': None, 'mode': 'censored', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg', 'censor': '/box/censor.json'}).encode()
     elif p == '/box/thoughts':
         qs_ = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
         try: since = int(qs_.get('since', ['0'])[0]); last = int(qs_.get('last', ['8'])[0])
