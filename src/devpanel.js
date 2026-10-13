@@ -2,6 +2,7 @@
 // Everything here is read live from the real sources: the site's API, her box (through its tunnel),
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
+import { renderSecurity, handleSecurityClick } from './mamasec.js';
 import RFB from '@novnc/novnc';
 import { asks, startAsks, renderAsks, handleAskClick, pendingCount } from './signin.js';
 // styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
@@ -27,7 +28,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><a href="/tab-live" target="_blank" rel="noopener" style="margin-left:auto;margin-right:8px;font-size:12px;color:#3ddc84;text-decoration:none;border:1px solid #1f5f3a;border-radius:999px;padding:1px 8px">🖥 Tab Live</a><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['asks', 'live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)' }[t]}</button>`).join('')}</nav>
+      <nav>${['asks', 'live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -47,6 +48,7 @@ export class DevPanel {
     this.body.addEventListener('keydown', (e) => { if (e.target.id === 'dp-lib-q' && e.key === 'Enter') this.body.querySelector('[data-libsearch]')?.click(); });
     this.body.addEventListener('click', async (e) => {
       if (await handleAskClick(e, () => this.render())) return;
+      if (this.tab === 'security' && (await handleSecurityClick(e, () => this.render()))) return;
       const key = localStorage.getItem('jena.dmKey');
       const out = this.body.querySelector('#dp-skill-out');
       const post = async (b) => { const r = await fetch('/api/boxdo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key || '' }, body: JSON.stringify(b) }); return r.json(); };
@@ -136,7 +138,7 @@ export class DevPanel {
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
     if (moves && !moves.error) this.data.moves = moves;
     this.data.at = Date.now();
-    if (!this.el.hidden && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
+    if (!this.el.hidden && this.tab !== 'security' && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
   }
   render() {
     const d = this.data, box = d.box?.data, live = box && d.box.online;
@@ -187,6 +189,7 @@ export class DevPanel {
           <h3>MCP servers on her box ${s.mcp_checked_at ? '(checked ' + ago(s.mcp_checked_at) + ')' : '(not checked yet)'}</h3><ul>${Object.entries(s.mcp || {}).map(([n, m]) => `<li>${okDot(m.connected)}<b>${esc(n)}</b> — ${esc(m.what || '')}${m.tools ? `<br><small>tools: ${m.tools.map((t) => (t.allowed === false ? `<s title="blocked for Jena">${esc(t.name)}</s>` : esc(t.name))).join(', ')}${m.allow ? ' <i>(struck out = blocked for her)</i>' : ''}</small>` : `<br><small>${esc(m.error || '')}</small>`}</li>`).join('') || '<li>no MCP check yet</li>'}</ul>`;
       }
     }
+    if (this.tab === 'security') h += renderSecurity();
     if (this.tab === 'mama') {
       const a = this.data.activity?.data;
       if (this.data.activity?.locked) h += `<p class="dp-warn">${esc(this.data.activity.error)}</p>`;

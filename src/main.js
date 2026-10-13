@@ -1,5 +1,6 @@
 import './style.css';
 import './mobile.css';
+import './trust.js';   // mama's trusted device: one unlock, then no passcode prompts (only for step-ups)
 import { loadConfig } from './config.js';
 import { Avatar } from './avatar.js';
 import { Desktop } from './desktop.js';

@@ -4,7 +4,7 @@
   const app = document.getElementById('app');
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const KEY = 'jena.dmKey';
-  let skew = 0, last = null, lastOk = 0, fails = 0, timer = null;
+  let skew = 0, last = null, lastOk = 0, fails = 0, timer = null, trustTried = false;
   const age = (iso) => { if (!iso) return null; return Math.max(0, (Date.now() - skew - Date.parse(iso)) / 1000); };
   const dur = (s) => { if (s == null) return '–'; s = Math.round(s); if (s < 60) return s + 's'; if (s < 3600) return Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : ''); return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm'; };
   const ago = (iso) => { const a = age(iso); return a == null ? '–' : dur(a) + ' ago'; };
@@ -43,7 +43,7 @@
     clearTimeout(timer);
     app.innerHTML = `<div class="lock"><b style="letter-spacing:.14em;color:var(--g)">TAB LIVE</b><p class="sub">what Tab is building for you, live. mama only.</p>
       <input id="pc" type="password" autocomplete="current-password" placeholder="dev passcode"><button class="btn" id="go">unlock</button><p class="sub" id="lm">${esc(msg || '')}</p></div>`;
-    const go = () => { const v = app.querySelector('#pc').value.trim(); if (!v) return; localStorage.setItem(KEY, v); poll(); };
+    const go = () => { const v = app.querySelector('#pc').value.trim(); if (!v) return; localStorage.setItem(KEY, v); trustTried = false; poll(); };
     app.querySelector('#go').onclick = go; app.querySelector('#pc').onkeydown = (e) => { if (e.key === 'Enter') go(); };
   }
 
@@ -132,7 +132,13 @@
   }
   async function poll() {
     clearTimeout(timer);
-    const key = localStorage.getItem(KEY);
+    let key = localStorage.getItem(KEY);
+    // mama's trusted device (one unlock, a year of no prompts): restore it from the cookie, or turn a typed passcode into it
+    if ((!key || !key.startsWith('jmt1.')) && !trustTried) {
+      trustTried = true;
+      const d = await fetch('/api/trust', key ? { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key }, body: JSON.stringify({ action: 'issue', label: 'Tab Live' }) } : { credentials: 'same-origin', cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+      if (d?.token) { localStorage.setItem(KEY, d.token); key = d.token; }
+    }
     if (!key) return lock();
     try {
       const t0 = Date.now();

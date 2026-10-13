@@ -1407,10 +1407,31 @@ async def pipe(r, w):
         except Exception: pass
 
 API_KEY = os.path.join(STATE, 'api_key')
+_MAMASEC = {'mod': None, 'mtime': 0}
+def _mamasec():
+    """import jena_mamasec, reloading it whenever its file changes (no desk restart for security-door updates)"""
+    import importlib
+    try:
+        fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jena_mamasec.py')
+        mt = os.path.getmtime(fp)
+        if _MAMASEC['mod'] is None:
+            import jena_mamasec; _MAMASEC['mod'] = jena_mamasec
+        elif mt != _MAMASEC['mtime']:
+            _MAMASEC['mod'] = importlib.reload(_MAMASEC['mod'])
+        _MAMASEC['mtime'] = mt
+    except Exception:
+        pass
+    return _MAMASEC['mod']
+
 async def mama_door(p, method, body):
     loop = asyncio.get_running_loop()
     try: b = json.loads(body or b'{}')
     except Exception: b = {}
+    if p.startswith('/box/mama/sec/'):   # mama's trusted devices, passkeys, Accounts vault, GitHub sign-in (jena_mamasec.py, hot-reloaded)
+        mod = _mamasec()
+        if mod is None: return 503, json.dumps({'ok': False, 'summary': 'the security module is not on my box yet'}).encode()
+        st, out = await loop.run_in_executor(None, mod.door, p, b)
+        return st, json.dumps(out).encode()
     if p == '/box/skills/run':
         name = str(b.get('name', '')); spec = skills.load().get(name, {})
         if spec.get('kind') == 'desktop':

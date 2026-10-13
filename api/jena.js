@@ -15,6 +15,8 @@ import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.j
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
 import { boxLink, boxAuth, ttsToken, accept as acceptBox, relayBox } from './_lib/boxlink.js';
 import { multiSearch, hotUrls } from './_lib/search.js';
+import { elevate, issue, verify, isPasscode, setCookie, clearCookie, noteDevice, mamaAuth } from './_lib/mama.js';
+import { intent as sayIntent, MAMA_ONLY } from '../box/jena-intent.mjs';
 
 function routeOf(req) {
   const u = new URL(req.url);
@@ -284,6 +286,10 @@ async function think(req) {
     attachment: b.attachment ? { name: clip(b.attachment.name, 120), type: clip(b.attachment.type, 80), size: +b.attachment.size || 0 } : undefined,
   };
   input.mama = keyed && input.source !== 'twitch' && input.user === 'mama';
+  // the public/stream side tried a mama-only command: her gateway refuses it as always, and the page that sent it
+  // shows mama's passcode prompt (X-Jena-Step-Up: mama_only) so mama can approve it on purpose
+  let stepUp = null;
+  if (!input.mama && input.message) { try { const it = sayIntent(input.message, {}); if (it && it.confidence >= 0.8 && MAMA_ONLY.has(it.action) && it.action !== 'stop' && it.action !== 'instead') stepUp = it.action; } catch {} }
   if (input.mama && /^\s*(?:hail\s*\||~!!)/i.test(input.message || '')) {   // NCOM_Sys: to Tab, never to her brain/desktop/memory/broadcast
     const bx = await boxLink().catch(() => null);
     const r = bx ? await fetch(`${bx.url}/box/ncom/in`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message }), signal: AbortSignal.timeout(8000) }).then((x) => x.json()).catch(() => null) : null;
@@ -333,7 +339,7 @@ async function think(req) {
       ctrl.close();
     },
   });
-  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Jena-Brain': brainName() } });
+  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Jena-Brain': brainName(), ...(stepUp ? { 'X-Jena-Step-Up': 'mama_only', 'X-Jena-Step-Up-Action': stepUp, 'Access-Control-Expose-Headers': 'X-Jena-Step-Up, X-Jena-Step-Up-Action' } : {}) } });
 }
 
 async function chat(req) {
@@ -410,10 +416,46 @@ async function announceDesktop(req) {
   return json({ ok: true, url, stores: backends() });
 }
 
+// mama's trusted devices (api/_lib/mama.js). GET: is this device trusted? POST {action:'issue'} with the passcode
+// (once) -> a 1-year token as an HttpOnly cookie + in the answer (localStorage fallback). {action:'forget'} revokes it.
+async function trust(req) {
+  const a = req.mamaAuth || (await mamaAuth(req));
+  const pub = (p) => ({ device: p.d, label: p.l, since: p.iat * 1000, expires: p.exp * 1000, via: p.via });
+  if (req.method !== 'POST') {
+    if (a.via === 'device') return json({ trusted: true, ...pub(a.device), ...(a.fromCookie ? { token: a.token } : {}) });
+    return json({ trusted: false, passcode: a.via === 'passcode', revoked: !!a.revoked, enabled: !!process.env.JENA_DM_KEY });
+  }
+  const b = await body(req);
+  const action = clip(b.action, 20) || 'issue';
+  if (action === 'issue') {
+    const viaPass = a.via === 'passcode' || isPasscode(String(b.passcode || ''));
+    if (!viaPass && a.via !== 'device') return json({ ok: false, error: 'wrong passcode' }, 401);
+    const t = issue(clip(b.label, 40), viaPass ? 'passcode' : 'refresh');
+    if (!t) return json({ ok: false, error: 'JENA_DM_KEY is not set on this deployment' }, 500);
+    noteDevice(t, 'add');
+    return json({ ok: true, token: t.token, ...pub(t) }, 200, { 'Set-Cookie': setCookie(t.token) });
+  }
+  if (action === 'forget') {
+    const p = a.via === 'device' ? a.device : verify(String(b.token || ''));
+    if (p) await noteDevice(p, 'revoke');
+    return json({ ok: true, forgotten: p ? p.d : null }, 200, { 'Set-Cookie': clearCookie() });
+  }
+  if (action === 'devices') {
+    if (!a.via) return json({ ok: false, error: 'mama only' }, 401);
+    const bx = await boxLink().catch(() => null);
+    const r = bx ? await fetch(`${bx.url}/box/mama/sec/trust`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify({ op: 'list' }), signal: AbortSignal.timeout(6000) }).then((x) => x.json()).catch(() => null) : null;
+    return json({ ok: !!r, devices: r?.devices || [], revoked: (r?.revoked || []).length, me: a.device?.d || null });
+  }
+  return json({ ok: false, error: 'unknown action' }, 400);
+}
+
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
   const route = routeOf(req);
   try {
+    const stepUp = await elevate(req, route);   // a trusted mama device -> the real key on this request (or a step-up)
+    if (stepUp) return stepUp;
+    if (route === 'trust') return await trust(req);
     if (route === 'config') return json(await config());
     if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
     if (route === 'box' && req.method === 'POST') { const env = await body(req), p = acceptBox(env); if (p) checkHealth(); const relay = p ? await relayBox(env, p) : null; return p ? json({ ok: true, url: p.url, relay }) : json({ error: 'bad signature' }, 401); }

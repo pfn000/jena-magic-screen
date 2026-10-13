@@ -2,6 +2,7 @@
 // by the tab-live service on the box). The passcode is checked here and again on the box.
 import { json, cors, checkKey } from './_lib/http.js';
 import { boxLink, boxAuth } from './_lib/boxlink.js';
+import { elevate } from './_lib/mama.js';
 
 // This function runs on its own instances, which may not have heard the box's announcement (the main api function
 // gets the box's direct POST). So also ask our own /api/config, and keep the last address that worked.
@@ -27,6 +28,8 @@ async function pass(req, box) {
 
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
+  const stepUp = await elevate(req, 'tablive');   // mama's trusted device: no passcode needed (api/_lib/mama.js)
+  if (stepUp) return stepUp;
   const k = checkKey(req);
   if (!k.ok) return json({ error: 'mama only: ' + k.why }, 401);
   const box = (await boxLink()) || (await viaConfig(req));
