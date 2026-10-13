@@ -1,0 +1,38 @@
+# Heavy build on GitHub's machines (free for this repo): builds Jena's whole box image from
+# Dockerfile.template and publishes it to GitHub Container Registry as ghcr.io/pfn000/jena-box.
+name: heavy-build (jena box image)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['Dockerfile.template', 'box/**', 'skills/**', '.github/workflows/heavy-build.yml']
+permissions:
+  contents: read
+  packages: write
+concurrency: { group: heavy-build, cancel-in-progress: true }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.template
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/jena-box:latest
+            ghcr.io/${{ github.repository_owner }}/jena-box:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: smoke test (the image starts; her gateway + desktop agent answer; no models are mounted here)
+        run: |
+          docker run -d --name jb -p 8088:8088 ghcr.io/${{ github.repository_owner }}/jena-box:${{ github.sha }}
+          ok=0; for i in $(seq 1 40); do if curl -fs http://127.0.0.1:8088/box/health; then ok=1; break; fi; sleep 4; done
+          docker exec jb supervisorctl status || true
+          docker logs jb 2>&1 | tail -40
+          test "$ok" = 1
