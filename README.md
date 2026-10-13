@@ -6,13 +6,44 @@ phone) and as an **OBS browser source** at 1920×1080.
 
 Jena = the character (one n). JenaXI = her own model.
 
-Nothing on this page is fake, simulated or borrowed: no demo chat, no made-up thoughts, no outside AI.
+Nothing on this page is fake, simulated or borrowed: no demo chat, no made-up thoughts. The only outside AI is Grok, used through her `ask_grok` skill, and its answers are always labelled as Grok's.
+
+## Built overnight, Oct 13 2026 (all live, all real)
+
+![Jena on her stage, lit like her room](docs/screenshots/stage-lighting.jpg)
+
+| | What it is | How to see it |
+|---|---|---|
+| **Skills + MCP** | `skills/<name>/skill.json` + `run.py`, pulled onto her box every 10 min: `ask_grok`, `explore_my_box`, `web_search`, `github_repos`, `fetch_page`, `my_files`, `repo_history`, `env_probe`, `update_my_packages`, plus skills she drafts herself. Her box runs an MCP client with three official servers: fetch, filesystem (sandboxed to her home by the server) and git (read tools only; commit/add/reset/checkout are blocked). A chat message that matches a skill runs it **first**. Her brain answers from what it really found, and her screen opens the real result. | Thought chain shows `using skill: X → result`. Public list: "Jena's skills" under the thought chain. Dev panel → **Skills + MCP** (run buttons, skill creator). |
+| **Skill creator** | She drafts a skill's code with her own brain (3 tries, each failure fed back). It is enabled only if it compiles **and** its own test run on her box returns ok. Her small brain usually fails this today, and the panel says why. | Dev panel → Skills + MCP → "Teach her a new skill" (mama passcode) |
+| **ask_grok** | Opens grok.com (from her hot-URL list) in her desktop Firefox and types the question. Answers are labelled as Grok's and saved to `~/learned/grok_notes.jsonl` (the Kaggle training picks that up). If grok.com asks for sign-in, she says so and asks mama; she never signs in by herself. | Thought chain / dev panel Mama tab |
+| **Never a made-up link** | Any link in her reply that didn't come from her skill or your message is removed, and the chain says so. | Thought chain: "removed 1 link she made up" |
+| **Lighting** | Matched to her room: lavender/warm bounce, bedside lamp (viewer's left), sunset window behind her as a back light, twinkling fairy lights, bunny night-light. `?light=flat` shows the old lights. | ![before/after](docs/screenshots/lighting-before-after.jpg) |
+| **Voice + lip-sync** | Piper (free, local, open-source neural TTS) on her box, ~0.5 s a line. Her mouth is driven by the real audio (loudness → open, low band → "oh"). Her voice only says lines she actually said: each line carries a signed token, so `/api/tts` refuses any other text. | 🔊 button bottom-right (browsers need a tap); OBS plays it |
+| **Memory service** | `~/memory/memories.jsonl` on her box. "remember …", names, favorites and likes are saved, recalled before she answers, and listed in full. | Chain: "saved to my memory" / "remembered"; dev panel → Memories |
+| **Desktop = thought chain** | Everything her desktop agent does streams into the site's thought chain ("her desktop" cards). | Thought chain |
+| **Terminal self-discovery** | `explore_my_box`: she runs a fixed list of read-only commands in her visible terminal and writes what she found to `notes/my_box.md`. | ![terminal](docs/screenshots/explore-terminal.jpg) |
+| **Hot modules** | `update_my_packages`: she updates her own pip/npm packages, restarts and re-checks her MCP servers, and hot-reloads her skills module from her repo with no restart. A small "⟳ updating…" flag shows meanwhile. Runs daily by itself. | Desktop panel flag |
+| **Parental log** | Every search, page, video and link she opens, with why. Suspicious words are flagged. Her help requests show here too. Mama passcode only, checked on the site **and** on her box. | ![mama tab](docs/screenshots/dev-mama.jpg) |
+| **Mama on her desktop** | Mama's DMs pop up on Jena's own screen; while they're up, the desktop panel is covered for everyone else and on OBS. **Take over her desktop**: full mouse + keyboard through a one-time 60 s token, while her hands pause. | ![takeover](docs/screenshots/takeover.jpg) |
+| **Jena's API** | OpenAI-compatible: `POST https://jena-magic-screen.vercel.app/api/v1/chat/completions` and `GET /api/v1/models` with `Authorization: Bearer jena-…`. The key lives only on her box (stored as a sha256) and is shown only to mama in the dev panel. | Dev panel → Mama → "her API key" |
+| **Locked brain** | Her box's raw brain/status/log endpoints refuse anything that isn't signed by her site (short-lived HMAC derived from `JENA_DM_KEY`), with a per-IP rate limit. If you change `JENA_DM_KEY`, update `auth.secret` on the box too. | `curl <tunnel>/v1/models` → 401 |
+| **Dual tracking** | The BODY panel shows MediaPipe's view of her rendered video (yellow) over her real 3D rig, and how far apart they are ("rig↔video 3% apart"). | ![dual](docs/screenshots/dual-tracking.jpg) |
+| **Room colliders** | Floor (her rug), the wall behind her and the stage edges keep her elbows, wrists, fingers and hips inside. Her room picture has no chair, so there is no chair collider. | BODY readout: "room: wall 46cm behind…" |
+| **Multi-model routing** | Per message: skill + memory run side by side → JenaXI-chat answers, JenaXI-0 is the backup, and Grok is used only through ask_grok (labelled). Her desktop hands keep working while she chats. | Chain: "routing: …" |
+| **Seamless auto-refresh** | A new version swaps in by itself at a quiet moment (nobody typing, nothing queued, she's not mid-sentence), keeping chat + thought chain. | Toast: "updated · nothing lost" |
+| **Docker + heavy build** | `Dockerfile.template` = her whole box in one image (llama.cpp built from source, gateway, Piper, desktop, VNC, her agent). `.github/workflows/heavy-build.yml` builds it on GitHub's machines → `ghcr.io/pfn000/jena-box`. Models are mounted at `/models`, not baked in. | Actions tab |
+
+Phone: ![phone](docs/screenshots/phone.jpg)
+
+**Not done yet (honest):** VRChat/SteamVR OSC bridge (needs her PC + headset); wardrobe; `.vrma` playback (the only file, `ANIMATIONS/dance.vrma`, is 1 byte); grok.com answers need mama to sign grok.com in once on Jena's desktop (use "take over"); her skill creator works, but her 0.5B brain can't write valid code yet.
+
 
 ## What's real
 
 | Panel | Source |
 |---|---|
-| Avatar | Her VRM rendered live with three.js + @pixiv/three-vrm: breathing, blinking, eye saccades, expressions, lip flap. |
+| Avatar | Her VRM rendered live with three.js + @pixiv/three-vrm: breathing, blinking, eye saccades, expressions, lip-sync from her real voice (random lip flap only when there's no audio). |
 | Her body is HERS | No movement buttons or commands. A behaviour controller (`src/autonomy.js`) picks her own gestures, gaze and expressions from what is actually happening (chat activity, someone saying her name, messages to her, file drops, idle time) and from her brain's own action tags. Every move is logged in the thought chain in her words: "I'm raising my left arm". Left/right always means HER left/right. |
 | Self-sense (her whole body) | Every frame she reads her REAL body off the live VRM: all humanoid bones the model has (hips, spine, chest, neck, head, eyes, shoulders, arms, hands, every finger joint, legs, feet, toes: local rotation + where each joint really is) and every expression / blend shape (blink, aa/ih/ou/ee/oh, happy/angry/sad/relaxed/surprised, lookUp/Down/Left/Right, plus any custom ones) and where her eyes point. It's all in `window.jena.selfState`. A compact live readout sits under "what I see", and notable changes go in the thought chain in her words ("my head's tilted left", "I'm smiling", "my weight's on my right leg"). HER left = screen right. Her self-vision is checked against it, so she never claims something her body says isn't true. |
 | Natural idle | Procedural, never-repeating motion: breathing with a wandering rate, weight shifts between her feet (feet stay planted with leg IK), hip sway, relaxed arms with soft elbows and curled fingers, head and eye drift, saccades, blinks. She stands on the floor (soles placed exactly at floor level, soft contact shadows). |
