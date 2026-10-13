@@ -198,7 +198,7 @@ function runEvent(e, run, { privateRun = false } = {}) {
     e = { ...e, text: tidy(e.text) };
     if (!privateRun) autonomy.onSay(e.text);
     if (privateRun) run.step('private', cfg.obs || !e.text ? 'replied privately' : `replied privately: “${e.text}”`);
-    else { run.step('say', e.text); say(e.text); voice.speak(raw.text, raw.voice); }
+    else { run.step('say', e.text); say(e.text); voice.speak(raw.text, raw.voice); voiceReply(raw); }
   }
   else if (e.type === 'done') run.done();
 }
@@ -377,7 +377,8 @@ else {
     gate: () => { if (localStorage.getItem(MIC_SEEN)) return true; micSheet(() => pubMic.start()); return false; },
     onStart: () => { voice.unlock(); if (!voice.on) { voice.on = true; localStorage.setItem('jena.voice', '1'); voice.paint(); } },   // you talk to her, she talks back
     params: () => ({ user: localStorage.getItem(KEY_STORE) ? 'mama' : 'guest', learn: micLearn() }),
-    onText: (text) => {
+    onText: (text, info) => {
+      if (info?.saved && info.id) pendingVoiceNote = { id: info.id, at: Date.now() };
       const input = $('#talk-input');
       input.value = text.slice(0, 300);
       $('#talk').requestSubmit();
@@ -392,6 +393,15 @@ else {
     params: () => ({ user: 'mama', private: true, learn: false, key: localStorage.getItem(KEY_STORE) || '' }),
     onText: (text) => { $('#dm-input').value = text.slice(0, 2000); $('#dm-form').requestSubmit(); },
   });
+}
+
+// her real answer to an opted-in voice message goes next to its transcript in her training notes (signed: only a line she said)
+let pendingVoiceNote = null;
+function voiceReply(raw) {
+  const p = pendingVoiceNote;
+  if (!p || Date.now() - p.at > 120000 || !raw.voice) return;
+  pendingVoiceNote = null;
+  fetch('/api/hear?reply=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, reply: raw.text, tok: raw.voice }) }).catch(() => {});
 }
 
 // ---------------- private DM drawer (never on stream) ----------------

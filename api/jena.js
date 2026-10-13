@@ -119,6 +119,20 @@ async function jenaApi(req) {
 // Limits: 2 MB / 30 s per clip, 6 clips a minute per visitor here, one at a time on her box.
 const hearHits = new Map();
 async function hear(req) {
+  const u0 = new URL(req.url);
+  if (u0.searchParams.get('reply') === '1') {
+    // her answer to an opted-in voice note (so the next training run sees what people said AND what she said back).
+    // Only a line she really said is accepted: the same signed token her voice uses.
+    const b = await body(req);
+    const reply = String(b.reply || '').slice(0, 600), id = String(b.id || '').slice(0, 40);
+    if (!id || !reply || ttsToken(reply) !== b.tok) return json({ error: 'only her own answer can be attached' }, 403);
+    const box = await boxLink();
+    if (!box) return json({ error: 'her box is offline' }, 503);
+    try {
+      const r = await fetch(`${box.url}/hear/reply`, { method: 'POST', headers: { ...boxAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ id, reply }), signal: AbortSignal.timeout(8000) });
+      return json(await r.json().catch(() => ({})), r.status);
+    } catch (e) { return json({ error: `her box did not answer: ${e.message}` }, 502); }
+  }
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
   const now = Date.now();
   const hits = (hearHits.get(ip) || []).filter((t) => now - t < 60000);

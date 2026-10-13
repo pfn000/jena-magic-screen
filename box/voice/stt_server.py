@@ -6,7 +6,7 @@
 # learn=1 (the speaker ticked "help Jena learn how people talk") and not private: the TEXT (not the audio) is appended
 # to ~/learned/speech_notes.jsonl, which her Kaggle training sync picks up for the next run. Mama's private (DM) voice
 # messages are never saved. Listens on 127.0.0.1 only; her gateway lets only signed requests from her own site through.
-import json, os, re, sys, tempfile, threading, time
+import json, os, re, sys, tempfile, threading, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -51,8 +51,24 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if urlparse(self.path).path in ('/health', '/hear/health'): return self.send(200, {'ok': True, **stats})
         self.send(404, {'error': 'not here'})
+    def reply(self):
+        # her real answer to a saved voice note, attached as its own line: {"reply_to": id, "reply": ...}
+        try: b = json.loads(self.rfile.read(min(int(self.headers.get('Content-Length') or 0), 8192)) or b'{}')
+        except Exception: return self.send(400, {'error': 'bad json'})
+        nid, rep = str(b.get('id', ''))[:40], str(b.get('reply', ''))[:600].strip()
+        if not nid or not rep: return self.send(400, {'error': 'id and reply needed'})
+        try: lines = open(NOTES).read().splitlines()[-500:]
+        except FileNotFoundError: lines = []
+        recs = [json.loads(l) for l in lines if l.strip()]
+        if not any(r.get('id') == nid for r in recs): return self.send(404, {'error': 'no such voice note'})
+        if any(r.get('reply_to') == nid for r in recs): return self.send(200, {'ok': True, 'already': True})
+        if BAD.search(rep): return self.send(200, {'ok': False, 'skipped': 'unsafe'})
+        with open(NOTES, 'a') as f: f.write(json.dumps({'reply_to': nid, 'ts': int(time.time() * 1000), 'reply': rep}) + '\n')
+        return self.send(200, {'ok': True})
+
     def do_POST(self):
         u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path == '/hear/reply': return self.reply()
         if u.path not in ('/hear',): return self.send(404, {'error': 'not here'})
         n = int(self.headers.get('Content-Length') or 0)
         if n <= 0: return self.send(400, {'error': 'no audio'})
@@ -73,12 +89,12 @@ class H(BaseHTTPRequestHandler):
         private = q.get('private') == '1'
         saved = False
         if text and q.get('learn') == '1' and not private and not BAD.search(text):
-            rec = {'ts': int(time.time() * 1000), 'user': re.sub(r'[^\w .-]', '', q.get('user', 'guest'))[:40] or 'guest', 'text': text[:600],
+            rec = {'id': uuid.uuid4().hex[:12], 'ts': int(time.time() * 1000), 'user': re.sub(r'[^\w .-]', '', q.get('user', 'guest'))[:40] or 'guest', 'text': text[:600],
                    'lang': lang, 'duration_s': round(dur, 1), 'source': 'voice', 'consent': 'ticked "help Jena learn how people talk" on her site'}
             os.makedirs(os.path.dirname(NOTES), exist_ok=True)
             with open(NOTES, 'a') as f: f.write(json.dumps(rec) + '\n')
             saved = True; stats['saved'] += 1
         print(time.strftime('%H:%M:%S'), f'heard {dur:.1f}s in {ms}ms', 'private' if private else ('saved' if saved else 'not saved'), flush=True)
-        self.send(200, {'text': text, 'lang': lang, 'duration_s': round(dur, 1), 'ms': ms, 'saved': saved, 'model': f'whisper-{MODEL} (local, on her box)'})
+        self.send(200, {'id': rec['id'] if saved else None, 'text': text, 'lang': lang, 'duration_s': round(dur, 1), 'ms': ms, 'saved': saved, 'model': f'whisper-{MODEL} (local, on her box)'})
 
 ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()
