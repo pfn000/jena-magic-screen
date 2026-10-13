@@ -1,0 +1,2 @@
+upstream/** linguist-vendored
+docs/images.md linguist-generated
