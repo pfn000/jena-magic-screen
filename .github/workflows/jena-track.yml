@@ -1,0 +1,53 @@
+# Jena's whole-body move tracking on GitHub's free runners: body + 21-point fingers per hand + face blendshapes for
+# every move the site plays (public/moves), so her box (8 GB, shared) never has to. Tab dispatches it through the
+# connected GitHub app with the video slices as git blobs (YouTube often blocks runners; yt-dlp is the fallback).
+# Results go to the release jena-track-moves as <id>.json; Tab checks them on her real VRM and commits them to public/moves.
+name: jena-track
+run-name: "jena-track ${{ inputs.request_id }}"
+on:
+  workflow_dispatch:
+    inputs:
+      clips: { description: 'JSON list of {"id": clip id, "blob": git blob sha of the video slice or ""}', required: true, type: string }
+      request_id: { description: "id Tab uses to find the result", required: true, type: string }
+permissions:
+  contents: write
+concurrency: { group: "jena-track-${{ inputs.request_id }}", cancel-in-progress: false }
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        clip: ${{ fromJSON(inputs.clips) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: "moves-pipeline\npublic/moves/index.json", sparse-checkout-cone-mode: false }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: deps
+        run: |
+          sudo apt-get install -y -qq tesseract-ocr >/dev/null || true
+          pip install -q "mediapipe==1.1.0" opencv-python-headless numpy scipy yt-dlp || pip install -q "mediapipe==0.10.21" opencv-python-headless numpy scipy yt-dlp
+      - name: track ${{ matrix.clip.id }}
+        env: { GH_TOKEN: "${{ github.token }}", OMP_NUM_THREADS: "4" }
+        run: python3 moves-pipeline/gha_track.py "${{ matrix.clip.id }}" "${{ matrix.clip.blob }}"
+      - uses: actions/upload-artifact@v4
+        with: { name: "move-${{ matrix.clip.id }}", path: "out/${{ matrix.clip.id }}.json", retention-days: 7 }
+  publish:
+    needs: track
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: arts, pattern: "move-*", merge-multiple: true }
+      - name: release jena-track-moves
+        env: { GH_TOKEN: "${{ github.token }}", REQ: "${{ inputs.request_id }}" }
+        run: |
+          ls -la arts || true
+          gh release view jena-track-moves -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create jena-track-moves -R "$GITHUB_REPOSITORY" --title "Jena whole-body moves" --notes "body + fingers + face, tracked on GitHub runners (jena-track.yml)" --prerelease
+          ls arts/*.json >/dev/null 2>&1 && gh release upload jena-track-moves arts/*.json --clobber -R "$GITHUB_REPOSITORY"
+          echo "{\"request_id\":\"$REQ\",\"run\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\",\"files\":[$(ls arts 2>/dev/null | sed 's/.*/"&"/' | paste -sd,)]}" > "$REQ.manifest.json"
+          gh release upload jena-track-moves "$REQ.manifest.json" --clobber -R "$GITHUB_REPOSITORY"
