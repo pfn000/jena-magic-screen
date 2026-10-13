@@ -42,8 +42,15 @@ def trust(b):
     op = b.get('op')
     dev = str(b.get('device') or '')[:24]
     if op == 'add' and dev:
-        t['devices'] = [d for d in t['devices'] if d.get('id') != dev][-49:] + [{'id': dev, 'label': str(b.get('label') or '')[:40], 'iat': int(b.get('iat') or time.time()), 'via': str(b.get('via') or '')[:12]}]
+        t['devices'] = [d for d in t['devices'] if d.get('id') != dev][-49:] + [{'id': dev, 'label': str(b.get('label') or '')[:40], 'iat': int(b.get('iat') or time.time()), 'via': str(b.get('via') or '')[:12], 'where': str(b.get('where') or '')[:60]}]
         _write(TRUST, t)
+    elif op == 'link_use':
+        n = str(b.get('link') or '')[:16]
+        uses = t.setdefault('links', {})
+        uses[n] = int(uses.get(n, 0)) + 1
+        if len(uses) > 50: t['links'] = dict(list(uses.items())[-50:])
+        _write(TRUST, t)
+        return 200, {'ok': True, 'uses': uses[n]}
     elif op == 'revoke' and dev:
         if dev not in t['revoked']: t['revoked'] = (t['revoked'] + [dev])[-500:]
         t['devices'] = [d for d in t['devices'] if d.get('id') != dev]

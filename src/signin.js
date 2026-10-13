@@ -234,6 +234,7 @@ export function openSignin(req) {
       form.querySelector('button').disabled = false; st.textContent = '';
       form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open';
       if (useLink) { form.querySelector('input').remove(); form.querySelector('button').remove(); }
+      else if (key() && d.summary !== 'wrong passcode') { form.querySelector('button').hidden = false; form.querySelector('button').textContent = 'try again'; }   // mama's trusted device: a box blip is not a passcode question
       else { form.querySelector('input').hidden = false; form.querySelector('button').hidden = false; form.querySelector('input').focus(); }
       return;
     }
@@ -252,7 +253,7 @@ export function openSignin(req) {
     }, 9000);
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
-  form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
+  form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); else if (key()) go(); };
   if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
   else form.querySelector('input').focus();
   // phone keyboard + key row live in the shared takeover screen (takeover.js)

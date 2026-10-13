@@ -177,8 +177,39 @@ function passkeyOnLock() {
   document.getElementById('dm-toggle')?.addEventListener('click', () => { if (!get()) preparePasskey('login'); });
 }
 
+// a one-tap trust link from Tab (/?trust=…): this device becomes mama's with nothing to type
+async function redeemLink() {
+  const q = new URLSearchParams(location.search);
+  const link = q.get('trust');
+  if (!link) return false;
+  q.delete('trust');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+  const r = await nativeFetch('/api/trust', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redeem', link, label: deviceLabel() }) }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (d.ok && d.token) { set(d.token); try { sessionStorage.removeItem('jena.locked'); } catch {} trust.state = { trusted: true, ...d }; emit(); location.reload(); return true; }
+  setTimeout(() => askPasscode('Trust link did not work', `${d.error || 'no answer from the site'}. Ask Tab for a fresh link, or type the passcode once.`).then((p) => p && trustWithPasscode(p)), 500);
+  return false;
+}
+
+// the key went missing mid-visit (a 401 somewhere cleared it, another tab, a reload race) but the cookie still
+// says this is mama's device: put it back silently. Only an explicit 'lock' (private drawer) keeps it locked.
+let lastRestore = 0;
+async function restore() {
+  if (get() || Date.now() - lastRestore < 15000) return;
+  try { if (sessionStorage.getItem('jena.locked') === '1') return; } catch {}
+  lastRestore = Date.now();
+  const r = await nativeFetch('/api/trust', { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
+  const d = r && r.ok ? await r.json().catch(() => null) : null;
+  if (d?.trusted && d.token && !get()) { set(d.token); trust.state = d; emit(); document.getElementById('dm')?.classList.remove('locked'); }
+}
+document.addEventListener('click', (e) => {
+  if (e.target?.closest?.('#dm-lock')) { try { sessionStorage.setItem('jena.locked', '1'); } catch {} }
+  if (e.target?.closest?.('#dm-unlock button, .desk-mama-key, [data-ask-unlock], #go')) { try { sessionStorage.removeItem('jena.locked'); } catch {} }
+}, true);
+
 if (!OBS) {
-  sync(true);
+  redeemLink().then((done) => { if (!done) sync(true); });
+  setInterval(restore, 3000);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', passkeyOnLock); else setTimeout(passkeyOnLock, 0);
   setInterval(() => { const v = get(); if (v && !v.startsWith(PREFIX)) sync(); }, 2000);   // passcode just typed somewhere -> trust it
   setInterval(() => sync(), 10 * 60000);

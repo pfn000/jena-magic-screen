@@ -35,6 +35,26 @@ export function issue(label = '', via = 'passcode') {
   return { token: PREFIX + body + '.' + sign(sec, body), ...p };
 }
 
+// a one-tap trust link Tab can text mama: opening it on a device makes that device trusted with nothing to type.
+// Valid 24 h, at most 4 devices (uses counted on her box).
+export function issueLink(hours = 24) {
+  const sec = secret();
+  if (!sec) return null;
+  const p = { k: 'link', n: crypto.randomBytes(6).toString('base64url'), exp: Math.floor(Date.now() / 1000) + hours * 3600 };
+  const body = Buffer.from(JSON.stringify(p)).toString('base64url');
+  return { link: 'jtl1.' + body + '.' + crypto.createHmac('sha256', sec).update('jtl1.' + body).digest('base64url'), ...p };
+}
+export function verifyLink(tok) {
+  const sec = secret();
+  if (!sec || typeof tok !== 'string' || !tok.startsWith('jtl1.')) return null;
+  const [body, sig] = tok.slice(5).split('.');
+  if (!body || !sig) return null;
+  const want = Buffer.from(crypto.createHmac('sha256', sec).update('jtl1.' + body).digest('base64url')), got = Buffer.from(sig);
+  if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return null;
+  try { const p = JSON.parse(Buffer.from(body, 'base64url').toString()); return p.k === 'link' && p.exp > Date.now() / 1000 ? p : null; } catch { return null; }
+}
+export async function linkUse(n) { return boxTrust('link_use', { link: n }).catch(() => null); }
+
 export function verify(tok) {
   const sec = secret();
   if (!sec || typeof tok !== 'string' || !tok.startsWith(PREFIX)) return null;
@@ -80,7 +100,7 @@ export async function isRevoked(d) {
 }
 export async function noteDevice(p, op = 'add') {
   if (op === 'revoke') rev.set.add(p.d);
-  return boxTrust(op, { device: p.d, label: p.l, iat: p.iat, via: p.via }).catch(() => null);
+  return boxTrust(op, { device: p.d, label: p.l, iat: p.iat, via: p.via, ...(p.where ? { where: p.where } : {}) }).catch(() => null);
 }
 
 // ---- who is asking: { via: 'passcode' | 'device' | null, device }

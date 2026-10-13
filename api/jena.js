@@ -17,7 +17,7 @@ import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.j
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
 import { boxLink, boxAuth, ttsToken, accept as acceptBox, relayBox } from './_lib/boxlink.js';
 import { multiSearch, hotUrls } from './_lib/search.js';
-import { elevate, issue, verify, isPasscode, setCookie, clearCookie, noteDevice, mamaAuth } from './_lib/mama.js';
+import { elevate, issue, verify, isPasscode, setCookie, clearCookie, noteDevice, mamaAuth, issueLink, verifyLink, linkUse } from './_lib/mama.js';
 import { intent as sayIntent, MAMA_ONLY } from '../box/jena-intent.mjs';
 import { registrationOptions, verifyRegistration, loginOptions, verifyLogin, rpOf } from './_lib/webauthn.js';
 
@@ -442,6 +442,22 @@ async function trust(req) {
     if (!viaPass && a.via !== 'device') return json({ ok: false, error: 'wrong passcode' }, 401);
     const t = issue(clip(b.label, 40), viaPass ? 'passcode' : 'refresh');
     if (!t) return json({ ok: false, error: 'JENA_DM_KEY is not set on this deployment' }, 500);
+    t.where = clip([req.headers.get('x-vercel-ip-city'), req.headers.get('x-vercel-ip-country')].filter(Boolean).join(', '), 60);
+    noteDevice(t, 'add');
+    return json({ ok: true, token: t.token, ...pub(t) }, 200, { 'Set-Cookie': setCookie(t.token) });
+  }
+  if (action === 'link') {   // mama (or Tab with the passcode) makes a one-tap trust link to text her
+    if (!a.via) return json({ ok: false, error: 'mama only' }, 401);
+    const l = issueLink(Math.min(72, Math.max(1, +b.hours || 24)));
+    return json({ ok: true, url: `${new URL(req.url).origin}/?trust=${l.link}`, expires: l.exp * 1000 });
+  }
+  if (action === 'redeem') {   // a device opened the trust link: trusted from now on, nothing typed
+    const l = verifyLink(String(b.link || ''));
+    if (!l) return json({ ok: false, error: 'this trust link is expired or not valid' }, 401);
+    const u = await linkUse(l.n);
+    if (u && u.uses > 4) return json({ ok: false, error: 'this trust link was already used on 4 devices' }, 401);
+    const t = issue(clip(b.label, 40), 'link');
+    t.where = clip([req.headers.get('x-vercel-ip-city'), req.headers.get('x-vercel-ip-country')].filter(Boolean).join(', '), 60);
     noteDevice(t, 'add');
     return json({ ok: true, token: t.token, ...pub(t) }, 200, { 'Set-Cookie': setCookie(t.token) });
   }
