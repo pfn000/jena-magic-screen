@@ -1,0 +1,16 @@
+{
+ "name": "what_i_did",
+ "description": "Her own memory of what she did lately: reads ~/.jena/memory (videos she watched, moves she learned, things she read and summarised for mama, sites she explored) and answers in plain words.",
+ "triggers": [
+  "\\bwhat (did|have) (you|u|ya) (been )?(do|doing|done|up to)\\b.{0,25}\\b(today|lately|all day|this morning|this afternoon|tonight|earlier)\\b",
+  "\\bwhat (have|did) (you|u) (learn|learned|watch|watched|read)\\b.{0,20}\\b(today|lately)\\b",
+  "\\bwhat('?ve| have) (you|u) been up to\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 15,
+ "needs": [],
+ "example": {
+  "text": "what did you do today?"
+ }
+}

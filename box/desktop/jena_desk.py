@@ -885,16 +885,27 @@ def act_learn():
     memory.record('learn', f'started learning a new move: "{q}"', key='learn:' + vid, action='learn', note='queued for my move pipeline')
 
 def wiki_random():
-    """a random Wikipedia article summary that passes her safety filter (title + text)"""
-    for _ in range(4):
-        try:
-            d = json.loads(_get('https://en.wikipedia.org/api/rest_v1/page/random/summary'))
-            t, x = d.get('title', ''), d.get('extract', '')
-            u = (d.get('content_urls') or {}).get('desktop', {}).get('page')
-            if u and len(x) > 120 and safe(t + ' ' + x) and not FLAG.search(t + ' ' + x) and d.get('type') == 'standard':
-                return t, u, x
-        except Exception:
-            pass
+    """something worth reading: today's featured article / most-read / on-this-day picks, or a random article
+    that isn't a tiny stub (title + text pass her safety filter). Never the same article twice (her memory)."""
+    cands = []
+    try:
+        d = json.loads(_get('https://en.wikipedia.org/api/rest_v1/feed/featured/' + time.strftime('%Y/%m/%d')))
+        if d.get('tfa'): cands.append(d['tfa'])
+        cands += (d.get('mostread') or {}).get('articles', [])[:25]
+        for e in (d.get('onthisday') or [])[:8]: cands += e.get('pages', [])[:1]
+    except Exception:
+        pass
+    random.shuffle(cands)
+    for _ in range(3):
+        try: cands.append(json.loads(_get('https://en.wikipedia.org/api/rest_v1/page/random/summary')))
+        except Exception: pass
+    for d in cands:
+        t, x = d.get('title', '') or '', d.get('extract', '') or ''
+        u = (d.get('content_urls') or {}).get('desktop', {}).get('page')
+        if not u or len(x) < 250 or d.get('type') != 'standard' or memory.seen('read:' + u): continue
+        if re.search(r'\b(commune|village|municipality|census|unincorporated|footballer|politician|election|war|murder|shooting|killed|death|crime|thriller|horror|terror\\w*)\b', x[:300], re.I): continue
+        if safe(t + ' ' + x) and not FLAG.search(t + ' ' + x):
+            return d.get('normalizedtitle') or t, u, x
     return None
 
 def act_summarise():

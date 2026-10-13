@@ -55,9 +55,12 @@ AUTO_IDEAS = ['just dance kids', 'easy tiktok dance tutorial', 'zumba kids warm 
     'waving hello reference', 'clapping reference video', 'thinking pose reference', 'excited jump celebration reference',
     'shrug gesture reference', 'victory pose reference', 'gangnam style dance tutorial', 'kpop dance tutorial easy mirrored', 'moonwalk tutorial']
 def auto_request(reqs):
+    # aim: one NEW clip per AUTO_MIN minutes. A rejected try (bad tracking) doesn't count, so she tries another
+    # idea a few minutes later; nothing is queued while something is still waiting.
     tried = {r.get('id') for r in reqs}
-    last = max([r.get('ts', 0) for r in reqs], default=0) / 1000
-    if time.time() - last < AUTO_MIN * 60: return None
+    last_req = max([r.get('ts', 0) for r in reqs], default=0) / 1000
+    last_ok = max([c.get('learned_at', 0) for c in index().get('clips', [])], default=0) / 1000
+    if time.time() - last_ok < AUTO_MIN * 60 or time.time() - last_req < 4 * 60: return None
     ideas = [q for q in AUTO_IDEAS if 'q_' + re.sub(r'\W+', '_', q.lower())[:30] not in tried]
     if not ideas: return None
     import random
