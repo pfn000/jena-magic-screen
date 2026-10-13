@@ -175,7 +175,7 @@ body.obs #chat-list, body.obs .thought-list { scrollbar-width: none; }
     grid-template-areas: 'jena' 'desk' 'chat' 'think';
     padding: 12px 12px 80px;
   }
-  body:not(.obs) #desktop .desk-body { aspect-ratio: 16 / 10; flex: none; }
+  body:not(.obs) #desktop .desk-body { aspect-ratio: var(--desk-ar, 1600 / 704); flex: none; }
   body:not(.obs) .controls { opacity: 1; bottom: calc(3% + 50px); }
   body:not(.obs) .chip, body:not(.obs) .brain-badge { max-width: 55%; font-size: 10.5px; }
 }
@@ -246,3 +246,8 @@ body.obs #build-stamp { display: none; }
 #deploy-bar span{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:rgba(20,16,34,.85);color:#fff;font:12px system-ui;padding:3px 10px;border-radius:10px;pointer-events:auto;white-space:nowrap}
 #deploy-bar.done .bar{animation:none;background:#3ddc84}
 @media (max-width:700px){#devpanel{inset:0;border-radius:0;font-size:12px}}
+
+/* desktop fills its panel edge to edge: desktop.js cover-scales the noVNC canvas */
+#desktop .desk-screen { overflow: hidden; }
+#desktop .desk-screen > div { overflow: hidden !important; display: block !important; width: 100% !important; height: 100% !important; background: transparent !important; }
+#desktop .desk-screen canvas { position: absolute; left: 0; top: 0; margin: 0 !important; cursor: default !important; }

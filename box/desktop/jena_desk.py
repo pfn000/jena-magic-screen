@@ -1,0 +1,624 @@
+#!/usr/bin/env python3
+"""Jena's desktop: she uses her own computer (X display :99) by herself, and looks at it.
+
+Runs as the unix user `jena` (her own account on the box: her own home, no access to anyone else's files).
+  * hands  - on her own schedule, and when people talk to her, she opens a terminal and runs harmless
+             little commands (htop, jenafetch, ls, tiny python scripts), opens Firefox to pages about what
+             is being talked about (Wikipedia, docs), and types her thoughts into a notes file. xdotool/wmctrl.
+  * eyes   - every few seconds: screenshot of :99, the active window's title, OCR (tesseract) of what is in
+             it -> a short "what's on my screen" line in her voice + the raw facts.
+  * door   - one small HTTP port (default 6081) for the site and the tunnel:
+               GET  /box/screen.json   what she sees now (summary, window, ocr text, recent actions)
+               GET  /box/shot.jpg      the latest screenshot (small jpeg)
+               GET  /box/desktop.json  {"websockify": "/websockify"}  (stream lives on this same host)
+               POST /box/event         {"text","user","source"}  something said to her (private ones ignored)
+               GET  /websockify        passed straight through to the noVNC websockify (view-only x11vnc)
+Nothing here logs in anywhere or touches anyone's accounts.
+"""
+import asyncio, json, os, random, re, subprocess, threading, time, hashlib, urllib.request, urllib.parse
+from collections import deque
+
+DISPLAY = os.environ.get('DISP', ':99')
+PORT = int(os.environ.get('JENA_BOX_PORT', '6081'))
+WS_UPSTREAM = ('127.0.0.1', int(os.environ.get('WEBSOCKIFY_PORT', '6080')))
+BRAIN = os.environ.get('JENA_BRAIN', 'http://127.0.0.1:8088/v1')
+SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
+HOME = os.path.expanduser('~')
+STATE = os.path.join(HOME, '.jena')
+os.makedirs(STATE, exist_ok=True)
+ENV = dict(os.environ, DISPLAY=DISPLAY, HOME=HOME)
+
+BAD = re.compile(r"\b(sex\w*|porn\w*|nude\w*|naked|nsfw|onlyfans|fetish\w*|erotic\w*|hentai|xxx|boob\w*|horny|kiss\w*|"
+                 r"strip\w*|lingerie|bikini|hook ?up|date me|marry me|bae|babe|daddy|nazi\w*|suicide|self.?harm|kill\w*|gore|"
+                 r"drug\w*|cocaine|meth|weed|vape|gun\w*|bomb\w*|hack (into|someone)|password\w*|login|log in|sign in|"
+                 r"credit card|ssn)\b", re.I)
+
+def safe(s):
+    return not BAD.search(s or '')
+
+def sh(cmd, timeout=10):
+    try:
+        r = subprocess.run(cmd, shell=isinstance(cmd, str), env=ENV, capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip()
+    except Exception:
+        return ''
+
+def spawn(cmd):
+    return subprocess.Popen(cmd, env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, cwd=HOME)
+
+# ---------------------------------------------------------------- shared state
+lock = threading.Lock()
+actions = deque(maxlen=12)       # what her hands did, newest last
+events_in = deque(maxlen=20)     # things people said to her
+screen = {'ok': False, 'summary': 'just woke up, nothing on my screen yet', 'ts': 0}
+shot_jpg = b''
+
+def did(text, kind='hands'):
+    with lock:
+        actions.append({'ts': int(time.time() * 1000), 'kind': kind, 'text': text})
+    print(time.strftime('%H:%M:%S'), kind, text, flush=True)
+
+# ---------------------------------------------------------------- windows
+def windows():
+    out = sh(['wmctrl', '-lx'])
+    res = []
+    for line in out.splitlines():
+        parts = line.split(None, 4)
+        if len(parts) >= 4:
+            res.append({'id': parts[0], 'cls': parts[2].lower(), 'title': parts[4] if len(parts) > 4 else ''})
+    return res
+
+def find(cls_part):
+    for w in windows():
+        if cls_part in w['cls']:
+            return w['id']
+    return None
+
+def wait_for(cls_part, secs=25):
+    t = time.time()
+    while time.time() - t < secs:
+        w = find(cls_part)
+        if w:
+            return w
+        time.sleep(0.5)
+    return None
+
+def focus(wid):
+    sh(['wmctrl', '-i', '-a', wid]); time.sleep(0.4)
+    sh(['xdotool', 'windowactivate', '--sync', str(int(wid, 16))], timeout=4); time.sleep(0.3)
+
+def type_(text, delay=55):
+    for chunk in re.split(r'(\n)', text):
+        if chunk == '\n':
+            sh(['xdotool', 'key', 'Return']); time.sleep(0.25)
+        elif chunk:
+            sh(['xdotool', 'type', '--delay', str(delay + random.randint(-15, 25)), chunk], timeout=60)
+
+def key(*k):
+    sh(['xdotool', 'key'] + list(k)); time.sleep(0.3)
+
+# ---------------------------------------------------------------- her apps
+def terminal():
+    wid = find('xterm')
+    if not wid:
+        spawn(['xterm', '-T', 'jena@xi: ~', '-xrm', 'XTerm*allowSendEvents: true', '-fa', 'DejaVu Sans Mono', '-fs', '12',
+               '-bg', '#1b1029', '-fg', '#f6dcff', '-cr', '#ff7ad9', '-geometry', '92x26+40+40', '-e', 'bash'])
+        wid = wait_for('xterm', 15)
+        time.sleep(1.2)
+    if wid:
+        focus(wid)
+    return wid
+
+def screen_size():
+    m = re.search(r'dimensions:\s+(\d+)x(\d+)', sh(['xdpyinfo']))
+    return (int(m.group(1)), int(m.group(2))) if m else (1600, 704)
+
+def firefox(url):
+    wid = find('firefox')
+    W, H = screen_size()
+    fw, fh = min(1180, W - 60), H - 70
+    if not wid:
+        spawn(['firefox-esr', '--new-instance', '--profile', os.path.join(HOME, '.ffprofile'), '--width', str(fw), '--height', str(fh), url])
+        wid = wait_for('firefox', 40)
+        if wid:
+            time.sleep(4)
+            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{W - fw - 20},8,{fw},{fh}'])
+            try:  # if memory gets tight, the browser goes first, never her brain
+                for pid in sh(['pgrep', '-u', str(os.getuid()), '-f', 'firefox-esr']).split():
+                    open(f'/proc/{pid}/oom_score_adj', 'w').write('800')
+            except Exception:
+                pass
+        return wid
+    focus(wid)
+    key('ctrl+l'); time.sleep(0.3)
+    type_(url + '\n', delay=35)
+    return wid
+
+def notes():
+    wid = find('mousepad')
+    if not wid:
+        spawn(['mousepad', os.path.join(HOME, 'notes', 'thoughts.txt')])
+        wid = wait_for('mousepad', 20)
+        if wid:
+            time.sleep(1.5)
+            W, H = screen_size()
+            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{W - 620},{H - 400},600,360'])
+    if wid:
+        focus(wid)
+    return wid
+
+# ---------------------------------------------------------------- pages she reads
+PAGES = [
+    ('Linux', 'https://en.wikipedia.org/wiki/Linux'), ('Tux the penguin', 'https://en.wikipedia.org/wiki/Tux_(mascot)'),
+    ('capture the flag', 'https://en.wikipedia.org/wiki/Capture_the_flag_(cybersecurity)'),
+    ('rubber duck debugging', 'https://en.wikipedia.org/wiki/Rubber_duck_debugging'),
+    ('the demoscene', 'https://en.wikipedia.org/wiki/Demoscene'), ('neural networks', 'https://en.wikipedia.org/wiki/Neural_network_(machine_learning)'),
+    ('transformers', 'https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)'),
+    ('the Python tutorial', 'https://docs.python.org/3/tutorial/index.html'), ('MDN JavaScript', 'https://developer.mozilla.org/en-US/docs/Web/JavaScript'),
+    ('three.js docs', 'https://threejs.org/docs/'), ('VTubers', 'https://en.wikipedia.org/wiki/VTuber'),
+    ('pixel art', 'https://en.wikipedia.org/wiki/Pixel_art'), ('the Game Boy', 'https://en.wikipedia.org/wiki/Game_Boy'),
+    ('Tetris', 'https://en.wikipedia.org/wiki/Tetris'), ('octopuses', 'https://en.wikipedia.org/wiki/Octopus'),
+    ('black holes', 'https://en.wikipedia.org/wiki/Black_hole'), ('Raspberry Pi', 'https://en.wikipedia.org/wiki/Raspberry_Pi'),
+    ('Rust', 'https://en.wikipedia.org/wiki/Rust_(programming_language)'), ('ASCII art', 'https://en.wikipedia.org/wiki/ASCII_art'),
+    ("Conway's Game of Life", 'https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life'), ('xkcd', 'https://xkcd.com/'),
+    ('the Turing test', 'https://en.wikipedia.org/wiki/Turing_test'), ('inverse kinematics', 'https://en.wikipedia.org/wiki/Inverse_kinematics'),
+]
+
+STOP = set("""a an the i im i'm you u your yours me my mine we us our is are was were be been am do does did
+to of in on at for with and or but so if then than that this these those it its it's what whats how why who when where
+which can could would should will just like hey hi hello yo jena jenaxi mama lol lmao omg pls please ok okay yeah yes no not
+dont don't have has had get got go going gonna wanna want know think tell say said make made really very much more some any
+about there here they them he she him her his hers up out one two all can't cant ur look check open show""".split())
+
+def _opensearch(q):
+    u = 'https://en.wikipedia.org/w/api.php?' + urllib.parse.urlencode({'action': 'opensearch', 'search': q, 'limit': 1, 'namespace': 0, 'format': 'json'})
+    req = urllib.request.Request(u, headers={'User-Agent': 'JenaDesk/1.0 (her own little desktop)'})
+    data = json.loads(urllib.request.urlopen(req, timeout=6).read())
+    if data[1] and safe(data[1][0]):
+        return data[1][0], data[3][0]
+    return None
+
+def wiki_for(text):
+    words = [w.strip(".'") for w in re.findall(r"[A-Za-z][A-Za-z0-9+#.'-]{2,}", text or '') if w.lower().strip(".'") not in STOP]
+    if not words or not safe(text):
+        return None
+    try:
+        hit = _opensearch(' '.join(words[:4]))
+        if not hit and len(words) > 1:
+            hit = _opensearch(max(words, key=len))
+        return hit
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------- exact URLs, multi-search, her hot list, videos
+URL_RE = re.compile(r"(https?://[^\s<>\"']+|\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|ai|dev|app|gg|tv|edu|gov|co|me|xyz|bot|site|info|us|uk|ca|de|jp)(?:/[^\s<>\"']*)?)", re.I)
+
+def url_in(text):
+    m = URL_RE.search(text or '')
+    if not m: return None
+    u = m.group(1).rstrip('.,!?)\]')
+    if not re.match(r'https?://', u, re.I): u = 'https://' + u
+    return u if safe(u) else None
+
+def _get(url, timeout=6, data=None, headers=None):
+    req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0 (JenaDesk/1.1; her own little desktop)', **(headers or {})})
+    return urllib.request.urlopen(req, timeout=timeout).read()
+
+def github_for(q):
+    try:
+        d = json.loads(_get('https://api.github.com/search/repositories?per_page=3&q=' + urllib.parse.quote(q)))
+        for x in d.get('items', []):
+            if safe(x['full_name'] + ' ' + (x.get('description') or '')):
+                return x['full_name'], x['html_url']
+    except Exception:
+        pass
+    return None
+
+def ddg_for(q):
+    try:
+        h = _get('https://html.duckduckgo.com/html/', data=('q=' + urllib.parse.quote(q)).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded'}).decode('utf8', 'ignore')
+        for m in re.finditer(r'class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', h):
+            u = m.group(1); mm = re.search(r'uddg=([^&]+)', u)
+            if mm: u = urllib.parse.unquote(mm.group(1))
+            if u.startswith('//'): u = 'https:' + u
+            t = re.sub(r'<[^>]+>', '', m.group(2))
+            if 'duckduckgo.com/y.js' in u or not safe(t + ' ' + u): continue
+            return t, u
+    except Exception:
+        pass
+    return None
+
+HOT = {'at': 0, 'list': []}
+def hot_urls():
+    if time.time() - HOT['at'] < 600 and HOT['list']: return HOT['list']
+    try:
+        txt = _get('https://raw.githubusercontent.com/pfn000/jena-magic-screen/main/Hot%20URLS/URLS.md').decode()
+        lst = []
+        for line in txt.splitlines():
+            m = re.match(r'\s*-\s*(\S+)\s*(?:\[([^\]]*)\])?', line)
+            if not m: continue
+            u = m.group(1)
+            if not re.match(r'https?://', u, re.I): u = 'https://' + u
+            lst.append((u, (m.group(2) or '').strip()))
+        HOT.update(at=time.time(), list=lst)
+    except Exception:
+        pass
+    return HOT['list']
+
+VIDEOS = {'at': 0, 'list': []}
+def my_videos():
+    """the real videos she learned her moves from (the site's moves library)"""
+    if time.time() - VIDEOS['at'] < 1800 and VIDEOS['list']: return VIDEOS['list']
+    try:
+        d = json.loads(_get(SITE + '/moves/index.json'))
+        VIDEOS.update(at=time.time(), list=[(c['source']['url'], c['source'].get('title') or c.get('what'), c.get('label')) for c in d.get('clips', []) if c.get('source', {}).get('url')])
+    except Exception:
+        pass
+    return VIDEOS['list']
+
+watching = {'video': None}
+def nap(secs):
+    """wait, but someone talking to her interrupts it"""
+    end = time.time() + secs
+    while time.time() < end:
+        time.sleep(0.5)
+        with lock:
+            if events_in: return
+def act_watch(video=None):
+    vids = my_videos()
+    if not vids and not video: return act_read()
+    url, title, label = video or random.choice(vids)
+    vid = re.search(r'[?&]v=([\w-]{11})', url)
+    page = f'https://www.youtube.com/watch?v={vid.group(1)}' if vid else url
+    did(f'watching "{title[:70]}" again, the video I learned my {label} move from')
+    with lock:
+        watching['video'] = {'url': url, 'title': title, 'label': label, 'since': int(time.time() * 1000)}
+    firefox(page)
+    nap(random.uniform(25, 40))
+    with lock:
+        watching['video'] = None
+
+def act_hot():
+    lst = [h for h in hot_urls() if safe(h[0])]
+    if not lst: return act_read()
+    u, note = random.choice(lst)
+    did(f'opened {u} from my hot list' + (f' ({note})' if note else ''))
+    firefox(u); time.sleep(4); scroll_some()
+
+def act_search(text):
+    """multi-search: DuckDuckGo results page on screen, then the best hit from DuckDuckGo / GitHub / Wikipedia / her hot list"""
+    q = ' '.join(w for w in re.findall(r"[A-Za-z0-9+#.'-]+", text) if w.lower() not in STOP)[:120] or text[:120]
+    if not safe(q): return False
+    did(f'searching "{q[:60]}" (DuckDuckGo, GitHub, Wikipedia, my hot list)')
+    firefox('https://duckduckgo.com/?q=' + urllib.parse.quote(q)); time.sleep(5)
+    want_code = re.search(r'\b(github|repo|repos|code|library|package|lib|framework|source)\b', text, re.I)
+    hot = [h for h in hot_urls() if any(w.lower() in (h[0] + ' ' + h[1]).lower() for w in q.split() if len(w) > 3)]
+    tries = ([github_for, ddg_for, wiki_for] if want_code else [ddg_for, wiki_for, github_for])
+    for f in tries:
+        hit = f(q)
+        if hit:
+            title, url = hit
+            src = {github_for: 'GitHub', ddg_for: 'DuckDuckGo', wiki_for: 'Wikipedia'}[f]
+            did(f'opened "{title[:60]}" from {src}')
+            firefox(url); time.sleep(3); scroll_some(); return True
+    if hot:
+        did(f'opened {hot[0][0]} from my hot list'); firefox(hot[0][0]); return True
+    did('my searches came back empty, so I kept the results page open')
+    return True
+
+def unstick():
+    """close dialogs that would freeze her apps (e.g. mousepad's 'Externally Modified')"""
+    for w in windows():
+        if re.search(r'externally modified|save changes|crash reporter|close tabs\?', w['title'], re.I):
+            focus(w['id']); key('Escape'); time.sleep(0.4)
+            if find_title(w['title']): sh(['wmctrl', '-i', '-c', w['id']])
+            did(f'closed a stuck "{w["title"][:40]}" dialog', 'hands')
+
+def find_title(t):
+    return any(w['title'] == t for w in windows())
+
+# ---------------------------------------------------------------- her brain (optional)
+def brain_line(prompt):
+    """One short line from her own model, if it answers and it's clean. None otherwise."""
+    try:
+        body = json.dumps({'model': 'JenaXI', 'max_tokens': 40, 'temperature': 0.8, 'messages': [
+            {'role': 'system', 'content': 'You are Jena (JenaXI), a chaotic gremlin teen hacker girl. You are writing one short line in your own notes file. No flirting, nothing romantic.'},
+            {'role': 'user', 'content': prompt}]}).encode()
+        req = urllib.request.Request(BRAIN.rstrip('/') + '/chat/completions', data=body, headers={'Content-Type': 'application/json'})
+        out = json.loads(urllib.request.urlopen(req, timeout=8).read())
+        line = (out['choices'][0]['message']['content'] or '').strip().split('\n')[0]
+        line = re.sub(r'\[[^\]]*\]|<\|[^|]*\|>', '', line).strip()
+        if 6 <= len(line) <= 160 and safe(line):
+            return line
+    except Exception:
+        pass
+    return None
+
+# ---------------------------------------------------------------- activities
+def act_htop():
+    if not terminal(): return
+    did('opened my terminal and ran htop')
+    type_('htop -u jena\n'); time.sleep(random.uniform(14, 22)); key('q'); type_('clear\n', 30)
+
+def act_fetch():
+    if not terminal(): return
+    did('ran jenafetch in my terminal')
+    type_('jenafetch\n'); time.sleep(6)
+    type_('ls ~/projects\n'); time.sleep(3)
+    type_(random.choice(['uptime\n', 'free -h\n', 'cat ~/projects/ctf/flag.txt\n', 'ls -la ~/notes\n'])); time.sleep(4)
+
+def act_python():
+    if not terminal(): return
+    s = random.choice(['matrix.py', 'fib.py', 'hearts.py', 'life.py', 'bones.py'])
+    did(f'ran my little python script {s}')
+    type_(f'python3 ~/projects/scripts/{s}\n'); time.sleep(random.uniform(9, 14))
+    key('ctrl+c'); type_('clear\n', 30)
+
+def scroll_some():
+    if not find('firefox'): return
+    for _ in range(random.randint(2, 5)):
+        time.sleep(random.uniform(2, 4)); key('Next')
+
+def act_read(topic=None):
+    if topic:
+        hit = wiki_for(topic)
+        if hit:
+            title, url = hit
+            did(f'looked up "{title}" because people were talking about it')
+            firefox(url); time.sleep(3); scroll_some(); return
+    name, url = random.choice(PAGES)
+    did(f'opened Firefox to read about {name}')
+    firefox(url); time.sleep(3); scroll_some()
+
+def act_note(extra=None):
+    if not notes(): return
+    with lock:
+        s = screen.get('summary', '')
+    prompt = f'What are you doing on your computer right now? ({s})' if not extra else f'People are talking about: {extra}. Write a note about it.'
+    line = brain_line(prompt)
+    src = 'my brain' if line else 'me'
+    if not line:
+        pool = [f"currently: {s}", "todo: fix my left arm doing the thing", "idea: juggle 3 windows at once",
+                "reminder: i am NOT some clanker", "note to self: htop is a vibe", "todo: learn more three.js for cooler poses",
+                "mama is cool. dont tell her i said that", "bug: my brain is tiny rn. upgrade pending", "goal: win a CTF before i turn 1",
+                f"chat was talking about {extra}. noted." if extra else "chat is quiet. suspicious."]
+        line = random.choice(pool)
+    key('ctrl+End')
+    type_('\n' + time.strftime('%H:%M') + '  ' + line, delay=60)
+    key('ctrl+s')
+    did(f'typed in my notes: "{line[:80]}"' + (' (from my brain)' if src == 'my brain' else ''))
+
+def act_tidy():
+    # sometimes she closes stuff so it's not always the same three windows
+    ws = [w for w in windows() if 'tint2' not in w['cls']]
+    if len(ws) <= 1: return
+    w = random.choice(ws)
+    if 'mousepad' in w['cls']:
+        focus(w['id']); key('ctrl+s'); key('ctrl+q'); did('saved and closed my notes')
+    elif 'firefox' in w['cls']:
+        sh(['wmctrl', '-i', '-c', w['id']]); did('closed Firefox, too many tabs energy')
+    elif 'xterm' in w['cls']:
+        focus(w['id']); type_('exit\n'); did('closed my terminal')
+
+ROTATION = [act_htop, act_fetch, act_python, act_read, act_hot, act_watch, act_watch, act_note, act_tidy]
+
+def hands():
+    time.sleep(3)
+    last = None
+    while True:
+        try:
+            ev = None
+            with lock:
+                if events_in: ev = events_in.popleft()
+            unstick()
+            if ev:
+                text = ev.get('text', '')
+                u = url_in(text)
+                if u:
+                    did(f'{ev.get("user") or "someone"} sent me a link, opening exactly {u[:90]}')
+                    firefox(u); time.sleep(4); scroll_some()
+                elif re.search(r'\b(video|watch|dance|dancing|move|moves)\b', text, re.I) and my_videos():
+                    act_watch()
+                elif re.search(r'\b(search|look up|lookup|google|find|github|repo|what is|who is|how (do|does|to))\b', text, re.I) or wiki_for(text):
+                    act_search(text)
+                    if random.random() < 0.5: act_note(' '.join(text.split()[:8]))
+                else:
+                    random.choice([act_python, act_fetch, act_note])()
+            else:
+                a = random.choice([a for a in ROTATION if a is not last]); last = a
+                a()
+        except Exception as e:
+            print('hands error', e, flush=True)
+        for _ in range(int(random.uniform(18, 40) * 2)):   # her own pace; someone talking to her interrupts the idle
+            time.sleep(0.5)
+            with lock:
+                if events_in: break
+
+# ---------------------------------------------------------------- eyes
+def ocr(path):
+    txt = sh(['tesseract', path, '-', '--psm', '6'], timeout=12)
+    txt = re.sub(r'[^\x20-\x7E\n]', '', txt)
+    return '\n'.join(l.strip() for l in txt.splitlines() if len(re.sub(r'[^A-Za-z]', '', l)) >= 3)
+
+def describe(title, cls, text, wins):
+    t, low = title or '', (text or '').lower()
+    if not wins:
+        return "my screen is empty rn, just my wallpaper and the clock"
+    if 'xterm' in cls:
+        if 'htop' in low or ('tasks' in low and 'load' in low) or 'load average' in low:
+            m = re.search(r'load average[: ]+([0-9]+[.,][0-9]+)', low)
+            try:
+                load = float(m.group(1).replace(',', '.')) if m else float(open('/proc/loadavg').read().split()[0])
+            except Exception:
+                load = float(open('/proc/loadavg').read().split()[0])
+            mood = 'chilling' if load < 2 else 'kinda busy' if load < 4 else 'SWEATING'
+            return f"I've got my terminal open with htop, my CPU is {mood} (load {load:.1f})"
+        if 'jenaxi' in low and ('cpu' in low or 'kernel' in low or 'memory' in low):
+            return "my terminal is showing jenafetch, aka my stats. flexing"
+        for s, d in [('wake up', 'my matrix rain script is going brrr in the terminal'), ('fib', 'my terminal is spitting out fibonacci numbers'),
+                     ('<3', 'my terminal is printing hearts, my hearts script'), ('generation', "my terminal is running Conway's Game of Life"),
+                     ('bone', 'my terminal is listing my bones, my bones.py script'), ('flag', "I'm poking at my CTF folder in the terminal"),
+                     ('mem:', "my terminal shows my memory, free -h"), ('up ', "I checked my uptime in the terminal")]:
+            if s in low:
+                return d
+        last = [l for l in (text or '').splitlines() if l.strip()][-1:] or ['']
+        return "I've got my terminal open" + (f', last thing on it: "{last[0][:60]}"' if last[0] else '')
+    if 'firefox' in cls:
+        page = re.sub(r'\s*[—–-]\s*Mozilla Firefox.*$', '', t).strip()
+        page = re.sub(r'\s*[—–-]\s*Wikipedia$', ' (Wikipedia)', page)
+        return f'Firefox is open, I\'m reading "{page[:80]}"' if page else 'Firefox is open, loading something'
+    if 'mousepad' in cls:
+        last = [l for l in (text or '').splitlines() if re.search(r'[a-z]{3}', l)][-1:] or ['']
+        return 'my notes are open' + (f', last line says "{last[0][:70]}"' if last[0] else '')
+    return f'"{t[:60]}" is open on my screen'
+
+def eyes():
+    global shot_jpg
+    lasthash = None
+    while True:
+        try:
+            raw = os.path.join(STATE, 'screen.png')
+            sh(['import', '-silent', '-window', 'root', raw], timeout=8)
+            h = hashlib.md5(open(raw, 'rb').read()).hexdigest() if os.path.exists(raw) else None
+            wins = [w for w in windows() if 'tint2' not in w['cls']]
+            aid = sh(['xdotool', 'getactivewindow'])
+            title = sh(['xdotool', 'getactivewindow', 'getwindowname']) if aid else ''
+            cls = ''
+            for w in wins:
+                try:
+                    if aid and int(w['id'], 16) == int(aid): cls = w['cls']
+                except Exception: pass
+            if not cls and wins:
+                cls, title = wins[-1]['cls'], wins[-1]['title']
+            with lock:
+                text = screen.get('text', '')
+            if h != lasthash:
+                crop = raw
+                if aid and cls:
+                    g = sh(['xdotool', 'getwindowgeometry', '--shell', aid])
+                    gd = dict(l.split('=', 1) for l in g.splitlines() if '=' in l)
+                    if gd.get('WIDTH'):
+                        crop = os.path.join(STATE, 'win.png')
+                        sh(['convert', raw, '-crop', f"{gd['WIDTH']}x{gd['HEIGHT']}+{gd['X']}+{gd['Y']}", '+repage', '-colorspace', 'Gray', crop])
+                text = ocr(crop)
+                sh(['convert', raw, '-resize', '640x400', '-quality', '70', os.path.join(STATE, 'shot.jpg')])
+                try: shot_jpg = open(os.path.join(STATE, 'shot.jpg'), 'rb').read()
+                except Exception: pass
+                lasthash = h
+            summary = describe(title, cls, text, wins)
+            clean_text = text if safe(text) else '(something on screen I am not reading out)'
+            now = int(time.time() * 1000)
+            with lock:
+                prev = screen.get('summary')
+                screen.update({'ok': True, 'ts': now, 'summary': summary, 'active': {'title': title[:120], 'app': cls.split('.')[-1] if cls else None},
+                               'windows': [{'app': w['cls'].split('.')[-1], 'title': w['title'][:80]} for w in wins], 'text': clean_text[:600],
+                               'changedAt': screen.get('changedAt', now) if prev == summary else now})
+        except Exception as e:
+            print('eyes error', e, flush=True)
+        time.sleep(4)
+
+# ---------------------------------------------------------------- listen to the site (backup to POST /box/event)
+seen_recent = deque(maxlen=30)
+def take_event(e):
+    text = str(e.get('text') or '')[:300]
+    if not text or not safe(text) or str(e.get('source')) in ('private', 'dm') or e.get('private'): return False
+    k = hashlib.md5(text.encode()).hexdigest()
+    if k in seen_recent: return False
+    seen_recent.append(k)
+    with lock:
+        events_in.append({'text': text, 'user': str(e.get('user') or '')[:40], 'ts': time.time()})
+    did(f'heard: "{text[:60]}"', 'ears')
+    return True
+
+def ears():
+    since = int(time.time() * 1000)
+    while True:
+        time.sleep(15)
+        try:
+            data = json.loads(urllib.request.urlopen(urllib.request.Request(f'{SITE}/api/events?since={since}', headers={'User-Agent': 'JenaDesk/1.0'}), timeout=8).read())
+            since = data.get('now', since)
+            for e in data.get('events', []):
+                tr = (e or {}).get('trigger') or {}
+                if tr.get('private') or not tr.get('text'): continue
+                take_event({'text': tr['text'], 'user': tr.get('user'), 'source': tr.get('source')})
+        except Exception:
+            pass
+
+# ---------------------------------------------------------------- the door (http + websocket passthrough)
+def payload():
+    with lock:
+        return dict(screen, actions=list(actions)[-8:], video=watching['video'], now=int(time.time() * 1000))
+
+CORS = b'Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
+
+async def pipe(r, w):
+    try:
+        while True:
+            d = await r.read(65536)
+            if not d: break
+            w.write(d); await w.drain()
+    except Exception:
+        pass
+    finally:
+        try: w.close()
+        except Exception: pass
+
+async def client(reader, writer):
+    try:
+        head = await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), 15)
+    except Exception:
+        writer.close(); return
+    line = head.split(b'\r\n', 1)[0].decode('latin1')
+    try:
+        method, path, _ = line.split(' ', 2)
+    except ValueError:
+        writer.close(); return
+    p = path.split('?')[0]
+    if p.startswith('/websockify'):
+        try:
+            ur, uw = await asyncio.open_connection(*WS_UPSTREAM)
+        except Exception:
+            writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
+        uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
+        await asyncio.gather(pipe(reader, uw), pipe(ur, writer)); return
+    hdrs = {}
+    for l in head.decode('latin1').split('\r\n')[1:]:
+        if ':' in l:
+            k, v = l.split(':', 1); hdrs[k.strip().lower()] = v.strip()
+    body = b''
+    n = int(hdrs.get('content-length') or 0)
+    if 0 < n < 8192:
+        body = await reader.readexactly(n)
+    status, ctype, out = 200, 'application/json', b''
+    if method == 'OPTIONS':
+        status, out = 204, b''
+    elif p in ('/box/screen.json', '/box/screen', '/screen.json'):
+        out = json.dumps(payload()).encode()
+    elif p in ('/box/shot.jpg', '/shot.jpg'):
+        ctype, out = 'image/jpeg', shot_jpg
+    elif p in ('/box/desktop.json', '/box', '/box/'):
+        out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
+    elif p == '/box/event' and method == 'POST':
+        try: ok = take_event(json.loads(body or b'{}'))
+        except Exception: ok = False
+        out = json.dumps({'ok': ok}).encode()
+    elif p in ('/', '/health', '/box/health'):
+        out = json.dumps({'ok': True, 'who': "Jena's desktop"}).encode()
+    else:
+        status, out = 404, b'{"error":"not here"}'
+    reason = {200: 'OK', 204: 'No Content', 404: 'Not Found'}[status]
+    writer.write(f'HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {len(out)}\r\nCache-Control: no-store\r\nConnection: close\r\n'.encode() + CORS + b'\r\n' + out)
+    try: await writer.drain()
+    except Exception: pass
+    writer.close()
+
+async def door():
+    srv = await asyncio.start_server(client, '127.0.0.1', PORT)
+    print(f'door open on 127.0.0.1:{PORT}', flush=True)
+    async with srv:
+        await srv.serve_forever()
+
+if __name__ == '__main__':
+    for f in (eyes, ears) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
+        threading.Thread(target=f, daemon=True).start()
+    asyncio.run(door())

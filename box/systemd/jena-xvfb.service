@@ -1,0 +1,11 @@
+[Unit]
+Description=Jena desktop: X display :99 (1600x704, matches the site's desktop panel)
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+User=user
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1600x704x24 -nolisten tcp
+Restart=always
+RestartSec=2
+[Install]
+WantedBy=multi-user.target

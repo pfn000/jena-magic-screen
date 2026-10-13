@@ -93,6 +93,8 @@ async function think(req) {
     attachment: b.attachment ? { name: clip(b.attachment.name, 120), type: clip(b.attachment.type, 80), size: +b.attachment.size || 0 } : undefined,
   };
   const broadcast = keyed && b.broadcast !== false && input.source !== 'twitch';
+  // her desktop hears public messages too (a typed URL opens exactly that URL, searches, videos)
+  const toDesk = input.message ? boxLink().then((bx) => bx && fetch(bx.url + '/box/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.message, user: input.user, source: input.source }), signal: AbortSignal.timeout(5000) })).catch(() => null) : null;
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {
@@ -106,6 +108,7 @@ async function think(req) {
         ctrl.enqueue(enc.encode(JSON.stringify({ type: 'step', kind: 'feel', text: `brain hiccup: ${e.message}` }) + '\n'));
         ctrl.enqueue(enc.encode(JSON.stringify({ type: 'done' }) + '\n'));
       }
+      if (toDesk) await toDesk;
       if (broadcast) {
         try {
           await pushItem('events', { type: 'thought_run', origin: clip(b.origin, 40), trigger: { source: input.source, user: input.user, text: clip(input.message, 200), attachment: input.attachment }, events: run }, 50);

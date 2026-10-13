@@ -1,0 +1,13 @@
+[Unit]
+Description=Jena desktop: view-only VNC of :99 (localhost only)
+After=jena-xvfb.service
+PartOf=jena-xvfb.service
+StartLimitIntervalSec=0
+[Service]
+User=user
+ExecStartPre=/bin/sleep 1
+ExecStart=/usr/bin/x11vnc -display :99 -forever -shared -viewonly -nopw -localhost -rfbport 5900 -noxdamage -quiet
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
