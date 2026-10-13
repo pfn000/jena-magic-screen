@@ -125,13 +125,13 @@ class Unit:
         self.probe_ok = None; self.fail_streak = 0; self.last_probe = None
         self.healthy_since = None
         self.level = 0; self.level_at = 0; self.last_wd_restart = 0
-        self.degraded = False; self.degraded_why = ''; self.settled_at = 0; self.bootstrap = False
+        self.degraded = False; self.degraded_why = ''; self.settled_at = 0; self.bootstrap = False; self.manual_at = 0
     def flaps(self, win=FLAP_WIN, after=0):
         """restart / down->up events in the window; a 'wake' within 60 s of another counted event is the same blip"""
         t = now(); out = []
         for e in sorted(self.events):
-            if t - e[0] > win or e[0] <= after or e[1] not in ('crash_restart', 'wd_restart', 'wake', 'frame_wake'): continue
-            if e[1] in ('wake', 'frame_wake') and out and e[0] - out[-1][0] < 60: continue
+            if t - e[0] > win or e[0] <= after or e[1] not in ('crash_restart', 'wd_restart', 'wake'): continue
+            if e[1] == 'wake' and out and e[0] - out[-1][0] < 60: continue
             out.append(e)
         return out
 
@@ -243,12 +243,12 @@ def check_unit(u):
             for _ in range(min(5, s['nrestarts'] - prev['nrestarts'])): u.events.append((now(), 'crash_restart'))
             incident(u.name, 'crash_restart', f"systemd restarted it on its own (NRestarts {prev['nrestarts']}->{s['nrestarts']})", 'none (systemd Restart=always)', s['active'])
         elif s['pid'] and prev['pid'] and s['pid'] != prev['pid'] and now() - u.last_wd_restart > 30:
-            u.events.append((now(), 'manual_restart'))   # someone deployed/restarted it on purpose: not a flap
+            u.events.append((now(), 'manual_restart')); u.manual_at = now()   # someone deployed/restarted it on purpose: not a flap
     u.last = s
     if u.spec.get('probe') and s['active'] == 'active':
         r = http_get(u.spec['probe'], 5); u.last_probe = {'ok': r['ok'], 'ms': r['ms'], 'status': r['status'], 'at': now(), 'error': r.get('error')}
         if u.probe_ok is True and not r['ok']: u.events.append((now(), 'sleep'))
-        if u.probe_ok is False and r['ok']: u.events.append((now(), 'wake'))
+        if u.probe_ok is False and r['ok'] and now() - u.manual_at > 120 and now() - u.last_wd_restart > 120: u.events.append((now(), 'wake'))
         u.probe_ok = r['ok']; u.fail_streak = 0 if r['ok'] else u.fail_streak + 1
     healthy = s['active'] == 'active' and (u.probe_ok is not False if u.spec.get('probe') else True)
     if healthy and u.healthy_since is None:
@@ -314,9 +314,16 @@ def check_extras():
     was = fr.get('fresh')
     fr.update({'fresh': fresh, 'censor_state': h['headers'].get('X-Censor-State'), 'censor_age_ms': age, 'screen_age_s': round(sj_age, 1) if sj_age is not None else None, 'private': private, 'at': now()})
     d = UNITS_STATE['jena-desk']
-    if was is True and not fresh: d.events.append((now(), 'sleep')); fr['stale_since'] = now()
+    if was is True and not fresh:
+        fr['stale_since'] = now(); fr['why'] = f"http {h['status'] or h.get('error')}, censor {fr['censor_state']} age {age} ms, screen.json {fr['screen_age_s']} s"
     if was is False and fresh:
-        d.events.append((now(), 'frame_wake')); fr['stale_since'] = None
+        fr['stale_since'] = None
+        if now() - max(d.manual_at, d.last_wd_restart) > 120:   # a deploy restart is not her desktop napping
+            fl = fr.setdefault('flips', []); fl.append(now()); fl[:] = [x for x in fl if now() - x < FLAP_WIN]
+            if len(fl) >= FLAP_N and now() - fr.get('flap_reported', 0) > 1800:
+                fr['flap_reported'] = now(); fl.clear()
+                incident('jena-desk', 'desktop_frame_flapping', f"her public desktop frame went stale and came back {FLAP_N}x in 10 min; last stale: {fr.get('why')}; desk API {'answering' if d.probe_ok else 'NOT answering'}",
+                         'none: frame-only flap (a restart would not fix a slow censor/CPU); desk-API flaps are restarted by the ladder', 'reported for Tab review')
     if not fresh and fr.get('stale_since') and now() - fr['stale_since'] > 180 and not private and not fr.get('reported'):
         fr['reported'] = True; incident('jena-desk', 'desktop_frame_stale', f"frame not fresh for 3 min (censor {fr['censor_state']} age {age} ms, screen.json {fr['screen_age_s']} s)", 'none yet (desk API still answers)', '')
     if fresh: fr['reported'] = False

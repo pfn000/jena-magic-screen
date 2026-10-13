@@ -69,13 +69,18 @@ function renderHealth(d, err) {
   const w = d.data || {};
   if (!w.private) return `<div id="wd-health" class="dp-card"><h3>Watchdog</h3><p>status: <b>${esc(w.status || '?')}</b> · details are mama-only: unlock the private DM drawer with your passcode first</p></div>`;
   const pill = { healthy: 'ready', trouble: 'checking', degraded: 'blocked' }[w.status] || '';
-  const units = Object.entries(w.units || {}).map(([n, u]) => `<tr><td>${dot(u.active === 'active' && (!u.probe || u.probe.ok) && !u.degraded)}${esc(n.replace('jena-', ''))}</td><td>${esc(u.active)}${u.probe ? ` · ${u.probe.ms} ms` : ''}</td><td>${u.flaps_10min}</td><td>${u.ladder ? 'L' + u.ladder : '—'}${u.degraded ? ' ⚠️' : ''}</td><td>${esc((u.known_good?.commits || []).join(' ') || '—')}</td></tr>`).join('');
+  const all = Object.entries(w.units || {});
+  const okU = (u) => u.active === 'active' && (!u.probe || u.probe.ok) && !u.degraded && !u.flaps_10min && !u.ladder;
+  const shown = all.filter(([, u]) => u.probe || !okU(u)), rest = all.filter(([, u]) => !u.probe && okU(u));
+  const kg = (u) => { const c = (u.known_good?.commits || []).find((x) => !x.startsWith('sha256:')) || (u.known_good?.commits || [])[0]; return c ? esc(c.replace('sha256:', '#').slice(0, 8)) : '—'; };
+  const units = shown.map(([n, u]) => `<tr><td>${dot(okU(u) || (u.active === 'active' && (!u.probe || u.probe.ok) && !u.degraded))}${esc(n.replace('jena-', ''))}</td><td>${esc(u.active === 'active' ? 'up' : u.active)}${u.probe ? ` ${u.probe.ms}ms` : ''}</td><td>${u.flaps_10min}</td><td>${u.ladder ? 'L' + u.ladder : '—'}${u.degraded ? ' ⚠️' : ''}</td><td>${kg(u)}</td></tr>`).join('')
+    + (rest.length ? `<tr><td colspan="5">${dot(true)}+${rest.length} more up: ${esc(rest.map(([n]) => n.replace('jena-', '')).join(', '))}</td></tr>` : '');
   const inc = (w.incidents || []).slice(-14).reverse().map((i) => `<li><small>${ago(i.ts)}</small> <b>${esc(i.unit)}</b> ${esc(i.what)} · ${esc(i.action)}${i.result ? ' → ' + esc(i.result).slice(0, 160) : ''}</li>`).join('');
   const f = w.frame || {}, t = w.tunnel || {}, c = w.chat_probe || {};
   return `<div id="wd-health" class="dp-card"><h3>Watchdog <span class="dp-pill ${pill}">${esc(w.status)}</span>${w.paused ? ' <span class="dp-pill">paused</span>' : ''}</h3>
     <p>checks every service every 20 s · flap = 3 restarts / sleep-wake cycles in 10 min → restart → roll back to the last known-good files → degraded</p>
     <p>${dot(t.ok)} public tunnel ${t.ms ?? '?'} ms · ${dot(f.fresh)} desktop frame ${esc(f.censor_state || '?')}${f.screen_age_s != null ? ` (${f.screen_age_s}s)` : ''} · ${dot(w.firefox_alive)} Firefox · ${dot(c.ok)} chat reply probe ${c.ms ?? '?'} ms</p>
-    <div style="overflow-x:auto"><table class="wd-t"><tr><th>service</th><th>state</th><th>flaps</th><th>ladder</th><th>known-good</th></tr>${units}</table></div>
+    <div style="overflow-x:auto"><table class="wd-t"><tr><th>service</th><th>state</th><th>flaps</th><th>step</th><th>good</th></tr>${units}</table></div>
     <h4>Incidents</h4><ul class="wd-inc">${inc || '<li>none yet</li>'}</ul><p class="dp-foot">watchdog read ${ago(d._at)}</p></div>`;
 }
 async function pullHealth() {
@@ -100,7 +105,7 @@ function place() {
 function startHealthView() {
   if (!document.getElementById('wd-css')) {
     const st = document.createElement('style'); st.id = 'wd-css';
-    st.textContent = '#wd-health table.wd-t{border-collapse:collapse;font-size:12px;width:100%}#wd-health .wd-t td,#wd-health .wd-t th{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;white-space:nowrap}#wd-health .wd-inc{font-size:12px;padding-left:16px;max-height:260px;overflow:auto;word-break:break-word}#wd-health .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#c33}#wd-health .dot.ok{background:#2c3}';
+    st.textContent = '#wd-health{background:#17121f !important}#wd-health .wd-t td[colspan]{white-space:normal}#wd-health table.wd-t{border-collapse:collapse;font-size:12px;width:100%}#wd-health .wd-t td,#wd-health .wd-t th{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;white-space:nowrap}#wd-health .wd-inc{font-size:12px;padding-left:16px;max-height:260px;overflow:auto;word-break:break-word}#wd-health .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#c33}#wd-health .dot.ok{background:#2c3}';
     document.head.appendChild(st);
   }
   const hook = () => {
