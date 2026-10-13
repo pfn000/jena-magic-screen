@@ -73,7 +73,7 @@ os.makedirs(dst, exist_ok=True)
 # 3b) extra training chats Tab syncs from her box (e.g. Jena's Grok notes), attached as the private
 #     Kaggle dataset saidienewara/jenaxi-training-data. Deduped against her handwritten persona chats and
 #     appended to the persona file of THIS session's copy of the repo (her repo itself is not changed).
-extra = sorted(glob.glob("/kaggle/input/**/jenaxi_extra_chats.jsonl", recursive=True))
+extra = sorted(glob.glob("/kaggle/input/**/jenaxi_extra_chats.jsonl", recursive=True)) or sorted(glob.glob("/tmp/jena_extra/jenaxi_extra_chats.jsonl"))   # dataset, or embedded in the kernel by the driver
 if extra:
     pf = os.path.join(REPO, "colab", "data", "jena_persona.jsonl")
     base = [json.loads(l) for l in open(pf, encoding="utf-8") if l.strip()]
