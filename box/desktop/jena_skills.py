@@ -123,30 +123,34 @@ def create(name, goal, brain='http://127.0.0.1:8088/v1'):
     os.makedirs(d, exist_ok=True)
     prompt = ("Write the body of a small Python 3 script. Variable i is a dict of inputs. Use only the standard library. "
               "At the end call done(True, 'one line summary', result=...) or done(False, 'why'). No markdown, only code.\nTask: " + goal)
-    body, err = '', ''
-    try:
-        req = urllib.request.Request(brain + '/chat/completions', data=json.dumps({'messages': [{'role': 'user', 'content': prompt}], 'max_tokens': 300, 'temperature': 0.3}).encode(), headers={'Content-Type': 'application/json'})
-        body = json.loads(urllib.request.urlopen(req, timeout=60).read())['choices'][0]['message']['content']
-        body = re.sub(r'^```\w*|```$', '', body.strip(), flags=re.M).strip()
-    except Exception as e:
-        err = f'brain did not answer: {e}'
-    code = TEMPLATE.format(body=body)
-    open(os.path.join(d, 'run.py'), 'w').write(code)
-    status, test = 'failed validation', {}
-    if not err:
+    status, test, err, attempts = 'failed validation', {}, '', []
+    for attempt in range(3):   # she gets 3 tries; each failed check is fed back to her
+        body, err = '', ''
+        msg = prompt if not attempts else prompt + f"\nYour last try failed: {attempts[-1]}. Fix it. One statement per line."
+        try:
+            req = urllib.request.Request(brain + '/chat/completions', data=json.dumps({'messages': [{'role': 'user', 'content': msg}], 'max_tokens': 300, 'temperature': 0.3 + 0.2 * attempt}).encode(), headers={'Content-Type': 'application/json'})
+            body = json.loads(urllib.request.urlopen(req, timeout=60).read())['choices'][0]['message']['content']
+            body = re.sub(r'^```\w*|```$', '', body.strip(), flags=re.M).strip()
+        except Exception as e:
+            err = f'brain did not answer: {e}'; attempts.append(err); break
+        code = TEMPLATE.format(body=body)
+        open(os.path.join(d, 'run.py'), 'w').write(code)
         try:
             py_compile.compile(os.path.join(d, 'run.py'), doraise=True)
             r = subprocess.run([PY, os.path.join(d, 'run.py')], input='{"test": true}', capture_output=True, text=True, timeout=10, cwd=d)
             last = (r.stdout.strip().splitlines() or [''])[-1]
-            test = json.loads(last)
-            if 'ok' in test: status = 'enabled'
-            else: err = 'test run printed JSON without "ok"'
-        except py_compile.PyCompileError as e: err = 'does not compile: ' + str(e)[-200:]
+            try: test = json.loads(last)
+            except Exception: raise RuntimeError('printed no JSON result' + (': ' + r.stderr.strip().splitlines()[-1][:120] if r.stderr.strip() else ''))
+            if test.get('ok') is True: status = 'enabled'; break
+            err = 'its own test run reported failure: ' + str(test.get('summary', ''))[:100] if 'ok' in test else 'test run printed JSON without "ok"'
+        except py_compile.PyCompileError as e: err = 'does not compile: ' + str(e).strip().splitlines()[-1][:160]
         except subprocess.TimeoutExpired: err = 'test run timed out'
         except Exception as e: err = f'test run failed: {str(e)[:160]}'
-    spec = {'name': name, 'description': goal[:200], 'triggers': [], 'kind': 'script', 'entry': 'run.py', 'timeout': 20, 'status': status, 'made_by': 'Jena (her own brain)', 'validation': err or 'passed: compiled and test run returned a result', 'created': int(time.time() * 1000)}
+        attempts.append(err)
+    code = open(os.path.join(d, 'run.py')).read() if os.path.exists(os.path.join(d, 'run.py')) else ''
+    spec = {'name': name, 'description': goal[:200], 'triggers': [], 'kind': 'script', 'entry': 'run.py', 'timeout': 20, 'status': status, 'made_by': 'Jena (her own brain)', 'validation': ('passed: compiled, and its test run on her box returned ok' if status == 'enabled' else err), 'attempts': attempts, 'created': int(time.time() * 1000)}
     json.dump(spec, open(os.path.join(d, 'skill.json'), 'w'), indent=1)
-    return {'ok': status == 'enabled', 'name': name, 'status': status, 'validation': spec['validation'], 'code': code[-1500:], 'test': test}
+    return {'ok': status == 'enabled', 'name': name, 'status': status, 'validation': spec['validation'], 'attempts': attempts, 'code': code[-1500:], 'test': test}
 
 def sync_loop():
     while True:
