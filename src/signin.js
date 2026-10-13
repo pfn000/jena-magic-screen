@@ -143,7 +143,7 @@ export function renderAsks(edits) {
   if (!key()) return h + '<p>Only mama sees Jena\'s asks. Passcode: <input id="ask-key" type="password" size="10" autocomplete="off"> <button data-ask-unlock>unlock</button></p>';
   if (!d) return h + `<p>${asks.error ? `<span class="dp-warn">${esc(asks.error)}</span>` : 'reading her asks…'}</p>`;
   const p = d.pending, act = d.active || {};
-  if (act.active) h += `<div class="dp-card"><b>🔒 Private sign-in open: ${esc(act.site)}</b><p>closes by itself ${act.until ? 'in ' + Math.max(0, Math.round((act.until - Date.now()) / 60000)) + ' min' : ''}</p><button data-ask-signin="${esc(act.id)}">reopen the window</button> <button data-ask-done="${esc(act.id)}">✓ Done</button></div>`;
+  if (act.active) h += `<div class="dp-card"><b>🖐 Sign-in window open: ${esc(act.site)}</b><p>closes by itself ${act.until ? 'in ' + Math.max(0, Math.round((act.until - Date.now()) / 60000)) + ' min' : ''}</p><button data-ask-signin="${esc(act.id)}">reopen the window</button> <button data-ask-done="${esc(act.id)}">✓ Done</button></div>`;
   if (p && p.status === 'pending') {
     const link = p.link || '';
     h += `<div class="dp-card ask-card"><b>🔑 Jena wants you to sign in to ${esc(p.label)}</b><p>${esc(p.reason || '')} · ${ago(p.ts)} · expires in ${Math.max(0, Math.round((p.ts + (d.expires_s || 600) * 1000 - Date.now()) / 60000))} min</p>
@@ -172,7 +172,7 @@ export async function handleAskClick(e, rerender) {
   const find = (id) => (asks.data?.pending?.id === id ? asks.data.pending : (asks.data?.requests || []).find((r) => r.id === id));
   if (ds.askSignin) { openSignin(find(ds.askSignin) || { id: ds.askSignin, label: asks.data?.active?.site || 'the site' }); return true; }
   if (ds.askCancel) { asks.out = JSON.stringify(await mamaSignin('cancel', { id: ds.askCancel })).slice(0, 300); rerender(); return true; }
-  if (ds.askDone) { asks.out = 'closing her private window (Firefox saves the session)…'; rerender(); const r = await mamaSignin('done', { id: ds.askDone }); asks.out = r.ok ? (r.request?.note || 'closed') : (r.summary || r.error); rerender(); return true; }
+  if (ds.askDone) { asks.out = 'closing her sign-in browser (Firefox saves the session)…'; rerender(); const r = await mamaSignin('done', { id: ds.askDone }); asks.out = r.ok ? (r.request?.note || 'closed') : (r.summary || r.error); rerender(); return true; }
   if (ds.askAnswer) { const a = (asks.data?.asks || []).find((x) => String(x.ts) === ds.ts); if (a) await answer(a, ds.askAnswer); const d = await mamaSignin('list'); if (d.ok) { asks.data = d; onData(d); } rerender(); return true; }
   if (ds.askNew !== undefined) { const v = document.getElementById('ask-site')?.value.trim() || 'grok.com'; const r = await mamaSignin('request', { site: v, reason: 'mama started it from the dev panel' }); asks.out = r.ok ? `ask added: ${r.request?.label}` : (r.summary || r.error); const d = await mamaSignin('list'); if (d.ok) asks.data = d; rerender(); return true; }
   return false;
@@ -180,9 +180,18 @@ export async function handleAskClick(e, rerender) {
 
 // mama's sign-in = a takeover of Jena's real desktop (:99): one-time token from her box, passcode checked there
 async function takeoverFor(pass) {
-  const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover' }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
-  if (r.ok && r.ws) localStorage.setItem(KEY, pass);
-  return r.ok && r.ws ? { ok: true, ws: r.ws, until: Date.now() + 15 * 60000 } : { ok: false, summary: r.error === 'wrong key' ? 'wrong passcode' : (r.summary || r.error || 'her box did not answer') };
+  // her tunnel can be mid-restart (the answer is then an HTML error page, not JSON): try 3 times over ~8 s
+  let last = null;
+  for (let i = 0; i < 3; i++) {
+    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover' }) })
+      .then(async (x) => { const t = await x.text(); try { return JSON.parse(t); } catch { return { ok: false, retry: true, summary: 'her box is reconnecting' }; } })
+      .catch(() => ({ ok: false, retry: true, summary: 'her box is reconnecting' }));
+    if (r.ok && r.ws) { localStorage.setItem(KEY, pass); return { ok: true, ws: r.ws, until: Date.now() + 60 * 60000 }; }
+    if (r.error === 'wrong key') return { ok: false, summary: 'wrong passcode' };
+    last = r;
+    await new Promise((res) => setTimeout(res, 1500 + i * 2000));
+  }
+  return { ok: false, summary: (last && (last.summary || last.error)) || 'her box did not answer', retry: true };
 }
 
 // ---------------- the private window ----------------
@@ -198,7 +207,7 @@ export function openSignin(req) {
       <button class="si-kb" hidden style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">⌨️</button>
       <button class="si-done" hidden style="padding:6px 12px;border-radius:9px;border:0;background:#38c172;color:#06200f;font-weight:700">✓ Done</button>
       <button class="si-x" style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">✕</button></header>
-    <form class="si-pass" style="margin:auto;max-width:330px;padding:20px;text-align:center"><p>You take over Jena's own desktop (her hands pause) and sign in right in her browser. Only the public/stream view shows a lock card meanwhile. You type everything yourself.</p>
+    <form class="si-pass" style="margin:auto;max-width:330px;padding:20px;text-align:center"><p>You take over Jena's own desktop (her hands pause) and sign in right in her browser. You type everything yourself.</p>
       <input type="password" autocomplete="off" placeholder="passcode" style="font-size:16px;padding:10px;border-radius:10px;border:1px solid #888;width:100%;box-sizing:border-box">
       <button style="margin-top:10px;width:100%;padding:11px;border-radius:10px;border:0;background:#b48cff;color:#1d1b2e;font:700 15px system-ui">Open ${label}</button><p class="si-err" style="color:#ff8a8a"></p></form>
     <div class="si-screen" hidden style="flex:1;min-height:0;background:#000;touch-action:none"></div>
@@ -210,12 +219,15 @@ export function openSignin(req) {
   const close = () => { clearInterval(timer); try { rfb?.disconnect(); } catch {} w.remove(); };
   w.querySelector('.si-x').onclick = close;   // the window on her box keeps running until Done or 10 min; reopen from the card
   const useLink = !!req.link && !key();   // mama with her passcode on this device always takes over her real desktop
+  let ownWindow = useLink;   // true = her Firefox on its own screen (box 'start'); Done closes it and saves the session
   const call = (op, pass) => (useLink ? linkSignin(op, req.link) : mamaSignin(op, { id: req.id }, pass || key()));
   const go = async (pass) => {
     form.querySelector('button').disabled = true; st.textContent = 'opening…';
     // mama (passcode on this device): sign in right on Jena's own desktop through a takeover. She sees it raw;
     // Jena's hands pause; only the public/OBS view gets the lock card meanwhile. The one-use link keeps the old window.
-    const d = useLink ? await call('start', pass) : await takeoverFor(pass || key());
+    let d = useLink ? await call('start', pass) : await takeoverFor(pass || key());
+    // her desktop isn't answering: open her own Firefox (same profile) on a free screen instead, raw for mama
+    if (!d.ok && !useLink && req.id && d.summary !== 'wrong passcode') { st.textContent = 'her desktop is busy, opening her browser by itself…'; const s2 = await mamaSignin('start', { id: req.id }, pass || key()); if (s2.ok) { d = s2; ownWindow = true; } }
     if (!d.ok) {
       form.querySelector('button').disabled = false; st.textContent = '';
       form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open';
@@ -223,17 +235,30 @@ export function openSignin(req) {
       else { form.querySelector('input').hidden = false; form.querySelector('button').hidden = false; form.querySelector('input').focus(); }
       return;
     }
-    if (d.label) w.querySelector('header b').textContent = `🔒 Sign Jena in to ${d.label}`;
+    if (d.label) w.querySelector('header b').textContent = `🖐 Sign Jena in to ${d.label}`;
     form.remove(); screen.hidden = false; kbBtn.hidden = false; doneBtn.hidden = false;
     until = d.until || Date.now() + 600000;
     rfb = new RFB(screen, d.ws, { shared: true, wsProtocols: d.protocol ? [d.protocol, 'binary'] : ['binary'] });
     rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.clipViewport = false; rfb.showDotCursor = true;
-    rfb.addEventListener('connect', () => { st.textContent = 'connected'; });
+    let connected = false;
+    rfb.addEventListener('connect', () => { connected = true; st.textContent = 'connected'; });
+    if (!ownWindow && req.id) setTimeout(async () => {   // takeover never connected (her :99 is down): switch to her own Firefox window
+      if (connected || !w.isConnected) return;
+      try { rfb.disconnect(); } catch {}
+      st.textContent = 'her desktop is off, opening her browser by itself…';
+      const s2 = await mamaSignin('start', { id: req.id }, key());
+      if (!s2.ok) { st.textContent = s2.summary || s2.error || 'could not open her browser'; return; }
+      ownWindow = true; until = s2.until || Date.now() + 600000;
+      screen.innerHTML = '';
+      rfb = new RFB(screen, s2.ws, { shared: true, wsProtocols: s2.protocol ? [s2.protocol, 'binary'] : ['binary'] });
+      rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.showDotCursor = true;
+      rfb.addEventListener('connect', () => { connected = true; st.textContent = 'connected'; });
+    }, 9000);
     rfb.addEventListener('disconnect', (ev) => { st.textContent = ev.detail?.clean ? 'closed' : 'connection dropped: tap ✕ and Open again'; });
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
   form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
-  if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser on a private screen only you can see…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
+  if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
   else form.querySelector('input').focus();
   // phone keyboard: a hidden input forwards what mama types as key presses (never stored anywhere)
   kbBtn.onclick = () => { kbIn.focus(); };
@@ -249,8 +274,8 @@ export function openSignin(req) {
   doneBtn.onclick = async () => {
     doneBtn.disabled = true; st.textContent = 'saving her session (closing Firefox)…';
     try { rfb?.disconnect(); } catch {}
-    const r = useLink ? await call('done') : { ok: true, request: { note: 'her own browser keeps the session (same Firefox profile)' } };
-    if (!useLink) mamaSignin('cancel', { id: req.id }).catch(() => {});   // the ask is handled: clear its card
+    const r = ownWindow ? (useLink ? await call('done') : await mamaSignin('done', { id: req.id })) : { ok: true, request: { note: 'her own browser keeps the session (same Firefox profile)' } };
+    if (!ownWindow && req.id) mamaSignin('cancel', { id: req.id }).catch(() => {});   // the ask is handled: clear its card
     st.textContent = r.ok ? 'done ✓' : (r.summary || r.error || 'failed');
     screen.innerHTML = `<p style="padding:20px;color:#fff">${r.ok ? '✓ Closed. Her browser saved the session and went back to her desktop.<br><small>' + esc(r.request?.note || '') + '</small>' : esc(r.summary || r.error || 'failed')}</p>`;
     clearInterval(timer); setTimeout(close, 6000);

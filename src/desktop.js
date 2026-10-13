@@ -79,7 +79,10 @@ export class Desktop {
     this.mamaBtn.addEventListener('click', () => this.unlockMama());
     if (!OBS) this.screen.appendChild(this.mamaBtn);
     this.syncMamaBtn();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && this.mode === 'public') this.kick(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (this.mode === 'public') this.kick(); else if (!this.rfb) this.startMama(); });
+    window.addEventListener('online', () => { if (this.mode === 'mama' && !this.rfb) this.startMama(); else if (this.mode === 'public') this.kick(); });
+    // self-heal: a mama view with no live connection and nothing scheduled gets restarted
+    setInterval(() => { if (this.mode === 'mama' && !this.rfb && !document.hidden && Date.now() - (this.mamaTried || 0) > 20000) this.startMama(); }, 10000);
     this.setUrl(url, true);
     setInterval(() => this.pollStatus(), 2500);
   }
@@ -88,24 +91,32 @@ export class Desktop {
 
   setUrl(url, first = false) {
     // the site can briefly forget her box's address (a cold server instance): keep using the last one that worked
-    // and look again every 10 s, instead of sitting on "asleep" while she is busy on her desktop
+    // and ask again right away with backoff (2 s, 4 s, 8 s … 15 s), instead of sitting on "asleep" while she is busy
     let base = boxBase(url);
     if (!base) {
       base = boxBase(localStorage.getItem('jena.lastBox'));
-      clearTimeout(this.cfgTimer);
-      this.cfgTimer = setTimeout(async () => {
-        const c = await fetch('/api/config', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-        this.setUrl(c?.desktopUrl || null);
-      }, 10000);
-    }
+      this.refetchConfig();
+    } else { this.cfgTry = 0; clearTimeout(this.cfgTimer); }
     if (!first && base === this.base) return;
     this.base = base;
     this.url = url;
     this.fails = 0;
     this.seq = null;
-    if (!base) { this.asleep('no desktop stream configured yet'); return; }
+    // mama's raw view doesn't need the address at all (her box answers /api/mama watch), so it never waits on it
+    if (this.wantsMama()) { if (this.state !== 'live') this.asleep('connecting to her desktop…', true); this.startMama(); return; }
+    if (!base) { this.asleep('finding her desktop…', true); return; }
     if (this.state !== 'live') this.asleep('waking up…', true);
-    if (this.wantsMama()) this.startMama(); else this.startPublic();
+    this.startPublic();
+  }
+
+  refetchConfig() {
+    clearTimeout(this.cfgTimer);
+    this.cfgTry = (this.cfgTry || 0) + 1;
+    const wait = Math.min(15000, 1000 * 2 ** Math.min(4, this.cfgTry));
+    this.cfgTimer = setTimeout(async () => {
+      const c = await fetch('/api/config', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+      if (c?.desktopUrl) this.setUrl(c.desktopUrl); else this.refetchConfig();
+    }, wait);
   }
 
   syncMamaBtn() { if (this.mamaBtn) this.mamaBtn.style.display = !OBS && this.mode !== 'mama' ? 'block' : 'none'; }
@@ -123,36 +134,45 @@ export class Desktop {
   // ---------------- MAMA VIEW: raw, smooth, view-only ----------------
   async startMama() {
     this.mode = 'mama';
+    this.mamaTried = Date.now();
     this.syncMamaBtn();
     clearTimeout(this.timer);
     const key = localStorage.getItem('jena.dmKey');
     const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key || '' }, body: JSON.stringify({ action: 'watch' }) })
       .then((x) => x.json().then((d) => ({ status: x.status, ...d }))).catch(() => null);
     if (!r || !r.ok || !r.ws) {
-      // wrong/old passcode or an older box without the watch door: the public (censored) view
       this.mamaWhy = r ? (r.error || r.summary || `status ${r.status}`) : 'no answer';
-      this.startPublic();
-      if (r && r.status !== 401) this.watchRetry = setTimeout(() => { if (this.mode === 'public' && this.wantsMama()) this.startMama(); }, 60000);
+      if (r && r.status === 401) { this.startPublic(); return; }   // wrong/old passcode: the public view
+      // her box didn't answer this time (tunnel blip, cold server): stay on mama view, keep the last picture, try again soon
+      this.mamaFails = (this.mamaFails || 0) + 1;
+      if (this.state === 'live' && this.rfb) this.root.classList.add('is-reconnecting');
+      else if (this.state !== 'live') this.asleep('reconnecting to her desktop…', true);
+      else this.root.classList.add('is-reconnecting');
+      if (this.mamaFails % 3 === 0) this.refetchConfig();
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => { if (this.mode === 'mama') this.startMama(); }, Math.min(15000, 2000 * this.mamaFails));
       return;
     }
+    this.mamaFails = 0;
     let RFB;
     try { RFB = (await import('@novnc/novnc')).default; } catch { this.startPublic(); return; }
     try { this.rfb?.disconnect(); } catch {}
-    this.vnc.innerHTML = '';
+    this.vnc.querySelectorAll('div').forEach((el) => { el.style.position = 'absolute'; el.style.inset = '0'; el.dataset.old = '1'; });   // old picture stays under the new one until it connects
     this.vnc.style.display = 'block';
     this.imgs.forEach((im) => { im.style.opacity = '0'; });
     const rfb = new RFB(this.vnc, r.ws, { shared: true });
     rfb.viewOnly = true; rfb.scaleViewport = true; rfb.resizeSession = false; rfb.focusOnClick = false; rfb.showDotCursor = true;   // her cursor is drawn into the picture by the box too
     rfb.background = '#000';
     this.rfb = rfb;
-    rfb.addEventListener('connect', () => { this.mamaOk = Date.now(); try { localStorage.setItem('jena.lastBox', this.base); } catch {} this.awake(); });
+    rfb.addEventListener('connect', () => { this.mamaOk = Date.now(); this.root.classList.remove('is-reconnecting'); this.vnc.querySelectorAll('[data-old]').forEach((el) => el.remove()); try { localStorage.setItem('jena.lastBox', this.base); } catch {} this.awake(); });
     rfb.addEventListener('disconnect', () => {
       if (this.rfb !== rfb) return;
       this.rfb = null;
       if (this.mode !== 'mama') return;
-      this.asleep('reconnecting mama view…', true);
+      // a blip never blanks the panel: the last picture stays with a small reconnecting dot
+      this.root.classList.add('is-reconnecting');
       clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.startMama(), WATCH_RETRY_MS);
+      this.timer = setTimeout(() => this.startMama(), this.mamaOk && Date.now() - this.mamaOk < 30000 ? WATCH_RETRY_MS : 1500);
     });
   }
 
@@ -190,8 +210,10 @@ export class Desktop {
       // a tunnel hiccup never blanks the panel: the last good frame stays up with a small "reconnecting" dot;
       // only 20 s+ with nothing at all is "napping"
       const quiet = Date.now() - (this.lastShown || 0);
-      if (this.state === 'live' && quiet < 20000) this.root.classList.add('is-reconnecting');
-      else if (this.fails >= 4 && quiet >= 20000 && this.state !== 'asleep') this.asleep("her machine is napping. it'll wake up when she does");
+      if (this.fails % 3 === 0) this.refetchConfig();   // her tunnel address may have changed: ask the site again
+      if (this.state === 'live' && quiet < 60000) this.root.classList.add('is-reconnecting');
+      else if (this.fails >= 6 && quiet >= 60000 && this.state !== 'asleep' && this.censor?.age_ms > 60000) this.asleep("her machine is napping. it'll wake up when she does");
+      else if (this.state !== 'live') this.asleep('reconnecting to her desktop…', true);
     }
     // long-poll answers as soon as there is a new frame; old boxes (no seq) are polled ~3/s
     const wait = !ok ? Math.min(30000, 1500 * this.fails) : this.seq != null ? 0 : Math.max(0, 330 - (performance.now() - t0));

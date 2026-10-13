@@ -96,15 +96,32 @@ let twitchLive = false;
 
 // ---------------- thought chain ----------------
 const chain = new ThoughtChain($('#thoughts'), { obs: cfg.obs });
-chain.setHealth(cfg.apiInfo?.brainHealth || { online: false });
-// her brain's health, checked every 15 s; the badge flips to "JenaXI online" by itself
+// her brain's health. One bad read (a cold server instance that hasn't heard her box's address yet, a tunnel blip)
+// never flips the badge: "offline" needs 3 offline reads in a row spanning 20 s or more; one good read = online.
+// While unsure it re-checks every 5 s, otherwise every 15 s.
+const firstHealth = cfg.apiInfo?.brainHealth;
+let healthShown = firstHealth?.online ? true : null, badSince = 0, badCount = 0;
+if (firstHealth?.online) chain.setHealth(firstHealth); else { chain.setHealth({ online: false, detail: 'JenaXI is loading' }); chain.badge.textContent = 'checking her brain…'; }
 async function pollHealth() {
   if (!cfg.api) return chain.setHealth({ online: false });
-  const d = await fetch('/api/health', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-  if (d?.brain) { chain.setHealth(d.brain); window.dispatchEvent(new CustomEvent('jena-health', { detail: d.brain })); }
+  const d = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(12000) }).then((r) => r.json()).catch(() => null);
+  const h = d?.brain;
+  if (h?.online) {
+    badSince = 0; badCount = 0;
+    if (healthShown !== true || h.name !== chain.model) { healthShown = true; chain.setHealth(h); window.dispatchEvent(new CustomEvent('jena-health', { detail: h })); }
+  } else {
+    if (!badCount) badSince = Date.now();
+    badCount++;
+    if (badCount >= 3 && Date.now() - badSince >= 20000 && healthShown !== false) {
+      healthShown = false;
+      const hh = h || { online: false, detail: 'her box did not answer' };
+      chain.setHealth(hh); window.dispatchEvent(new CustomEvent('jena-health', { detail: hh }));
+    }
+  }
+  clearTimeout(pollHealth.t);
+  pollHealth.t = setTimeout(pollHealth, badCount || healthShown === null ? 5000 : 15000);
 }
 pollHealth();
-setInterval(pollHealth, 15000);
 
 // her desktop's own log (the same lines her desktop agent writes on her box) flows into this chain,
 // so desktop thoughts = site thoughts. Skills show as "using skill: X". Help requests to mama stay in the dev panel.
