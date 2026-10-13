@@ -17,5 +17,11 @@
     "api/jena.js": {
       "maxDuration": 30
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "box-state": false,
+      "jena-memory": false
+    }
   }
 }

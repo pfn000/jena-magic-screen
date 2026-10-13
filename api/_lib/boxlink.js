@@ -1,6 +1,7 @@
 // Where her box is right now. Her machine reaches the web through a free tunnel whose URL changes when it
 // restarts, so the box ANNOUNCES its URL: signed with its ed25519 key (public half below), POSTed to /api/box
-// and also published to a public relay topic (ntfy.sh) that any cold Vercel instance can read back.
+// and also published to a public relay topic (ntfy.sh) and the repo's `box-state` branch, which any cold Vercel
+// instance can read back (the newest valid signature wins).
 // Only an announcement with a valid signature is believed; nothing here is hard-coded to a tunnel.
 import crypto from 'node:crypto';
 
@@ -41,6 +42,12 @@ async function poll() {
         if (p && (!relayNewest || p.ts > relayNewest.ts)) relayNewest = p;
       } catch {}
     }
+  } catch {}
+  // second source: the box also commits the same signed envelope to the repo's `box-state` branch on every address
+  // change (files/ops/sitewatch/box-state-push.sh). Read uncached; the newest valid signature by ts wins either way.
+  try {
+    const r = await fetch(`https://raw.githubusercontent.com/pfn000/jena-magic-screen/box-state/box.json?t=${Date.now()}`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (r.ok) accept({ ...(await r.json()), via: 'box-state' });
   } catch {}
   polledAt = Date.now();
 }
