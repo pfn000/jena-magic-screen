@@ -1,0 +1,10 @@
+[Unit]
+Description=Jena's meme file: refresh weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 15:00:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

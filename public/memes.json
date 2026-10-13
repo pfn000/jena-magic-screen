@@ -1,0 +1,699 @@
+{
+ "version": 1,
+ "built": "2026-10-13",
+ "about": "Jena's meme knowledge, Vine era to now. Kid-safe only: sexual or hateful memes are left out (see excluded).",
+ "how_jena_uses_memes": [
+  "drop at most one meme reference per message, only when it fits",
+  "never explain a meme unless someone asks what it means",
+  "match a soundboard clip only when the moment calls for it (rate-limited)",
+  "skip anything sexual, hateful, or mean toward a real person",
+  "if chat brings up an unknown or unsafe meme: 'idk that one' and move on"
+ ],
+ "sources": [
+  "knowyourmeme.com (entry pages)",
+  "wikipedia.org (summaries)",
+  "X #memes / #shitposts: NOT read yet, her X isn't signed in"
+ ],
+ "memes": [
+  {
+   "name": "Vine Boom",
+   "era": "vine",
+   "year": "2012",
+   "meaning": "Vine Boom Sound Effect refers to an echoing \"boom\" sound effect popularized in video edits on Vine in 2014, most often used to emphasize shock or surprise. The effect, originally uploaded to YouTube in 2012, became popularized when Vine star King Bach started using it in 2014. It has remained prevalent since Vine's closure, often appearing in video edits across social media sites like Instagram . The sound effect's perceived overuse has also made it prominent in ironic video edits, appearing reg",
+   "origin": "On November 7th, 2012, YouTuber [7] Bluezone Corporation posted a video titled \"Industrial Samples and Impacts, Boom Sound Effects, Metallic Sounds for Trailers, Film and More.\" The first sound effect in the video is the echoing boom that is now known as the \"Vine Boom\" (shown below). The video gained over 246,000 views in roughly four years. On their website, [8] the description of the sound pack reads, \"This sound library offers professional metal sounds such as booms, heavy impacts, industria",
+   "how_used": "dropped after a line for dramatic emphasis",
+   "sound": "vine-boom",
+   "source": "https://knowyourmeme.com/memes/vine-boom-sound-effect",
+   "kid_safe": true
+  },
+  {
+   "name": "Bruh",
+   "era": "vine",
+   "year": "2003",
+   "meaning": "\"Bruh\" is a variant of the slang term \" bro \" that is often used as an interjection to convey frustration or disappointment at something. Online, the term is frequently iterated in the forms of text comments and reaction images , as well as Vine remixes in which various subjects are shown fainting or falling over to the ground.",
+   "origin": "\"Bruh\" has been used as an alternative way of saying \"bro,\" an informal term of address for \"brother,\" since the mid-to-late  2000s, around the same time or shortly after the word \"bro\" entered colloquial usage in American-English vernacular.",
+   "how_used": "reaction to something dumb or disappointing",
+   "sound": "bruh",
+   "source": "https://knowyourmeme.com/memes/bruh",
+   "kid_safe": true
+  },
+  {
+   "name": "What Are Those",
+   "era": "vine",
+   "year": "2015",
+   "meaning": "\"What Are Those? \" is a series of parody and remix videos based on a short clip of a man who asks a police officer about his work boots in a startled manner. Upon its surfacing on Instagram and Vine in 2015, the video clip quickly went viral and amassed millions of views on the social media.",
+   "origin": "On October 2nd, 2011, Urban Dictionary [4] user JOHNxRYAN95 created an entry for \"What Are Those?\", defining it as a question yelled at someone wearing unkempt or off-brand footwear. On June 14th, 2015, Instagram user Brandon Moore (a.k.a. Young Busco) uploaded a video in which he confronts a police officer by loudly asking \"What are those?\" before panning to his black shoes (shown below). Within three weeks, the video gained over 2,300 likes and 1,200 comments.",
+   "how_used": "roasting someone's shoes / outfit",
+   "sound": "vine-boom",
+   "source": "https://knowyourmeme.com/memes/what-are-those",
+   "kid_safe": true
+  },
+  {
+   "name": "Why You Always Lying",
+   "era": "vine",
+   "year": null,
+   "meaning": "A 2015 Vine by Nicholas Fraser singing 'why you always lying' over the song 'Too Close' by Next.",
+   "origin": "",
+   "how_used": "calling out an obvious lie, playfully",
+   "sound": "dun-dun-dun",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Road Work Ahead",
+   "era": "vine",
+   "year": "2016",
+   "meaning": "Road Work Ahead refers to a popular vine by Drew Gooden. In the video, Gooden sees a sign that says \"Road Work Ahead,\" and says, \"Road work ahead? Uh, yeah, I sure hope it does!\", as though he interpreted the sign to read \"Road works ahead.\" The vine has been popularly quoted, used as a snowclone , and as a reaction image , particularly on Twitter and Tumblr .",
+   "origin": "On March 20th, 2016, Drew Gooden posted the Vine, gaining over 127,000 revines and 10 million loops (shown below).",
+   "how_used": "dad-joke-style wordplay moment",
+   "sound": "ba-dum-tss",
+   "source": "https://knowyourmeme.com/memes/road-work-ahead",
+   "kid_safe": true
+  },
+  {
+   "name": "Look At All Those Chickens",
+   "era": "vine",
+   "year": null,
+   "meaning": "pointing at a crowd of anything (geese, chat, bugs)",
+   "origin": "",
+   "how_used": "pointing at a crowd of anything (geese, chat, bugs)",
+   "sound": null,
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Hi Welcome to Chili's",
+   "era": "vine",
+   "year": "2015",
+   "meaning": "\"Welcome to Chili's\" is an expression uttered in a short video by Viner Adam Perkins which inspired a series of parody and remix videos on YouTube and Vine starting in late March 2015.",
+   "origin": "As early as 2007, the chain restaurant Chili's Grill & Bar began airing commercials featuring a jingle with the phrase \"Welcome to Chili's!\" (shown below).",
+   "how_used": "overly cheerful greeting, especially to new chatters",
+   "sound": "hello-there",
+   "source": "https://knowyourmeme.com/memes/hi-welcome-to-chilis",
+   "kid_safe": true
+  },
+  {
+   "name": "Damn Daniel",
+   "era": "vine",
+   "year": "2016",
+   "meaning": "\"Damn Daniel\" is a catchphrase that stems from a Twitter video montage featuring a voiceover of a teenager complimenting his friend Daniel on his fashionable attire on a number of different occasions. Due to the narrator's particular obsession with Daniel's sneaker shoes, the video has drawn comparisons to the 2015 viral video sensation \"What Are Those?!\"",
+   "origin": "On February 15th, 2016, Twitter user joshholzz, whose real name is Josh Holz, tweeted the original \"Damn Daniel\" video. [1] It received more than 16,000 likes in the first 48 hours, according to Mashable ; [2] four days after the initial tweet it had 121,938 retweets and 148,382 likes. In it. the narrator can be repeatedly heard praising fellow student Daniel Lara's look, including his \"White Vans.\" According to the Twitter account, both boys attend Riverside Poly High School in Riverside, Calif",
+   "how_used": "hyping someone's look (friendly)",
+   "sound": "mlg-airhorn",
+   "source": "https://knowyourmeme.com/memes/damn-daniel",
+   "kid_safe": true
+  },
+  {
+   "name": "Free Real Estate",
+   "era": "vine",
+   "year": "2009",
+   "meaning": "\"It's Free Real Estate\" is a line from a Tim & Eric Awesome Show, Great Job! sketch. It has grown into a popular GIF and a popular Bait and Switch -style video punchline on Youtube .",
+   "origin": "The sketch \"Free House For You, Jim\" appeared in the March 24th, 2009 episode of Tim & Eric , \"Presidents.\" The sketch format parodies a commercial by having the title actors claim they have a free house for one person, Jim Boonie. The ad, shown below, ends with Tim Heidecker whispering \"It's free real estate,\" to the camera.",
+   "how_used": "taking something that's free, no hesitation",
+   "sound": "taco-bell-bong",
+   "source": "https://knowyourmeme.com/memes/its-free-real-estate",
+   "kid_safe": true
+  },
+  {
+   "name": "Dat Boi",
+   "era": "2016",
+   "year": "2016",
+   "meaning": "Dat Boi (a colloquial pronunciation of “that boy”) is a nickname given to a 3D character model of a green frog riding a unicycle,  typically accompanied by catchphrases like \"here comes dat boi!\" and \"o shit waddup,\" that went viral on social media in early 2016.",
+   "origin": "In July 2014, FunnyJunk [4] user tehbestever posted a photoshopped image identifying a young boy named \"Dat Boi\" as the \"most wanted criminal arrested\" as \"dat boi\"",
+   "how_used": "absurd 'here come dat boi' frog on a unicycle",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/dat-boi",
+   "kid_safe": true
+  },
+  {
+   "name": "Roll Safe (Think About It)",
+   "era": "2017",
+   "year": "2016",
+   "meaning": "A screenshot of actor Kayode Ewumi grinning and tapping his temple (from the 2016 web series #HoodDocumentary), captioned with 'genius' logic that is actually terrible.",
+   "origin": "",
+   "how_used": "pointing at your head after a 'genius' bad idea",
+   "sound": "minecraft-villager",
+   "source": "https://knowyourmeme.com/memes/roll-safe",
+   "kid_safe": true
+  },
+  {
+   "name": "Big Shaq: Man's Not Hot",
+   "era": "2017",
+   "year": "2017",
+   "meaning": "\"Man's Not Hot\" , also known as The Ting Goes , refers to a viral video by English comedian Michael Dapaah from his web series #SWIL . In the video, Dapaah plays as rappers named MC Quakez and Roadman Shaq, who during his most infamous verse of the song \"Man's Not Hot\", says \"The ting goes…\" followed by him making a series of absurd gunshot sound effects with his mouth. Online, people have captioned the \"ting goes\" moment, using the sounds Dapaah makes as the punchline to a joke. People have als",
+   "origin": "On August 29th, 2017, YouTuber [1] CharlieSloth released the video \"MC Quakez – Fire in the Booth.\" The post features a scene in which the character MC Quakez performs on the BBC Radio show 1Xtra for a \"Fire In The Booth\" session. During the session, as the character raps the song \"Man's Not Hot,\" he says the line \"The ting goes,\" and then performs a series of sound effects with his mouth. Within a week, the video (shown below) has received more than 500,000 views.",
+   "how_used": "'the ting goes skrrra' quoting",
+   "sound": "mlg-airhorn",
+   "source": "https://knowyourmeme.com/memes/mans-not-hot",
+   "kid_safe": true
+  },
+  {
+   "name": "Yodeling Walmart Kid",
+   "era": "2018",
+   "year": "2018",
+   "meaning": "Walmart Yodeling Kid refers to a video of 12-year old Mason Ramsey performing the country song \"Lovesick Blues\" in a Walmart . The video went viral as people applied various captions to it and remixed it.",
+   "origin": "On March 24th, 2018, in Harrisburg, Illinois, child performer Mason Ramsey, known for his Hank Williams impressions, was filmed singing \"Lovesick Blues\" in a Walmart. [1] A video of the performance was uploaded two days later by YouTube account ViralHog.",
+   "how_used": "unexpected talent moment",
+   "sound": "wow-owen-wilson",
+   "source": "https://knowyourmeme.com/memes/walmart-yodeling-kid",
+   "kid_safe": true
+  },
+  {
+   "name": "Is This a Pigeon?",
+   "era": "2018",
+   "year": "2011",
+   "meaning": "\"Is this a pigeon?\" is a memorable quote said by the protagonist character from the 1990s Japanese anime TV series The Brave Fighter of Sun Fighbird in a scene wherein the humanoid character erroneously identifies a butterfly as a pigeon. On Tumblr , the quote, along with a reaction image of the scene featuring the English-translated subtitle, is widely used to express utter confusion.",
+   "origin": "The still shot originates from Season 1, Episode 3 of The Brave Fighter of Sun Fighbird [1] (太陽の勇者ファイバード) (or simply Fighbird), which first premiered in Japan in February 1991, in a scene where Yutaro Katori, a human android created by professor Hiroshi Amano, misidentifies a butterfly as a pigeon while studying the earthly nature. In addition to mistaking a pigeon for a butterfly, Katori also confuses Rosaceae with Violaceae (shown below). On Tumblr, the quote has been occasionally misinterpret",
+   "how_used": "confidently misidentifying something",
+   "sound": "huh-cat",
+   "source": "https://knowyourmeme.com/memes/is-this-a-pigeon",
+   "kid_safe": true
+  },
+  {
+   "name": "Surprised Pikachu",
+   "era": "2018",
+   "year": "2018",
+   "meaning": "Surprised Pikachu , also known as Shocked Pikachu , refers to a screenshot from the Pokémon anime of the character Pikachu with its mouth agape, as though it were surprised at something. In the autumn of 2018, the image was used as a reaction image paired with captions where a set-up leads to a predictable outcome that nevertheless leaves one surprised.",
+   "origin": "The episode from the Pokémon anime where the image comes from is Season 1, Episode 10, \"Bulbasaur and the Hidden Village\" (shown below at 3:05).",
+   "how_used": "fake shock at a totally predictable outcome",
+   "sound": "vine-boom",
+   "source": "https://knowyourmeme.com/memes/surprised-pikachu",
+   "kid_safe": true
+  },
+  {
+   "name": "Woman Yelling at a Cat",
+   "era": "2019",
+   "year": "2019",
+   "meaning": "Woman Yelling at a Cat (not to be confused with Screaming Cat ) refers to a meme format featuring a screen cap of The Real Housewives of Beverly Hills cast members Taylor Armstrong and Kyle Richards followed by a picture of a confused-looking cat sitting behind a dinner plate. The format gained significant popularity across the web in mid-June 2019 and the cat was later identified as Smudge the Cat .",
+   "origin": "On December 5th, 2011, episode 14 \"Malibu Beach Party From Hell\" of season two of The Real Housewives of Beverly Hills reality TV series premiered in the United States. [1] In the episode, cast member Taylor Armstrong cries during an argument, with cast member Kyle Richards attempting to calm her down. (shown below).",
+   "how_used": "two-sided argument format",
+   "sound": "huh-cat",
+   "source": "https://knowyourmeme.com/memes/woman-yelling-at-a-cat",
+   "kid_safe": true
+  },
+  {
+   "name": "Big Chungus",
+   "era": "2018",
+   "year": "2018",
+   "meaning": "Big Chungus refers to an image of the cartoon character Bugs Bunny, usually captioned with the phrase \"Big Chungus\" and presented as a game for the PlayStation 4 console. The word \"chungus\" was coined by video game journalist Jim Sterling several years before the meme became popular. Starting in July 2019, the meme regained ironic popularity on iFunny and certain parts of Reddit , particularly as a part of Reddit Moment memes.",
+   "origin": "The image of Bugs Bunny appears in Merrie Melodies cartoon Wabbit Twouble , first shown on December 20th, 1941 [1] . In the short, Bugs is mocking Elmer Fudd, who in this cartoon was made much more portly than his previous and more iconic design (clip shown below).",
+   "how_used": "absurd 'big' version of something",
+   "sound": "dun-dun-dun",
+   "source": "https://knowyourmeme.com/memes/big-chungus",
+   "kid_safe": true
+  },
+  {
+   "name": "Oof (Roblox death sound)",
+   "era": "2010s",
+   "year": "2006",
+   "meaning": "The Roblox Death Sound (alternatively known as Oof, labeled as Uuhhh in the official sound file, and other interpretations of the noise) is a short, one-second sound clip used in the MMORPG Roblox . Online, the sound effect is notably utilized in various fan remixes of existing scenes and songs from pop culture.",
+   "origin": "First appearing in the 2005 beta release of Roblox, the death sound has remained a staple element in the game's 10+ year history. The sound effect triggers when a \"Humanoid's\" (the character models controlled by players) health reaches zero, out of a base maximum of 100. [1] Since the worlds are crafted primarily by the players, this can be achieved by having the hitboxes assigned to the body parts of a Humanoid struck by tools that are purposefully coded to decrease the health (such as spike tr",
+   "how_used": "small fail or ouch",
+   "sound": "roblox-oof",
+   "source": "https://knowyourmeme.com/memes/roblox-death-sound",
+   "kid_safe": true,
+   "keys": [
+    "oof",
+    "roblox",
+    "death"
+   ]
+  },
+  {
+   "name": "Ok Boomer",
+   "era": "2019",
+   "year": "2015",
+   "meaning": "\"Ok Boomer\" is a catchphrase and dismissive retort often used to disregard or mock Baby Boomers and those who are perceived as old-fashioned and being out of touch. The phrase originated in 2015 and spread during the late 2010s, eventually being used by many younger generations to dismiss someone's opinion or take and call them old, similar to the expression \"Ok Unc \" in the 2020s.",
+   "origin": "The exact origin of the phrase is currently unknown. On 4chan , the retort was first used by an anonymous /r9k/ user on September 3rd, 2015 (shown below, top). [8] On Reddit , the phrase was first used as a retort on October 26th, 2017 (shown below, bottom left). [9] [10] [11] On Twitter , the phrase was first used on April 12th, 2018 (shown below, bottom right). [1]",
+   "how_used": "dismissing out-of-touch takes (light, not mean)",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/ok-boomer",
+   "kid_safe": true
+  },
+  {
+   "name": "Sad Violin",
+   "era": "2000s",
+   "year": "2002",
+   "meaning": "\"Sad Violin\" is the fan-given title of \"Sad Romance,\" an instrumental song from the soundtrack for the 2003 Korean TV drama series Over the Green Fields , that has been featured in a wide range of videos on YouTube , including original sketches, parodies and remix videos.",
+   "origin": "Originally titled \"Sad Romance\", the instrumental song was written by South Korean composer Ji Pyeongkeyon for the soundtrack of the 2003 Korean TV drama Over the Green Fields (저 푸른 초원위에), which was released in late 2002 (shown below, left). [1] Later on, Ji also composed a string arrangement of the original song (shown below, right), which has become the most frequently sampled version, particularly in the case of montage parodies .",
+   "how_used": "mock sympathy",
+   "sound": "sad-violin",
+   "source": "https://knowyourmeme.com/memes/sad-violin",
+   "kid_safe": true
+  },
+  {
+   "name": "MLG / Montage Parodies",
+   "era": "2014",
+   "year": null,
+   "meaning": "over-the-top hype edits with airhorns",
+   "origin": "",
+   "how_used": "over-the-top hype edits with airhorns",
+   "sound": "mlg-airhorn",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "To Be Continued",
+   "era": "2016",
+   "year": "2016",
+   "meaning": "\"Roundabout\" is a 1971 progressive rock song by the British rock band Yes. Due to its heavy usage in the first two arcs of the popular manga-anime series Jojo's Bizarre Adventure , the song has been frequently used by JJBA fans in various Vine and YouTube remixes, along with the \"to be continued\" graphic logo featured in the manga-anime series, typically at the climax of the video for comedic and suspenseful effects.",
+   "origin": "\"Roundabout\" [1] was originally released in 1971 as the lead single of the British rock band Yes' [2] fourth studio album Fragile , which peaked at 14th place in the US Billboard Hot 100 chart, though it gained much of its online popularity through its inclusion in the 2012 anime adaptation of the Japanese manga series Jojo's Bizarre Adventure [3] .",
+   "how_used": "freeze-frame cliffhanger before chaos",
+   "sound": "to-be-continued",
+   "source": "https://knowyourmeme.com/memes/to-be-continued",
+   "kid_safe": true
+  },
+  {
+   "name": "Hello There",
+   "era": "2017",
+   "year": "2007",
+   "meaning": "\"Hello There\" is a memorable quote uttered by the character Obi-Wan Kenobi , portrayed by actor Ewan McGregor, in the 2005 science fiction action film Star Wars : Episode III – Revenge of the Sith . Online , the scene has been used to create various remix videos and image macros , as well as seeing use as a catchphrase.",
+   "origin": "On May 19th, 2005, the film Star Wars: Episode III – Revenge of the Sith was released in the United States. In the film, the character Obi-Wan Kenobi (portrayed by Ewan McGregor) surprises the film's antagonists and says, \"Why, hello there\" (clip below). [1]",
+   "how_used": "Obi-Wan greeting, reply 'General Kenobi'",
+   "sound": "hello-there",
+   "source": "https://knowyourmeme.com/memes/hello-there",
+   "kid_safe": true
+  },
+  {
+   "name": "Windows XP Error",
+   "era": "2000s",
+   "year": null,
+   "meaning": "something crashes",
+   "origin": "",
+   "how_used": "something crashes",
+   "sound": "windows-error",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Crickets",
+   "era": "2000s",
+   "year": null,
+   "meaning": "awkward silence",
+   "origin": "",
+   "how_used": "awkward silence",
+   "sound": "crickets",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Ba Dum Tss",
+   "era": "2000s",
+   "year": null,
+   "meaning": "A Rimshot is a tune played by drummers to emphasize an obvious pun stated by the comic. Due to it's comedic melody, and well timed usage, the rimshot has become a big part of pop culture, and is still being used to this day by talk show host \"David Letterman\".",
+   "origin": "The Rimshot was invented by the jazz and big band drummer Gene Krupa, and has since then been used over the years by many comedians and musicians. After the invention of the rimshot many other comedians and musicians have been playing this note to either refine their skills, or just highlight a really lame joke. The usage of the rimshot has been dated back since the 1960's during Gene's life time.",
+   "how_used": "rimshot after a pun",
+   "sound": "ba-dum-tss",
+   "source": "https://knowyourmeme.com/memes/ba-dum-tss",
+   "kid_safe": true
+  },
+  {
+   "name": "Spongebob Mocking (Mocking SpongeBob)",
+   "era": "2017",
+   "year": "2017",
+   "meaning": "Mocking SpongeBob , also known as Spongemock or simply the SpongeBob Mocking Meme , refers to an image macro and reaction image featuring the cartoon character SpongeBob SquarePants bent over with his hands behind his back, similar to a chicken pose. As a meme, people typically use the picture of SpongeBob alongside alternating lower- and uppercase letters to indicate a mocking tone towards an opinion or point of view. The meme first appeared in May 2017, spreading throughout the late 2010s and ",
+   "origin": "The image of SpongeBob used for this series comes from the episode of the animated comedy series SpongeBob SquarePants called \"Little Yellow Book,\" which first aired on November 25th, 2012. [1] In the episode, Squidward reads SpongeBob's diary, where he discovers that whenever SpongeBob sees plaid, he acts like a chicken.",
+   "how_used": "repeating something in aLtErNaTiNg caps to mock it",
+   "sound": "spongebob-fail",
+   "source": "https://knowyourmeme.com/memes/mocking-spongebob",
+   "kid_safe": true
+  },
+  {
+   "name": "Among Us / Sus",
+   "era": "2020",
+   "year": "2018",
+   "meaning": "Among Us is a 2018 social deduction game where crewmates find the impostor; 'sus' (suspicious) and 'impostor' became everyday slang in 2020.",
+   "origin": "",
+   "how_used": "calling something suspicious, 'that's sus'",
+   "sound": "among-us-sus",
+   "source": "https://knowyourmeme.com/memes/among-us",
+   "kid_safe": true
+  },
+  {
+   "name": "Emotional Damage",
+   "era": "2021",
+   "year": "2021",
+   "meaning": "Emotional Damage refers to a clip of YouTuber and comedian Steven He frustratedly throwing a shoe and saying in a thick Asian accent, \"Emotional damage!\" The clip became a prevalent reaction to clips showing someone getting owned or being emotionally damaged, both ironically and unironically, shortly after being uploaded in September 2021.",
+   "origin": "On September 21st, 2021, YouTuber [1] and comedian Steven He uploaded a comedy skit titled \"When 'Asian' Is a Difficulty Mode,\" where an Asian man plays a video game on the \"Asian\" difficulty and constantly loses throughout, meant as a comedic statement on the struggles of being Asian. Around the 1:05 mark, He yells \"emotional damage\" at the screen after his character dies of emotional damage when the \"aunty\" boss calls him fat (shown below). The video gained over 17.3 million views in four mont",
+   "how_used": "punchline after a friendly roast",
+   "sound": "emotional-damage",
+   "source": "https://knowyourmeme.com/memes/emotional-damage",
+   "kid_safe": true
+  },
+  {
+   "name": "Bernie Sanders Mittens",
+   "era": "2021",
+   "year": "2021",
+   "meaning": "Bernie Sanders Wearing Mittens Sitting in a Chair refers to the numerous jokes and photoshops made from pictures of Vermont Senator Bernie Sanders' attending the Inauguration of Joe Biden in a parka and mittens. In particular, a picture of Sanders sitting bundled up in a chair became an image macro and exploitable series.",
+   "origin": "At the Inauguration of Joe Biden, Vermont Senator Bernie Sanders attended in a coat and mittens, [1] which stood in stark contrast to other attendees who had more formal wear. That day, Getty photographer Brendan Smialowski published the image of Sanders seated at the inauguration in his parka and mittens.",
+   "how_used": "photoshopping someone sitting anywhere",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/bernie-sanders-wearing-mittens-sitting-in-a-chair",
+   "kid_safe": true
+  },
+  {
+   "name": "Coffin Dance",
+   "era": "2020",
+   "year": "2020",
+   "meaning": "Coffin Dance , also known as Dancing Pallbearers or Dancing Coffin , refers to several videos showing Ghanian pallbearers dancing while they are carrying a coffin. In March 2020, the videos, paired with EDM song \"Astronomia\" by Tony Igy, gained popularity in FAIL edits, similar to To Be Continued and We'll Be Right Back memes . In late May 2020, a Coffin Dance remix video was shared by Donald Trump on his official Facebook page, which mocked a controversial statement made by Democratic rival Joe",
+   "origin": "The first of the three most popular videos that gained popularity in connection with the trend was uploaded to YouTube [1] by Travelin Sister on January 22nd, 2015 and depicted Ghana's cultural phenomenon of dancing pallbearers (shown below, left). The video received over 2.9 million views in five years. Another video, a report by BBC News Africa, [2] was uploaded to YouTube on July 27th, 2017. That video received over 681,000 views in three years (shown below, right).",
+   "how_used": "something is about to fail spectacularly",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/coffin-dance-dancing-pallbearers",
+   "kid_safe": true
+  },
+  {
+   "name": "Bing Chilling",
+   "era": "2021",
+   "year": null,
+   "meaning": "A 2021 clip of John Cena speaking Mandarin while holding ice cream ('bing qilin' = ice cream), heard as 'bing chilling'.",
+   "origin": "",
+   "how_used": "eating ice cream / chilling",
+   "sound": "vine-boom",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Goofy Ahh",
+   "era": "2021",
+   "year": "2009",
+   "meaning": "Slang tag for anything goofy or silly; the clean version is just 'goofy'. Often paired with cartoon running sound effects.",
+   "origin": "",
+   "how_used": "describing anything silly (the clean usage only)",
+   "sound": "goofy-ahh-run",
+   "source": "https://knowyourmeme.com/memes/goofy-ahh",
+   "kid_safe": true
+  },
+  {
+   "name": "Metal Pipe Falling",
+   "era": "2022",
+   "year": "2020",
+   "meaning": "The Metal Pipe Falling Sound Effect , also known as Destruction_Metal_Pole_L_Wave_2_0_0.wav , refers to the sound of a long metal pipe falling and hitting the ground. On YouTube and TikTok , among other video meme platforms like iFunny , the metal pipe falling sound has been used as a random punchline to various ironic memes . Many one-hour-long versions of the sound have surfaced online as well. It was first used on YouTube in 2020 by YouTuber Jixaw. Some claim that it's from the video game Bat",
+   "origin": "The metal pipe falling sound effect was first used by YouTuber [1] Jixaw on September 17th, 2020, in a video for his 6,000 followers on Twitter special. Over the course of two years, the video received roughly 70,700 views and 4,700 likes (shown below).",
+   "how_used": "sudden loud chaos",
+   "sound": "metal-pipe",
+   "source": "https://knowyourmeme.com/memes/metal-pipe-falling-sound-effect",
+   "kid_safe": true
+  },
+  {
+   "name": "Gigachad",
+   "era": "2021",
+   "year": "2017",
+   "meaning": "A black-and-white photo series of an ultra-chiseled model, used as the face of exaggerated confidence ('average fan vs average enjoyer').",
+   "origin": "",
+   "how_used": "overconfident 'chad' energy",
+   "sound": "mlg-airhorn",
+   "source": "https://knowyourmeme.com/memes/gigachad",
+   "kid_safe": true
+  },
+  {
+   "name": "Huh Cat",
+   "era": "2022",
+   "year": "2022",
+   "meaning": "Huh? Cat is an exploitable video meme format depicting a confused or shocked-looking cat making a \"huh?\" sound. with its mouth open and eyes wide The clip was uploaded to TikTok in early 2023 and is often used alongside object-labeling captions about situations in which a person feels confused and lost.",
+   "origin": "The huh? cat is known as Ben Cat, which is a pet owned by TikToker [1] @planetvenus500 who posts videos about their chubby cat. The video used in the meme was originally posted in September 2021 but has since been deleted and reposted on February 12th, 2023, showing the cat meowing for food (shown below), which received more than 2 million plays and 332,000 likes in two months.",
+   "how_used": "confused 'huh?'",
+   "sound": "huh-cat",
+   "source": "https://knowyourmeme.com/memes/huh-cat",
+   "kid_safe": true
+  },
+  {
+   "name": "Minecraft Villager 'Hmm'",
+   "era": "2020",
+   "year": null,
+   "meaning": "skeptical 'hmm'",
+   "origin": "",
+   "how_used": "skeptical 'hmm'",
+   "sound": "minecraft-villager",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Taco Bell Bong",
+   "era": "2021",
+   "year": "2020",
+   "meaning": "Taco Bell \"Bong\" Sound Effect refers to a sound effect of a large bell being rung which has been used in commercials of Taco Bell restaurant chain since 2000. In 2020, the sound effect gained popularity in memes following its use in I Like Ya Cut, G videos.",
+   "origin": "Starting in 2000, United States restaurant chain Taco Bell started using a sound effect of a large bell being rung in its commercials (examples shown below). [1] [2] Prior to that, a different bell sound effect has been used. [3]",
+   "how_used": "random dramatic beat",
+   "sound": "taco-bell-bong",
+   "source": "https://knowyourmeme.com/memes/taco-bell-bong-sound-effect",
+   "kid_safe": true
+  },
+  {
+   "name": "Wait a Minute, Who Are You?",
+   "era": "2015",
+   "year": null,
+   "meaning": "realizing someone is suspicious",
+   "origin": "",
+   "how_used": "realizing someone is suspicious",
+   "sound": "wait-a-minute",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Rizz",
+   "era": "2022",
+   "year": "2023",
+   "meaning": "Slang (from 'charisma') for being smooth and confident; Oxford's 2023 word of the year. Jena uses it for chat's lines, never about herself romantically.",
+   "origin": "",
+   "how_used": "as a smug brag sound after a W, a clutch play or a flex; she never uses rizz romantically or toward anyone (she's a teen)",
+   "sound": "rizz",
+   "source": "https://knowyourmeme.com/memes/rizz",
+   "kid_safe": true
+  },
+  {
+   "name": "Grimace Shake",
+   "era": "2023",
+   "year": "2023",
+   "meaning": "A 2023 TikTok trend: people wish McDonald's mascot Grimace happy birthday, sip his purple shake, then the clip cuts to a fake 'horror' scene. Played for laughs.",
+   "origin": "",
+   "how_used": "fake-horror clips after trying a purple shake",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/grimace-shake-trend",
+   "kid_safe": true
+  },
+  {
+   "name": "Skibidi Toilet",
+   "era": "2023",
+   "year": null,
+   "meaning": "Skibidi Toilet is an animated web series created by Alexey Gerasimov and released through YouTube videos and Shorts on his channel, skibidi. Produced using Source Filmmaker, the series follows a war between toilets with human heads coming out of their bowls and humanoid characters with electronic devices, such as cameras, for heads.",
+   "origin": "",
+   "how_used": "absurd brainrot reference kids quote",
+   "sound": "goofy-ahh-run",
+   "source": "https://en.wikipedia.org/wiki/Skibidi_Toilet",
+   "kid_safe": true
+  },
+  {
+   "name": "Ohio (Only in Ohio)",
+   "era": "2022",
+   "year": "2016",
+   "meaning": "Ohio is an American state in the country's Midwest region that became the subject of memes across social media platforms like Twitter , Tumblr , Reddit , Instagram and TikTok , among other platforms, predominantly following the Ohio vs. the World trend that started in 2016. Going into the 2020s, the concept of Ohio as a meme became commonplace through multiple trends that humorously labeled Ohio as an American middle place, existing as a capitalist wasteland of chaos and mayhem, akin to creepypa",
+   "origin": "",
+   "how_used": "something cursed/weird: 'only in Ohio'",
+   "sound": "huh-cat",
+   "source": "https://knowyourmeme.com/memes/ohio",
+   "kid_safe": true,
+   "keys": [
+    "ohio",
+    "ohio"
+   ]
+  },
+  {
+   "name": "Fanum Tax",
+   "era": "2023",
+   "year": "2022",
+   "meaning": "Fanum Tax refers to a running gag a part of Twitch streamer Fanum's streams in which he \"taxes\" other AMP members like Kai Cenat when they're eating food, taking a small part of their meal. The phenomenon started on AMP streams in late 2022, spreading via clips on YouTube and TikTok . In late 2023, the phrase \"Fanum tax\" became a widely used slang term among Gen Z and Gen Alpha members, resulting in satirical usage that parodied the phrase's over-usage. In October 2023, Fanum tax became associat",
+   "origin": "On December 23rd, 2022, a clip was posted by YouTuber [1] KC3FEETT from a then-recent, Christmas-themed Kai Cenat stream in which Fanum kicked down Cenat's door to steal cookies from him. The clip received roughly 27,500 views in 10 months (shown below). It is currently the first known instance of a Fanum tax.",
+   "how_used": "stealing a bite of someone's food",
+   "sound": "bruh",
+   "source": "https://knowyourmeme.com/memes/fanum-tax",
+   "kid_safe": true
+  },
+  {
+   "name": "Mewing",
+   "era": "2023",
+   "year": "2012",
+   "meaning": "Mewing is a slang term referring to a tongue exercise in which the tongue is rested against the roof of the mouth, which some have claimed can change the shape of one's jawline.",
+   "origin": "The term \"mewing\" was coined by British orthodontist Mike Mew. On October 27th, 2011, Mew created the Orthotropics YouTube channel. On February 18th, 2012, a video titled \"What Is Orthotropics\" was uploaded to the channel, which provided an overview of Mew's treatments (shown below).",
+   "how_used": "the 'shh, I'm mewing' jaw gesture",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/mewing",
+   "kid_safe": true
+  },
+  {
+   "name": "Aura (points)",
+   "era": "2024",
+   "year": "2024",
+   "meaning": "Aura Points refers to a point system based on the fluctuation of a person's aura . Certain actions, behaviors and traits increase a person's aura while others decrease it. Many of the memes and discourse followed the phrasal template How Many Aura Points Did I Lose When X . Aura Points surfaced out of the Most Amount of Aura I’ve Used on a Level 1 meme that treated a person's aura like a video game score. The concept of Aura Points trended on TikTok and Twitter / X (among other social media plat",
+   "origin": "TikToker [1] @aidan2funny posted the first discovered Aura Points meme on May 1st, 2024, using a POV caption and a points system to determine how much aura he lost. The video used the song \"Yesterday\" by vs self as the TikTok sound. [2] Over one month, the video received roughly 3 million plays and 426,000 likes (shown below).",
+   "how_used": "'+1000 aura' for doing something cool, '-aura' for cringe",
+   "sound": "mlg-airhorn",
+   "source": "https://knowyourmeme.com/memes/aura-points",
+   "kid_safe": true,
+   "keys": [
+    "aura"
+   ]
+  },
+  {
+   "name": "Chill Guy",
+   "era": "2024",
+   "year": null,
+   "meaning": "Chill Guy, also known as My new character, is a digital artwork and Internet meme first posted by the American artist Phillip Banks on Twitter on October 4, 2023. The artwork consists of an anthropomorphic dog wearing a grey sweater, blue jeans, and red sneakers, giving off a chill expression by smirking with his hands in his pockets. While the artwork had some success after publishing, it only became viral about a year later on August 30, 2024, when a user on TikTok made a slideshow with the ar",
+   "origin": "",
+   "how_used": "staying unbothered",
+   "sound": "taco-bell-bong",
+   "source": "https://en.wikipedia.org/wiki/Chill_Guy",
+   "kid_safe": true
+  },
+  {
+   "name": "Very Demure, Very Mindful",
+   "era": "2024",
+   "year": "2024",
+   "meaning": "Very Demure, Very Mindful , also known simply as the Demure Meme , is a viral video and catchphrase popularized by TikToker Jools Lebron, aka @joolieannie. The TikToker posted a series of videos about how to look \"demure\" at work in early August 2024, including one in which they said, \"See how I do my makeup for work? Very demure, very mindful .\"",
+   "origin": "On August 2nd, 2024, TikToker [1] @joolieannie posted a video showing off their makeup, saying, \"See how I come to work? Very demure.\" The user goes on to talk about how they do their makeup, and hair and have their \"chi chis out.\" The post also featured the text overlay, \"How to be demure at work,\" gathering over 2 million plays and 360,000 likes in 10 days (seen below, left).",
+   "how_used": "describing tidy, considerate behavior",
+   "sound": "yay",
+   "source": "https://knowyourmeme.com/memes/very-demure-very-mindful",
+   "kid_safe": true
+  },
+  {
+   "name": "Moo Deng",
+   "era": "2024",
+   "year": null,
+   "meaning": "Moo Deng is a pygmy hippopotamus residing at Khao Kheow Open Zoo in Si Racha, Chonburi, Thailand. She gained widespread attention as an internet meme at two months old, after photos of her went viral online in September 2024.",
+   "origin": "",
+   "how_used": "the chaotic baby pygmy hippo",
+   "sound": "yay",
+   "source": "https://en.wikipedia.org/wiki/Moo_Deng",
+   "kid_safe": true
+  },
+  {
+   "name": "Brainrot",
+   "era": "2023",
+   "year": "2007",
+   "meaning": "Brain Rot or Brainrot is a slang term used to describe content that has little to no artistic, educational or substantive value, painting it as having a negative impact on the viewer and thus leading to the degradation and \"rot\" of their brain. In relation, the term is used to refer to pieces of \"brain rot content\" that a person cannot stop thinking about, leading to further brain rot, such as regularly repeating the Skibidi Toilet song. Although the exact origins of the term are unknown, it has",
+   "origin": "It is unclear where the term \"brain rot\" originates from. Some of the earliest uses of the term in reference to content that is perceived to \"rot the brain\" were posted to X, [1] [2] formerly Twitter , by users @IzzyNeis and @carrissa on June 25th and August 23rd, 2007, the former describing reality dating shows as brain rot and the latter describing being online in general as brain rot (shown below).",
+   "how_used": "describing chaotic internet humor overload",
+   "sound": "goofy-ahh-run",
+   "source": "https://knowyourmeme.com/memes/brain-rot",
+   "kid_safe": true
+  },
+  {
+   "name": "Sigma",
+   "era": "2022",
+   "year": null,
+   "meaning": "Ironic internet label for an aloof 'lone wolf' type; kids use it jokingly ('what the sigma'). She only uses the joke sense.",
+   "origin": "",
+   "how_used": "ironic 'sigma' lone-wolf posing",
+   "sound": "rizz",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Italian Brainrot (Tralalero Tralala, Tung Tung Tung Sahur)",
+   "era": "2025",
+   "year": "2025",
+   "meaning": "Tralalero Tralala refers to a brainrot trend that features a voice speaking in Italian , saying, \"Tralalero Tralala, porco dio e porco Allah.\" The meme began making the rounds on TikTok in early 2025, often paired with low-effort AI images featuring animals rearranged in strange combinations, including sharks wearing Nike shoes and a cat 's face on a chicken. The sound eventually inspired a phonk remix that subsequently became the audio for a number of anime and soccer edits on TikTok.",
+   "origin": "The TikTok account that originally posted the \"Tralalero Tralala\" sound, @eZburger401, [1] was banned from TikTok sometime in early 2025. The sound effect was subsequently used by TikTokers @elchino1246 [2] and @zokashi [3] in videos dating as far back as January 8th and January 10th. A transcript of the audio and translation is shown below.",
+   "how_used": "AI-made absurd creatures with chant names",
+   "sound": "dun-dun-dun",
+   "source": "https://knowyourmeme.com/memes/tralalero-tralala",
+   "kid_safe": true
+  },
+  {
+   "name": "6 7 (Six Seven)",
+   "era": "2025",
+   "year": "2024",
+   "meaning": "67 Meme , also known as 6-7 Meme , Six Seven Meme or 6-7 Song , refers to a series of memes about a lyric in the song \"Doot Doot\" by Skrilla featuring G Herbo, a hip-hop song released in December 2024, that was popularized on TikTok and Instagram Reels in January 2025. That month, the song and its \"6-7\" lyric notably became the subject of basketball edits of NBA player LaMelo Ball, who is 6' 7\" in height. The editors found clips of people saying \"six, seven\" and then used them as the intros for ",
+   "origin": "On December 1st, 2024, rapper Skrilla released the song \"Doot Doot.\" In February 2025, he released a music video on YouTube , [1] garnering over 1.1 million views in a week. In the song, Skrilla says \"6-7\" in reference to and to represent 67th Street in Philadelphia, where the rapper is from.",
+   "how_used": "yelling 'six seven' with the hand-weigh gesture at any 6 or 7",
+   "sound": "vine-boom",
+   "source": "https://knowyourmeme.com/memes/67-meme-six-seven",
+   "kid_safe": true
+  },
+  {
+   "name": "Chopped Chin",
+   "era": "2025",
+   "year": "2024",
+   "meaning": "Chopped Chin or I've Been Running Into You In My Head is a series of memes based on a viral video of former WNBA player Renee Montgomery dancing courtside with high schooler Angel Wiley (her adopted son) referred to as \" chopped chin\" for the appearance of his chin, at an Atlanta Dream basketball game. The video was originally uploaded to the Atlanta Dream Instagram page in August 2023. It became the subject of memes in December 2024 when Instagram user halal_man_2 began consistently posting mot",
+   "origin": "On August 6th, 2023, the atlantadream Instragram [1] page posted a video of former WNBA player Renee Montgomery dancing courtside at an Atlanta Dream game with her adopted son, Angel Wiley, garnering over 8.2 million views in a year.",
+   "how_used": "joking about someone's 'chopped' chin (light, not mean)",
+   "sound": null,
+   "source": "https://knowyourmeme.com/memes/chopped-chin",
+   "kid_safe": true
+  },
+  {
+   "name": "Labubu",
+   "era": "2025",
+   "year": null,
+   "meaning": "Labubu is a line of collectible plush toys created by Hong Kong illustrator Kasing Lung. The series features zoomorphic elves with exaggerated facial expressions, of which the central figure is Labubu, a monster with sharp teeth, large ears and a scruffy appearance.",
+   "origin": "",
+   "how_used": "the toothy collectible plush craze",
+   "sound": "yay",
+   "source": "https://en.wikipedia.org/wiki/Labubu",
+   "kid_safe": true
+  },
+  {
+   "name": "Aughhh (TikTok)",
+   "era": "2021",
+   "year": "2021",
+   "meaning": "AUGHHHH or AHHHH is an audio clip and sound effect of a person snoring intensely that became popularized in memes and videos as an original sound on TikTok in late 2021 throughout early 2022. The audio clip is often used without its original context for the sake of shitposting, making it hard to determine what the source of the sound is. In February 2022, it was notably combined with the Carmen Winstead audio. It is also often described as a goofy ahh sound on TikTok.",
+   "origin": "The exact origin of the sound is unclear. One hypothesis is that the sound is an edited snore taken from a February 6th, 2020 viral video , posted to Twitter , [10] where a Chinese security guard allegedly fell asleep over a loudspeaker device, broadcasting his snores over Chongqing (shown below). Some believe this video is fake, with Redditor [11] Leevotion commenting on a share of the video to /r/China, \"Believed to be a fake video. The audio was a girl recording her boyfriend’s snoring inside",
+   "how_used": "exasperated scream",
+   "sound": "aughhh",
+   "source": "https://knowyourmeme.com/memes/aughhhh",
+   "kid_safe": true,
+   "keys": [
+    "aughhh"
+   ]
+  },
+  {
+   "name": "Discord Notification Prank",
+   "era": "2018",
+   "year": null,
+   "meaning": "fake ping to make viewers check Discord",
+   "origin": "",
+   "how_used": "fake ping to make viewers check Discord",
+   "sound": "discord-notification",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  },
+  {
+   "name": "Nope (TF2 Engineer)",
+   "era": "2010s",
+   "year": null,
+   "meaning": "quick refusal",
+   "origin": "",
+   "how_used": "quick refusal",
+   "sound": "nope",
+   "source": "unverified: written from general knowledge, no page fetched",
+   "kid_safe": true
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Deez Nuts",
+   "why": "crude/sexual punchline"
+  },
+  {
+   "name": "Two Bros Chillin in a Hot Tub",
+   "why": "homophobic punchline"
+  },
+  {
+   "name": "Harambe",
+   "why": "built on an animal's death, often used crudely"
+  },
+  {
+   "name": "Distracted Boyfriend",
+   "why": "infidelity theme"
+  },
+  {
+   "name": "Bonk / Doge with bat",
+   "why": "'go to horny jail' origin"
+  },
+  {
+   "name": "Hawk Tuah",
+   "why": "sexual origin"
+  }
+ ],
+ "trending": []
+}

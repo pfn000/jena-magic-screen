@@ -309,6 +309,7 @@ export class Avatar {
   // The camera eases between them (no jumps). ?view=full|talk pins one.
   frameGoal(mode) {
     const fov = THREE.MathUtils.degToRad(this.camera.fov), tan = Math.tan(fov / 2), asp = this.camera.aspect || 1;
+    if (this.vrm && document.body.classList.contains('stream')) { const g = this.streamGoal(tan, asp, mode); if (g) return g; }
     let top, bottom, wantW = 0.95, cx = 0;
     if (mode === 'talk' && this.vrm) {
       const H = this.vrm.humanoid, P = (b) => H.getNormalizedBoneNode(b)?.getWorldPosition(new THREE.Vector3());
@@ -337,6 +338,34 @@ export class Avatar {
     const visH = 2 * d * tan; // world height the camera shows at her depth
     return { x: cx, y: top - visH / 2 + (visH - span) / 2 * (mode === 'talk' ? 0.35 : 0.5), d };
   }
+  // STREAM LAYOUT framing (VTuber norms, jena-stream/vtuber-framing.md): head-to-waist, the waist sitting on the
+  // bottom edge of the frame, her whole head (hair included) with headroom above it; never a full-body shot.
+  // ?cam=<0.5-1.4> pulls the camera back (<1) or in (>1); default 0.9 keeps a little air around her head and arms.
+  streamGoal(tan, asp, mode = 'talk') {
+    const H = this.vrm.humanoid, P = (b) => H.getNormalizedBoneNode(b)?.getWorldPosition(new THREE.Vector3());
+    const head = P('head'), hips = P('hips'), lh = P('leftHand'), rh = P('rightHand');
+    if (!head || !hips || !lh || !rh) return null;
+    if (this._streamCam === undefined) { const c = parseFloat(new URLSearchParams(location.search).get('cam')); this._streamCam = c >= 0.5 && c <= 1.4 ? c : 0.9; }
+    // the stream camera director (src/stream.js) picks a shot: wide / mid / close / low / high, with its own ease
+    const shot = window.jenaCam?.shot || {}, zoom = this._streamCam * (shot.zoom || 1);
+    const handTop = Math.max(lh.y, rh.y);
+    let top, bottom;
+    if (mode === 'full') {   // dances: head to feet, the whole head always in, a little headroom (her examples)
+      top = Math.max(head.y + 0.25, handTop + 0.1) + 0.05; bottom = -0.05;
+    } else {
+      top = Math.max(head.y + 0.25, handTop + 0.12) + 0.06;   // hair top + headroom (a raised hand too)
+      bottom = hips.y - 0.06;                                 // just below the waist, cut by the frame edge
+    }
+    const wantW = Math.max(0.72, Math.abs(lh.x - rh.x) + 0.3);
+    let d = Math.max((top - bottom) / 2 / tan, wantW / 2 / (tan * asp)) / zoom;
+    const visH = 2 * d * tan;
+    // bottom-anchored on the stream (her waist / feet sit on the frame edge); a close-up anchors on her head instead
+    let y = bottom + visH / 2;
+    const room = shot.tight ? 0 : 0.07;   // punch-ins keep a little headroom; only the scream zoom may go tight
+    if (y + visH / 2 < top + room) y = top + room - visH / 2;   // zoomed in past her height: her whole head stays in, the cut moves down
+    const tilt = (shot.tilt || 0) * visH;   // low angle: camera below, looking up (+); high angle: above, looking down (-)
+    return { x: (lh.x + rh.x) / 4 + (shot.pan || 0) * visH, y: y - tilt, d, ly: y + tilt * 0.35, k: shot.k };
+  }
   measureCover() {
     try {
       const c = this.canvas.getBoundingClientRect(); let cover = 0;
@@ -350,6 +379,7 @@ export class Avatar {
     } catch { this.coverBottom = 0; }
   }
   frameCamera() {
+    if (this.cam && document.body.classList.contains('stream')) return;   // stream: panel resizes (dance <-> talk) ease through updateCamera, never snap
     const pin = new URLSearchParams(location.search).get('view');
     this.viewPin = pin === 'full' || pin === 'talk' ? pin : null;
     const g = this.frameGoal(this.viewPin || 'full');
@@ -360,6 +390,8 @@ export class Avatar {
   viewMode(now) {
     if (this.viewPin) return this.viewPin;
     const mv = window.jenaMoves?.playing;
+    // stream layout: VTuber head-to-waist; on the phone layout a real dance goes full body (her example TikToks)
+    if (document.body.classList.contains('stream')) return mv && mv.c?.kind === 'dance' && document.body.classList.contains('stream-phone') ? 'full' : 'talk';   // wide: always head-to-waist
     if (mv && ['dance', 'stretch', 'weight', 'happy'].includes(mv.c?.kind)) return 'full';
     if (now < (this.talk.until || 0) + 4000) return 'talk';
     if (mv) return 'full';
@@ -372,11 +404,13 @@ export class Avatar {
     if (!(now < this._coverAt)) { this._coverAt = now + 1000; this.measureCover(); }
     const mode = this.viewMode(now);
     this.viewNow = mode;
-    const g = this.frameGoal(mode), k = mode === this._lastMode ? 1.6 : 2.2;
+    const g = this.frameGoal(mode), k = g.k || (mode === this._lastMode ? 1.6 : 2.2);
     this._lastMode = mode;
+    if (document.body.classList.contains('stream')) document.body.classList.toggle('stream-full', mode === 'full');
     this.cam.x = damp(this.cam.x, g.x, k, dt); this.cam.y = damp(this.cam.y, g.y, k, dt); this.cam.d = damp(this.cam.d, g.d, k, dt);
+    this.cam.ly = damp(this.cam.ly ?? this.cam.y, g.ly ?? g.y, k, dt);
     this.camera.position.set(this.cam.x, this.cam.y, this.cam.d);
-    this.camera.lookAt(this.cam.x, this.cam.y, 0);
+    this.camera.lookAt(this.cam.x, this.cam.ly, 0);
   }
 
   // A different body every time the page loads: random seed, mid-breath, a random weight side, head

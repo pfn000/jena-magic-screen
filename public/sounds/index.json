@@ -1,0 +1,420 @@
+{
+ "source": "myinstants.com (public instant pages; each 'source' is the original mp3)",
+ "fetched": "2026-10-13",
+ "rules": {
+  "min_gap_s": 20,
+  "max_per_5min": 4,
+  "stream_only_when_live": false,
+  "scream_min_gap_s": 300,
+  "hidden_every_s": [
+   120,
+   300
+  ]
+ },
+ "sounds": [
+  {
+   "id": "vine-boom",
+   "file": "/sounds/vine-boom.mp3",
+   "dur": 1.31,
+   "tags": [
+    "dramatic",
+    "reveal",
+    "shock",
+    "emphasis",
+    "vine"
+   ],
+   "when": "right after a dramatic reveal or a line that hits hard",
+   "source": "https://www.myinstants.com/media/sounds/vine-boom.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "bruh",
+   "file": "/sounds/bruh.mp3",
+   "dur": 0.86,
+   "tags": [
+    "bruh",
+    "disappointed",
+    "fail",
+    "really"
+   ],
+   "when": "when someone (or she) does something dumb or disappointing",
+   "source": "https://www.myinstants.com/media/sounds/movie_1.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "roblox-oof",
+   "file": "/sounds/roblox-oof.mp3",
+   "dur": 1.04,
+   "tags": [
+    "oof",
+    "fail",
+    "ouch",
+    "died",
+    "roblox"
+   ],
+   "when": "a small fail: she misclicks, loses, or a joke flops",
+   "source": "https://www.myinstants.com/media/sounds/roblox-death-sound_1.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "mlg-airhorn",
+   "file": "/sounds/mlg-airhorn.mp3",
+   "dur": 3.0,
+   "tags": [
+    "hype",
+    "win",
+    "epic",
+    "mlg"
+   ],
+   "when": "hype moment: a win, a clutch play, a sick result",
+   "source": "https://www.myinstants.com/media/sounds/mlg-airhorn.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "sad-violin",
+   "file": "/sounds/sad-violin.mp3",
+   "dur": 5.04,
+   "tags": [
+    "sad",
+    "tragic",
+    "pity",
+    "rip"
+   ],
+   "when": "fake-sad moment, mock pity, 'rip'",
+   "source": "https://www.myinstants.com/media/sounds/sad-violin.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "emotional-damage",
+   "file": "/sounds/emotional-damage.mp3",
+   "dur": 3.37,
+   "tags": [
+    "roast",
+    "burn",
+    "damage"
+   ],
+   "when": "after a roast lands (friendly roasts only)",
+   "source": "https://www.myinstants.com/media/sounds/emotional-damage-meme.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "among-us-sus",
+   "file": "/sounds/among-us-sus.mp3",
+   "dur": 4.55,
+   "tags": [
+    "sus",
+    "suspicious",
+    "impostor",
+    "among us"
+   ],
+   "when": "something is suspicious, 'that's sus'",
+   "source": "https://www.myinstants.com/media/sounds/among-us-role-reveal-sound.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "windows-error",
+   "file": "/sounds/windows-error.mp3",
+   "dur": 1.02,
+   "tags": [
+    "error",
+    "bug",
+    "crash",
+    "computer"
+   ],
+   "when": "an app crashes or errors on her desktop",
+   "source": "https://www.myinstants.com/media/sounds/erro.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "crickets",
+   "file": "/sounds/crickets.mp3",
+   "dur": 4.05,
+   "tags": [
+    "silence",
+    "awkward",
+    "nobody",
+    "quiet"
+   ],
+   "when": "awkward silence, a joke nobody laughed at, empty chat",
+   "source": "https://www.myinstants.com/media/sounds/crickets.swf.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "to-be-continued",
+   "file": "/sounds/to-be-continued.mp3",
+   "dur": 6.03,
+   "tags": [
+    "cliffhanger",
+    "end",
+    "continued",
+    "jojo"
+   ],
+   "when": "cliffhanger, freeze-frame before something goes wrong",
+   "source": "https://www.myinstants.com/media/sounds/untitled_1071.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "metal-pipe",
+   "file": "/sounds/metal-pipe.mp3",
+   "dur": 3.21,
+   "tags": [
+    "loud",
+    "clang",
+    "chaos",
+    "drop"
+   ],
+   "when": "sudden loud chaos, something falls apart",
+   "source": "https://www.myinstants.com/media/sounds/jixaw-metal-pipe-falling-sound.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "taco-bell-bong",
+   "file": "/sounds/taco-bell-bong.mp3",
+   "dur": 1.96,
+   "tags": [
+    "dramatic",
+    "bong",
+    "reveal"
+   ],
+   "when": "a random dramatic beat",
+   "source": "https://www.myinstants.com/media/sounds/taco-bell-bong-sfx.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "wow-owen-wilson",
+   "file": "/sounds/wow-owen-wilson.mp3",
+   "dur": 0.84,
+   "tags": [
+    "wow",
+    "amazing",
+    "impressed"
+   ],
+   "when": "genuinely impressed, 'wow'",
+   "source": "https://www.myinstants.com/media/sounds/wao.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "rizz",
+   "file": "/sounds/rizz.mp3",
+   "dur": 1.96,
+   "tags": [
+    "brag",
+    "w",
+    "clutch",
+    "flex",
+    "smug",
+    "roast-chat"
+   ],
+   "when": "smug/cocky BRAG moments only: a W, a clutch play, roasting chat, a flex. NEVER for flirting or anything romantic or suggestive (Jena is a minor)",
+   "source": "https://www.myinstants.com/media/sounds/rizz-sound-effect.mp3",
+   "kid_safe": true,
+   "expression": "smug"
+  },
+  {
+   "id": "spongebob-fail",
+   "file": "/sounds/spongebob-fail.mp3",
+   "dur": 3.42,
+   "tags": [
+    "fail",
+    "awkward",
+    "oops"
+   ],
+   "when": "a failure with comedic timing",
+   "source": "https://www.myinstants.com/media/sounds/spongebob-fail.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "dun-dun-dun",
+   "file": "/sounds/dun-dun-dun.mp3",
+   "dur": 4.05,
+   "tags": [
+    "dramatic",
+    "suspense",
+    "plot twist"
+   ],
+   "when": "plot twist, suspense",
+   "source": "https://www.myinstants.com/media/sounds/dun-dun-dun-sound-effect-brass_8nFBccR.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "ba-dum-tss",
+   "file": "/sounds/ba-dum-tss.mp3",
+   "dur": 1.93,
+   "tags": [
+    "joke",
+    "pun",
+    "rimshot",
+    "funny"
+   ],
+   "when": "after a pun or a bad joke",
+   "source": "https://www.myinstants.com/media/sounds/rimshot.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "yay",
+   "file": "/sounds/yay.mp3",
+   "dur": 3.03,
+   "tags": [
+    "yay",
+    "celebrate",
+    "good news",
+    "win"
+   ],
+   "when": "good news, celebration",
+   "source": "https://www.myinstants.com/media/sounds/kids-saying-yay-sound-effect_2.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "huh-cat",
+   "file": "/sounds/huh-cat.mp3",
+   "dur": 3.03,
+   "tags": [
+    "huh",
+    "confused",
+    "what"
+   ],
+   "when": "confused, 'huh?'",
+   "source": "https://www.myinstants.com/media/sounds/huh-cat.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "goofy-ahh-run",
+   "file": "/sounds/goofy-ahh-run.mp3",
+   "dur": 4.05,
+   "tags": [
+    "run",
+    "escape",
+    "goofy",
+    "chase"
+   ],
+   "when": "running away from a problem, escaping",
+   "source": "https://www.myinstants.com/media/sounds/goofy-ahh-running-sounds.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "aughhh",
+   "file": "/sounds/aughhh.mp3",
+   "dur": 1.88,
+   "tags": [
+    "scream",
+    "panic",
+    "frustrated"
+   ],
+   "when": "frustrated scream, panic",
+   "source": "https://www.myinstants.com/media/sounds/aughhhh-tiktok.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "discord-notification",
+   "file": "/sounds/discord-notification.mp3",
+   "dur": 0.52,
+   "tags": [
+    "notification",
+    "ping",
+    "message"
+   ],
+   "when": "pranking chat with a fake ping",
+   "source": "https://www.myinstants.com/media/sounds/discord-notification.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "minecraft-villager",
+   "file": "/sounds/minecraft-villager.mp3",
+   "dur": 1.36,
+   "tags": [
+    "hmm",
+    "villager",
+    "minecraft",
+    "thinking"
+   ],
+   "when": "'hmm', thinking, skeptical",
+   "source": "https://www.myinstants.com/media/sounds/minecraft-villager-sound-effect.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "wait-a-minute",
+   "file": "/sounds/wait-a-minute.mp3",
+   "dur": 4.05,
+   "tags": [
+    "wait",
+    "suspicious",
+    "who"
+   ],
+   "when": "realizing something is off",
+   "source": "https://www.myinstants.com/media/sounds/wait-a-minute-who-are-you.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "nope",
+   "file": "/sounds/nope.mp3",
+   "dur": 0.42,
+   "tags": [
+    "nope",
+    "no",
+    "refuse"
+   ],
+   "when": "refusing something, 'nope'",
+   "source": "https://www.myinstants.com/media/sounds/tf2-engineer-nope.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "hello-there",
+   "file": "/sounds/hello-there.mp3",
+   "dur": 0.86,
+   "tags": [
+    "hello",
+    "greeting",
+    "hi"
+   ],
+   "when": "greeting someone new in chat",
+   "source": "https://www.myinstants.com/media/sounds/obi-wan-hello-there.mp3",
+   "kid_safe": true
+  },
+  {
+   "id": "keys-jingle",
+   "file": "/sounds/keys-jingle.mp3",
+   "dur": 2.53,
+   "tags": [
+    "attention",
+    "hidden",
+    "quiet"
+   ],
+   "when": "retention hook only: a quiet key jingle every few minutes, never over her speech (peak -23 dBFS)",
+   "source": "https://www.myinstants.com/media/sounds/jingling-keys.mp3",
+   "kid_safe": true,
+   "hidden": true,
+   "volume": 1.0
+  },
+  {
+   "id": "tom-scream",
+   "file": "/sounds/tom-scream.mp3",
+   "dur": 2.59,
+   "tags": [
+    "scream",
+    "chaos",
+    "random"
+   ],
+   "when": "random-scream moment (Dallas Soup style): at most once per 5 minutes, with a punch-in; limited to -6 dBFS peak",
+   "source": "https://www.myinstants.com/media/sounds/tom-scream.mp3",
+   "kid_safe": true,
+   "scream": true,
+   "volume": 1.0
+  },
+  {
+   "id": "goat-scream",
+   "file": "/sounds/goat-scream.mp3",
+   "dur": 1.88,
+   "tags": [
+    "scream",
+    "goat",
+    "chaos",
+    "random"
+   ],
+   "when": "random-scream moment: the screaming goat; at most once per 5 minutes, limited to -6 dBFS peak",
+   "source": "https://www.myinstants.com/media/sounds/screaming-goat.mp3",
+   "kid_safe": true,
+   "scream": true,
+   "volume": 1.0
+  }
+ ]
+}

@@ -17,6 +17,7 @@
 //   {type:"status", text}                     brain state, e.g. offline
 //   {type:"done"}
 import { PERSONA } from './persona.js';
+import { memeNote, takeSfx, pickSound, playCommand } from './memes.js';
 import { boxLink, boxAuth, ttsToken } from './boxlink.js';
 
 const env = (k) => (process.env[k] || '').trim();
@@ -164,7 +165,7 @@ function jenaxiPrompt(input) {
   const msg = input.attachment ? describe(input) : input.message;
   turns.push(`<|mama|>${msg}`);
   // a skill result rides as the system turn (her box's gateway uses it in place of its short default persona)
-  const note = skillNote(input.skill) + memNote(input.memories);
+  const note = skillNote(input.skill) + memNote(input.memories) + memeNote(input.message);
   if (note) turns.unshift(`<|system|>You are Jena (JenaXI), Saidie's AI: a chaotic, funny teen gremlin hacker girl. Saidie is mama. Never flirty.${note.replace(/\s+/g, ' ')}`);
   return turns.join('\n') + '\n<|jena|>';
 }
@@ -187,6 +188,16 @@ async function* sse(body) {
 }
 
 export async function* thinkEvents(input) {
+  // her soundboard, asked for by name ("jena play the vine boom"): played for real, no brain needed (src/soundboard.js
+  // rate-limits it on the page, and never plays it for a private run)
+  const playId = !input.attachment && !input.skill && playCommand(input.message);
+  if (playId) {
+    yield { type: 'step', kind: 'tool', text: `soundboard: ${playId} (myinstants clip)` };
+    yield { type: 'sfx', id: playId, why: 'asked for it' };
+    yield { type: 'say', text: `🔊 ${playId.replace(/-/g, ' ')}` };
+    yield { type: 'done' };
+    return;
+  }
   const p = await endpoint();
   let h = await brainHealth();
   if (!h.online) h = await checkHealth(); // fresh look before saying she's offline
@@ -220,7 +231,7 @@ export async function* thinkEvents(input) {
     method: 'POST',
     headers: { ...headers(p), 'X-Jena-Origin': String(input.source || 'stage').slice(0, 20), 'X-Jena-Mama': input.mama ? '1' : '0' },
     body: JSON.stringify(chatMode
-      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) + memNote(input.memories) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
+      ? { model, stream: true, temperature: 0.8, max_tokens: 300, messages: [{ role: 'system', content: PERSONA + skillNote(input.skill) + memNote(input.memories) + memeNote(input.message) }, ...(input.history || []).slice(-10), { role: 'user', content: describe(input) }] }
       : { model, stream: true, temperature: 0.8, top_p: 0.95, max_tokens: 160, prompt: jenaxiPrompt(input), stop: ['<|mama|>', '<|system|>', '\n<|', '</s>'] }),
     signal: AbortSignal.timeout(process.env.VERCEL ? 22000 : 45000), // Vercel function limit is 30 s
   });
@@ -287,7 +298,10 @@ export async function* thinkEvents(input) {
     invented++; return '[link removed]';
   });
   if (invented) yield { type: 'step', kind: 'status', text: `removed ${invented} link${invented > 1 ? 's' : ''} she made up (not from her search or your message)` };
-  let { text, events } = extractTags(cleaned);
+  const cue = takeSfx(cleaned);   // [sfx:id] she wrote herself
+  let { text, events } = extractTags(cue.text);
+  const sfxPick = cue.id ? { id: cue.id, why: 'her pick' } : pickSound(input.message, text);   // or the picker, only on a clear match
+  if (sfxPick) events.push({ type: 'sfx', id: sfxPick.id, why: sfxPick.why });
   // if her words skipped what her skill really found, the real top result rides along, labelled as the skill's
   const top = input.skill?.ok && input.skill.top;
   if (text && top?.url && !text.includes(top.url) && !(top.title && text.toLowerCase().includes(String(top.title).toLowerCase()))) text = `${text} (what my ${input.skill.name} skill really found: ${top.title ? top.title + ' ' : ''}${top.url})`;

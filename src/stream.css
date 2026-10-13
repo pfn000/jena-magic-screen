@@ -1,0 +1,99 @@
+/* STREAM LAYOUT (/stream?layout=wide|phone): Jena as a VTuber.
+   Her censored desktop fills the frame, her waist-up body stands in front of it on a transparent background (no box
+   around her), and the live chat she reads sits on the right (wide 16:9) or along the side (phone 9:16).
+   Everything private is already gone in OBS mode (body.obs); this only moves things around. */
+body.stream { background: #000; }
+body.stream #bg, body.stream #thoughts, body.stream #body-views, body.stream #self-eye, body.stream .controls,
+body.stream #dm-toggle, body.stream #dm, body.stream #build-stamp, body.stream .drop-hint, body.stream #voice-btn,
+body.stream #talk, body.stream #mic-status, body.stream .mic-note, body.stream #skills-pub, body.stream .m-tabs,
+body.stream .m-top, body.stream #avatar-status { display: none !important; }
+body.stream #stage { display: block !important; position: fixed; inset: 0; padding: 0 !important; gap: 0; }
+
+/* the desktop: full-frame background, no panel chrome */
+body.stream #desktop { position: fixed !important; inset: 0 !important; z-index: 0; border: 0 !important; border-radius: 0 !important;
+  background: #120c1c !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.stream #desktop .panel-head { display: none !important; }
+body.stream #desktop .desk-body { position: absolute !important; inset: 0 !important; margin: 0 !important; border-radius: 0 !important; aspect-ratio: auto !important; }
+body.stream #desktop .desk-screen img { object-fit: cover !important; }
+body.stream.desk-fit #desktop .desk-screen img { object-fit: contain !important; object-position: 50% 0 !important; }
+body.stream #desktop .desk-sleep .why { display: none; }
+
+/* Jena: in front, transparent, no frame */
+body.stream #avatar-panel { position: fixed !important; z-index: 3; background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible; }
+body.stream #avatar-canvas { filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
+body.stream #avatar-still { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); max-height: 100%; max-width: 100%; }
+body.stream .nametag { bottom: 2%; padding: 0.35vmin 1.6vmin; }
+body.stream .nametag .name { font-size: 2.2vmin; }
+body.stream .nametag .model { font-size: 1.1vmin; }
+body.stream #speech { font-size: 1.9vmin; max-width: 92%; }
+
+/* chat: the stream chat she reads */
+body.stream #chat { position: fixed !important; z-index: 2; display: flex; flex-direction: column;
+  background: rgba(22, 14, 34, 0.62) !important; border: 1.5px solid rgba(255, 255, 255, 0.28) !important; color: #fbf2ff;
+  backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; border-radius: 1.6vmin !important; box-shadow: 0 1vmin 4vmin rgba(0, 0, 0, 0.35) !important; }
+body.stream #chat .panel-head { padding: 1vmin 1.6vmin 0.6vmin; }
+body.stream #chat .panel-head h2 { font-size: 2vmin; color: #fff; }
+body.stream #chat .panel-head .sub, body.stream #chat .chip { color: #f3dcff; background: rgba(255, 255, 255, 0.14); font-size: 1.2vmin; }
+body.stream #chat-list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5vmin;
+  padding: 0 1.6vmin 1.4vmin !important; margin: 0; font-size: 1.9vmin !important; line-height: 1.3; color: #fbf2ff; }
+body.stream #chat-list li, body.stream #chat-list li.from-you, body.stream #chat-list li.from-jena { align-self: stretch !important; max-width: none !important; margin: 0 !important; text-align: left;
+  background: rgba(255, 255, 255, 0.1) !important; border-radius: 1vmin !important; padding: 0.5vmin 1vmin !important; color: #fbf2ff !important; box-shadow: none !important; }
+body.stream #chat-list li.from-jena { background: rgba(255, 122, 198, 0.32) !important; }
+body.stream #chat-list li b { display: inline !important; margin-right: 0.6vmin; font-weight: 800; filter: brightness(1.25); }
+body.stream #chat-list li b:not([style*='color']), body.stream #chat-list li b[style='color:'] { color: #ffb3e1 !important; }
+body.stream #chat-list li span { display: inline !important; color: #fbf2ff !important; }
+body.stream #chat-list li .tag:empty { display: none; }
+body.stream #chat-list .msg-correct, body.stream #chat-list .ask-pill { display: none !important; }
+body.stream #chat-list .chat-empty { display: none !important; }
+body.stream #chat-list:empty::before { content: 'chat shows up here'; opacity: 0.6; font-size: 1.6vmin; }
+
+/* WIDE 16:9 (YouTube / Twitch): Jena lower-left, chat on the right */
+/* VTuber norms (jena-stream/vtuber-framing.md): she is a lower-corner presence, head-to-waist, ~45-50% of the
+   frame height, the desktop stays readable */
+body.stream-wide #avatar-panel { left: 0.5vw; bottom: 0; width: 30vw; height: 52vh; }
+body.stream-wide #chat { right: 1.5vw; top: 4vh; width: 23vw; height: 60vh; }
+
+/* PHONE 9:16 (TikTok): N•OS phone layout behind her, Jena in the bottom half, chat along the left side
+   (TikTok's own buttons live on the right edge and its caption at the very bottom) */
+body.stream-phone #avatar-panel { left: 4vw; right: 4vw; width: auto; bottom: 0; height: 44vh; transition: height 0.9s ease; }
+/* a dance on the phone layout: her whole body, head always in, the way her example TikToks frame it */
+body.stream-phone.stream-full #avatar-panel { height: 80vh; }
+body.stream-phone #chat { left: 3vw; top: 14vh; width: 62vw; height: 26vh; }
+body.stream-phone #chat .panel-head { display: none; }
+body.stream-phone #chat-list { font-size: 1.7vh !important; }
+body.stream-phone .nametag .name { font-size: 2vh; }
+body.stream-phone #speech { font-size: 1.8vh; }
+
+/* one layer alone (?part=avatar|chat|desktop) for streamers who build their own OBS scene */
+body.stream.part-avatar #desktop, body.stream.part-avatar #chat,
+body.stream.part-chat #desktop, body.stream.part-chat #avatar-panel,
+body.stream.part-desktop #avatar-panel, body.stream.part-desktop #chat { display: none !important; }
+body.stream.part-avatar, body.stream.part-chat { background: transparent !important; }
+body.stream.part-avatar #avatar-panel { left: 0; right: 0; top: 0; bottom: 0; width: auto; height: auto; }
+body.stream.part-chat #chat { left: 0; right: 0; top: 0; bottom: 0; width: auto; height: auto; }
+
+/* ON-SCREEN TEXT: captions of what she says (word-pop with her voice) + punchline pops. Safe area: clear of TikTok's
+   right-edge buttons (~16% of the width) and its bottom caption (~18%), and clear of the chat panel. */
+#stream-caption, #stream-pop { display: none; }
+body.stream #stream-caption { display: block; position: fixed; z-index: 5; pointer-events: none; text-align: center; opacity: 0; transition: opacity 0.25s;
+  font: 900 3.4vmin/1.18 'Arial Black', 'Segoe UI', system-ui, sans-serif; color: #fff; text-transform: none; letter-spacing: 0.01em;
+  -webkit-text-stroke: 0.55vmin #000; paint-order: stroke fill; text-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.55); }
+body.stream #stream-caption.on { opacity: 1; }
+body.stream #stream-caption span { display: inline-block; margin: 0 0.14em; transition: transform 0.12s, color 0.12s; }
+body.stream #stream-caption span[hidden] { display: none; }
+body.stream #stream-caption span.now { color: #ffe14d; transform: scale(1.18); }
+body.stream #stream-pop { display: block; position: fixed; z-index: 6; pointer-events: none; opacity: 0; text-align: center;
+  font: 900 7vmin/1 'Arial Black', 'Segoe UI', system-ui, sans-serif; color: #ff5fb8; -webkit-text-stroke: 0.9vmin #fff; paint-order: stroke fill;
+  text-shadow: 0 0.8vmin 0 #2a0b3a, 0 1.4vmin 2.4vmin rgba(0, 0, 0, 0.5); transform: rotate(-4deg) scale(0.4); }
+body.stream #stream-pop { transition: opacity 0.3s; }
+body.stream #stream-pop.on { opacity: 1; animation: jena-pop 0.45s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+@keyframes jena-pop { 0% { transform: rotate(-4deg) scale(0.4); } 55% { transform: rotate(-4deg) scale(1.1); } 100% { transform: rotate(-4deg) scale(1); } }
+/* wide: captions along the bottom between her and the chat column, pops above her head */
+body.stream-wide #stream-caption { left: 31vw; right: 26vw; bottom: 15vh; }   /* clear of her desktop's dock */
+body.stream-wide #stream-pop { left: 2vw; width: 34vw; bottom: 54vh; }
+/* phone: captions in the gap between the chat and her head, left of TikTok's buttons; pops just above */
+body.stream-phone #stream-caption { left: 4vw; right: 18vw; top: 44vh; font-size: 3.1vh; -webkit-text-stroke-width: 0.5vh; }
+body.stream-phone #stream-pop { left: 4vw; right: 18vw; top: 34vh; font-size: 5.4vh; }
+body.stream-phone.stream-full #stream-caption { top: auto; bottom: 20vh; }
+body.stream.part-avatar #stream-caption, body.stream.part-chat #stream-caption, body.stream.part-desktop #stream-caption,
+body.stream.part-avatar #stream-pop, body.stream.part-chat #stream-pop, body.stream.part-desktop #stream-pop { display: none !important; }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Jena's meme file: weekly refresh from public pages (Know Your Meme, Wikipedia; X only when she is signed in)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=jena
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=20min
+ExecStart=/usr/bin/python3 /usr/local/lib/jena/memes_refresh.py --seed /usr/local/share/jena/memes.json --out /home/jena/learned

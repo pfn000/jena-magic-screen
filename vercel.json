@@ -11,6 +11,10 @@
     {
       "source": "/api/:path*",
       "destination": "/api/jena?route=:path*"
+    },
+    {
+      "source": "/stream",
+      "destination": "/index.html"
     }
   ],
   "functions": {

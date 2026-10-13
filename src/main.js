@@ -1,5 +1,8 @@
 import './style.css';
 import './mobile.css';
+import './stream.css';
+import { streamLayout, streamDirector, streamCaptions, streamHooks } from './stream.js';
+import { Soundboard } from './soundboard.js';
 import './trust.js';   // mama's trusted device: one unlock, then no passcode prompts (only for step-ups)
 import { loadConfig } from './config.js';
 import { Avatar } from './avatar.js';
@@ -33,6 +36,7 @@ const cfg = await loadConfig();
 document.body.classList.toggle('obs', cfg.obs);
 document.body.classList.toggle('bg-none', cfg.bgNone);
 document.body.classList.toggle('no-controls', !cfg.controls || cfg.obs);
+streamLayout(cfg);   // /stream?layout=wide|phone: the VTuber layout (src/stream.js, src/stream.css)
 
 // ---------------- avatar ----------------
 const status = $('#avatar-status');
@@ -68,6 +72,10 @@ const avatarTimer = setTimeout(() => avatarStill('her 3D body is taking long to 
 // her voice (Piper on her box) + lip-sync from the real audio
 if (cfg.obs) $('#voice-btn')?.remove();
 const voice = new Voice(avatar, { obs: cfg.obs, button: cfg.obs ? null : $('#voice-btn') });
+const sfx = new Soundboard({ obs: cfg.obs, voice });   // her meme soundboard (src/soundboard.js)
+streamDirector(cfg, avatar);   // stream camera director: push-ins, punch-ins, low angles (src/stream.js)
+streamCaptions(cfg, avatar);   // TikTok-style captions + punchline pops (src/stream.js)
+streamHooks(cfg, avatar);   // retention hooks: hidden key jingles, a rare random scream, out-of-pocket caption pops
 $('#talk')?.addEventListener('submit', () => voice.unlock()); // sending a message counts as the click browsers need
 
 // speech bubble
@@ -264,6 +272,7 @@ function runEvent(e, run, { privateRun = false } = {}) {
     if (privateRun) run.step('private', cfg.obs || !e.text ? 'replied privately' : `replied privately: “${e.text}”`);
     else { run.step('say', e.text); say(e.text); voice.speak(raw.text, raw.voice); voiceReply(raw); }
   }
+  else if (e.type === 'sfx') { if (!privateRun) sfx.play(e.id, e.why).then((r) => { if (!r.played) return; run.step('feel', `🔊 ${e.id}${e.why ? ' (' + e.why + ')' : ''}`); if (e.id === 'rizz') avatar.setExpression('smug', 0.8, 2600); }); }   // rizz = brag: a smug face
   else if (e.type === 'done') run.done();
 }
 
@@ -291,6 +300,10 @@ async function pollEvents() {
     for (const ev of d.events || []) {
       since = Math.max(since, ev.ts);
       if (ev.origin === ORIGIN || ev.type !== 'thought_run') continue;
+      // the stream layout's chat panel: what people say to her on the site, live (her own replies follow via say());
+      // never a private or DM run, never an attachment, starred by the same stream-safety mask as Twitch
+      const tr = ev.trigger || {};
+      if (cfg.stream && !twitchLive && !tr.private && !/^(dm|private|mama_dm)$/i.test(tr.source || '') && tr.text && !tr.attachment) addChat({ user: String(tr.user || 'someone').slice(0, 30), text: clean(String(tr.text).slice(0, 200)), cls: 'from-you' });
       busy = busy.then(async () => {
         const t = ev.trigger || {};
         const run = chain.start(t.private ? { user: t.user || 'mama', private: true, source: 'private' } : t);

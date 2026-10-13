@@ -17,6 +17,17 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎀</text></svg>">
 </head>
 <body>
+  <script>
+    // STREAM LAYOUT is always the OBS page: force ?obs=1 before any module reads the URL (fail closed: the censored
+    // desktop, no private controls, never mama's raw view), and tag the body for src/stream.css.
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (!/^\/stream\/?$/.test(location.pathname) && !q.has('layout')) return;
+      if (q.get('obs') !== '1') { q.set('obs', '1'); history.replaceState(null, '', location.pathname + '?' + q + location.hash); }
+      var lay = /phone|tiktok/.test(q.get('layout') || '') ? 'phone' : 'wide';
+      document.body.classList.add('obs', 'stream', 'stream-' + lay, 'bg-none', 'no-controls');
+    })();
+  </script>
   <div id="bg" aria-hidden="true"></div>
   <main id="stage">
     <section id="avatar-panel" aria-label="Jena">

@@ -6,7 +6,12 @@
 //   ?obs=1              OBS browser-source mode: 1920x1080, no scrollbars, no private controls
 //   ?bg=none            transparent background (for OBS scenes with their own backdrop)
 //   ?controls=0         hide the test buttons
+//   /stream?layout=wide|phone  STREAM LAYOUT (VTuber): her censored desktop full-screen behind her, her waist-up body in
+//                       front on a transparent background, live chat on the right (wide 16:9) or along the side (phone 9:16).
+//                       Always OBS-safe (implies ?obs=1). ?part=avatar|chat|desktop shows one layer alone for OBS scenes.
 const q = new URLSearchParams(location.search);
+// the stream layout is always the public, censored, OBS-safe page (never mama's raw view)
+const STREAM = /^\/stream\/?$/.test(location.pathname) || q.has('layout');
 
 const DEFAULTS = {
   twitch: null,
@@ -45,8 +50,11 @@ export async function loadConfig() {
     ...(file || {}),
     api: !!api,
     apiInfo: api,
-    obs: q.get('obs') === '1' || q.get('obs') === 'true',
-    bgNone: q.get('bg') === 'none' || q.get('bg') === 'transparent',
+    stream: STREAM,
+    layout: STREAM ? (q.get('layout') === 'phone' || q.get('layout') === 'tiktok' ? 'phone' : 'wide') : null,
+    part: STREAM && ['avatar', 'chat', 'desktop'].includes(q.get('part')) ? q.get('part') : null,
+    obs: STREAM || q.get('obs') === '1' || q.get('obs') === 'true',
+    bgNone: STREAM || q.get('bg') === 'none' || q.get('bg') === 'transparent',
     controls: q.get('controls') !== '0',
   };
   cfg.twitch = q.get('twitch') || api?.twitch || null; // never a default channel
