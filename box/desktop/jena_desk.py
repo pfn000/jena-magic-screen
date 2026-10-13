@@ -839,6 +839,24 @@ def ears():
         except Exception:
             pass
 
+# ---------------------------------------------------------------- her thoughts.txt (the notes file open on her desktop)
+# Every line in ~/notes/thoughts.txt goes to the site's thought chain, read straight from the file, so it
+# doesn't matter who wrote the line (her hands, her brain, mama during a takeover). Line numbers are the cursor.
+THOUGHTS = os.path.join(HOME, 'notes', 'thoughts.txt')
+
+def thoughts_since(since=0, last=8):
+    try:
+        st = os.stat(THOUGHTS)
+        lines = open(THOUGHTS, encoding='utf-8', errors='replace').read().split('\n')
+    except FileNotFoundError:
+        return {'file': '~/notes/thoughts.txt', 'exists': False, 'total': 0, 'lines': []}
+    rows = [{'n': i + 1, 'text': l.rstrip()[:500]} for i, l in enumerate(lines) if l.strip()]
+    if since > 0:
+        rows = [r for r in rows if r['n'] >= since][:60]     # >= so the site sees a line that grew since last read
+    else:
+        rows = rows[-max(1, min(last, 40)):]
+    return {'file': '~/notes/thoughts.txt', 'exists': True, 'total': len(lines), 'mtime': int(st.st_mtime * 1000), 'lines': rows}
+
 # ---------------------------------------------------------------- the door (http + websocket passthrough)
 def payload():
     with lock:
@@ -948,6 +966,11 @@ async def client(reader, writer):
         ctype, out = 'image/jpeg', shot_jpg
     elif p in ('/box/desktop.json', '/box', '/box/'):
         out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
+    elif p == '/box/thoughts':
+        qs_ = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
+        try: since = int(qs_.get('since', ['0'])[0]); last = int(qs_.get('last', ['8'])[0])
+        except ValueError: since, last = 0, 8
+        out = json.dumps(thoughts_since(since, last)).encode()
     elif p == '/box/event' and method == 'POST':
         try: ok = take_event(json.loads(body or b'{}'))
         except Exception: ok = False

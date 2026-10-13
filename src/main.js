@@ -95,11 +95,31 @@ async function pollDesk() {
     if (a.ts <= deskSeen) continue;
     deskSeen = a.ts;
     if (a.kind === 'help') continue;
+    if (/^typed in my notes: /.test(a.text)) continue;   // the line itself arrives from thoughts.txt (below), whole
     chain.desk(a.kind === 'skill' ? 'tool' : 'see', a.text, a.ts);
   }
 }
 pollDesk();
 setInterval(pollDesk, 5000);
+
+// her thoughts.txt (the notes file open on her desktop): every line written there shows here, in order, within ~3 s.
+// Read from the file itself on her box, so it doesn't matter who typed it. Cursor = line number in the file.
+let noteAt = 0, noteTotal = 0, noteBusy = false;
+async function pollNotes() {
+  if (!cfg.api || document.hidden || noteBusy) return;
+  noteBusy = true;
+  try {
+    const d = await fetch(`/api/box?what=thoughts&since=${noteAt}&last=6`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+    const t = d?.data;
+    if (!t?.exists) return;
+    if (t.total < noteTotal) { noteAt = 0; noteTotal = 0; return; }      // file was rewritten shorter: re-read the tail next time
+    noteTotal = t.total;
+    for (const l of t.lines || []) { chain.noteLine(l.n, l.text); noteAt = Math.max(noteAt, l.n); }
+  } finally { noteBusy = false; }
+}
+pollNotes();
+setInterval(pollNotes, 3000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollNotes(); });
 
 // public list of her skills, read live from her box when opened (nothing listed that doesn't run there)
 const skillsPub = $('#skills-pub');

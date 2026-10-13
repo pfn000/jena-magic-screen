@@ -1,7 +1,7 @@
 // The thought process chain panel: each run is a card; steps stream in one at a time.
 // Only real events: what people say to her, file drops, her own movements, what she sees of herself,
 // and what her brain (JenaXI) actually answers. Nothing is invented.
-const ICON = { notice: '📥', think: '🧠', tool: '🔧', feel: '💢', plan: '🗺️', say: '💬', status: '⚠️', body: '🤸', see: '👁️', sense: '🫧', private: '🔒' };
+const ICON = { notice: '📥', think: '🧠', tool: '🔧', feel: '💢', plan: '🗺️', say: '💬', status: '⚠️', body: '🤸', see: '👁️', sense: '🫧', private: '🔒', note: '📝' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const EMPTY = '<p class="empty">Nothing yet. Real events show up here as they happen: what you say to Jena, chat that mentions her, file drops, her own moves, what she sees of herself, what she does on her desktop (skills too), and what her brain answers.</p>';
 
@@ -78,6 +78,31 @@ export class ThoughtChain {
     }
     this.deskAt = now;
     this.addStep(this.deskCard.querySelector('.steps'), kind, text);
+  }
+
+  // her thoughts.txt, the notes file open on her desktop: every line in it, in order, read from the file itself.
+  // n = the line's number in the file (no line is shown twice; a line that grew is updated in place).
+  noteLine(n, text) {
+    if (!this.noteSteps) {   // after a seamless refresh the restored chain already holds some lines: adopt them
+      this.noteSteps = new Map();
+      this.list.querySelectorAll('.run.note .step[data-n]').forEach((li) => this.noteSteps.set(+li.dataset.n, li));
+      this.noteCard = [...this.list.querySelectorAll('.run.note')].pop() || null;
+    }
+    const have = this.noteSteps.get(n);
+    if (have?.isConnected) { if (have.dataset.text !== text) { have.dataset.text = text; have.querySelector('.txt').textContent = text; } return; }
+    if (!this.noteCard || !this.noteCard.isConnected || this.noteCard.querySelectorAll('.step').length >= 8) {
+      this.list.querySelector('.empty')?.remove();
+      const card = document.createElement('article');
+      card.className = 'run note is-done';
+      card.innerHTML = `<header><span class="who">Jena</span><span class="src">thoughts.txt on her desktop</span><span class="time">${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></header><ol class="steps"></ol>`;
+      this.noteCard = card;
+      this.mount(card);
+    }
+    this.addStep(this.noteCard.querySelector('.steps'), 'note', text);
+    const li = this.noteCard.querySelector('.steps').lastElementChild;
+    li.dataset.n = n; li.dataset.text = text;
+    this.noteSteps.set(n, li);
+    if (this.noteSteps.size > 400) this.noteSteps.delete(this.noteSteps.keys().next().value);
   }
 
   mount(card) {

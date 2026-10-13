@@ -143,7 +143,9 @@ async function boxProxy(req) {
   if (!box) return json({ online: false, error: 'her box has not announced itself in the last 30 min (box or tunnel down)' }, 503);
   const what = new URL(req.url).searchParams.get('what') || 'status';
   if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
-  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory' }[what] || '/status';
+  const q = new URL(req.url).searchParams;
+  const th = `/box/thoughts?since=${Math.max(0, parseInt(q.get('since') || '0', 10) || 0)}&last=${Math.min(40, Math.max(1, parseInt(q.get('last') || '8', 10) || 8))}`;
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity', memory: '/box/memory', thoughts: th }[what] || '/status';
   try {
     const r = await fetch(box.url + path, { headers: { ...boxAuth(), ...(what === 'activity' ? { 'X-Jena-Key': req.headers.get('x-jena-key') || '' } : {}) }, signal: AbortSignal.timeout(8000) });
     const d = await r.json();
