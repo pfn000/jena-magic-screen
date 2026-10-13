@@ -96,9 +96,22 @@ export class Desktop {
     const isMama = () => this.mode === 'mama' || !!localStorage.getItem('jena.dmKey');
     const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ minutes: 60, source: 'double_click' })); };
     // capture phase: noVNC's own mouse/touch handlers on the canvas stop these events from bubbling
-    this.screen.addEventListener('dblclick', (e) => { if (e.target === this.mamaBtn) return; e.preventDefault(); go(); }, true);
+    // a mouse double-click is detected from two pointerdowns: noVNC captures the pointer on mousedown (its capture
+    // div takes the mouseup), so the browser's own dblclick lands on <body>, never on this panel (1600 px bug).
+    // The whole desk body counts, so it also works while the picture is still connecting.
+    const area = this.screen.parentElement || this.screen;
+    const skip = (e) => e.target === this.mamaBtn || !!e.target?.closest?.('button, a, input, textarea, select');
+    let pd = 0, px = 0, py = 0;
+    area.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || e.button !== 0 || skip(e)) return;
+      const now = Date.now();
+      if (now - pd < 450 && Math.hypot(e.clientX - px, e.clientY - py) < 12) { pd = 0; go(); }
+      else { pd = now; px = e.clientX; py = e.clientY; }
+    }, true);
+    area.addEventListener('dblclick', (e) => { if (skip(e)) return; e.preventDefault(); go(); }, true);
     let last = 0, lx = 0, ly = 0;
-    this.screen.addEventListener('touchend', (e) => {
+    area.addEventListener('touchend', (e) => {
+      if (skip(e)) return;
       const t = e.changedTouches[0]; if (!t || e.touches.length) return;
       const now = Date.now();
       if (now - last < 350 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { last = 0; if (e.cancelable) e.preventDefault(); go(); }
