@@ -18,6 +18,10 @@ Nothing here logs in anywhere or touches anyone's accounts.
 import asyncio, json, os, random, re, subprocess, threading, time, hashlib, urllib.request, urllib.parse
 from collections import deque
 import jena_skills as skills
+try: import jena_censor            # public desktop frames are censored before they leave the box (optional module)
+except Exception as _e: jena_censor = None; print('jena_censor not loaded:', _e, flush=True)
+try: import jena_signin            # private one-time sign-in windows for mama (optional module)
+except Exception as _e: jena_signin = None; print('jena_signin not loaded:', _e, flush=True)
 
 DISPLAY = os.environ.get('DISP', ':99')
 PORT = int(os.environ.get('JENA_BOX_PORT', '6081'))
@@ -38,15 +42,57 @@ BAD = re.compile(r"\b(sex\w*|porn\w*|nude\w*|naked|nsfw|onlyfans|fetish\w*|eroti
 def safe(s):
     return not BAD.search(s or '')
 
+class HandsPaused(Exception): pass
+input_gate = threading.RLock()
+input_jobs = set()
+private_session = False
+
+def hands_blocked():
+    si = globals().get('signin')
+    return bool(globals().get('mama', {}).get('driving') or private_session or (si is not None and si.active()))
+
+def input_command(cmd):
+    words = cmd if isinstance(cmd, (list, tuple)) else str(cmd).split()
+    if not words: return False
+    tool = os.path.basename(str(words[0]))
+    if tool == 'xdotool':
+        return len(words) < 2 or not str(words[1]).startswith(('get', 'search'))
+    return tool == 'wmctrl' and any(x in words for x in ('-a', '-r', '-c', '-k', '-s'))
+
+def stop_her_inputs():
+    # Called while claiming the gate: kills typing/click commands ALREADY in flight.
+    with input_gate:
+        for proc in tuple(input_jobs):
+            try: proc.terminate()
+            except Exception: pass
+
 def sh(cmd, timeout=10):
+    changing = input_command(cmd)
+    proc = None
     try:
+        if changing:
+            with input_gate:
+                if hands_blocked(): raise HandsPaused('input blocked: mama owns the desktop')
+                proc = subprocess.Popen(cmd, shell=isinstance(cmd, str), env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                input_jobs.add(proc)
+            out, _ = proc.communicate(timeout=timeout)
+            return out.strip()
         r = subprocess.run(cmd, shell=isinstance(cmd, str), env=ENV, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip()
+    except HandsPaused: raise
     except Exception:
+        if proc:
+            try: proc.kill()
+            except Exception: pass
         return ''
+    finally:
+        if proc:
+            with input_gate: input_jobs.discard(proc)
 
 def spawn(cmd):
-    return subprocess.Popen(cmd, env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, cwd=HOME)
+    with input_gate:
+        if hands_blocked(): raise HandsPaused('app launch blocked: mama owns the desktop')
+        return subprocess.Popen(cmd, env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, cwd=HOME)
 
 # ---------------------------------------------------------------- shared state
 lock = threading.Lock()
@@ -116,6 +162,7 @@ def screen_size():
     return (int(m.group(1)), int(m.group(2))) if m else (1600, 704)
 
 def firefox(url):
+    if hands_blocked(): return None     # mama is driving, or her Firefox profile is busy in the private sign-in window
     wid = find('firefox')
     W, H = screen_size()
     fw, fh = min(1180, W - 60), H - 70
@@ -426,7 +473,11 @@ def skill_ask_grok(inp):
     if wall: ans = ''
     if not ans:
         if re.search(CF, text or '', re.I): why = 'grok.com put up a Cloudflare "verify you are human" check, and I do not do CAPTCHAs by myself'
-        elif wall or re.search(r'\b(sign in|log in|sign up)\b', text or '', re.I): why = 'grok.com showed a "sign up to continue" wall (signed-out visitors get no answer), and I do not sign in or make accounts by myself. Mama: sign in once on my desktop (dev panel -> take over) and it stays signed in'
+        elif wall or re.search(r'\b(sign in|log in|sign up)\b', text or '', re.I):
+            why = 'grok.com showed a "sign up to continue" wall (signed-out visitors get no answer), and I do not sign in or make accounts by myself'
+            request_signin('grok', f'Grok needs an account to answer; I wanted to ask it "{q[:80]}"')
+            ask_mama(f'I tried asking Grok "{q[:80]}" but {why}. Please sign me in once (dev panel -> sign-in request) and it stays signed in.')
+            return {'ok': False, 'summary': why + '; I asked mama to sign me in once (dev panel)'}
         else: why = 'I could not read an answer off the page'
         ask_mama(f'I tried asking Grok "{q[:80]}" but {why}.')
         return {'ok': False, 'summary': why}
@@ -437,6 +488,75 @@ def skill_ask_grok(inp):
     did(f'Grok answered (Grok\'s words, saved to my memory): "{re.sub(chr(10), " ", ans)[:160]}"', 'skill')
     return {'ok': True, 'summary': f'asked Grok "{q[:60]}" and saved its answer', 'question': q, 'answer': ans[:4000], 'answered_by': 'Grok'}
 skills.desktop_skills['ask_grok'] = skill_ask_grok
+
+# ---------------------------------------------------------------- check_my_email: her Proton Mail inbox (web only), read in her own Firefox
+# Mama signs in once (private sign-in window). Jena only READS the inbox list: sender, subject, time, and whether a mail looks
+# like a verification code. She never sends mail. Bodies, addresses and code digits never go to the public site or her thought
+# chain (there it is only "got a code from X ✔"); the details go to mama's activity log (passcode, dev panel).
+MAIL_URL = 'https://mail.proton.me/u/0/inbox'
+MAIL_CHROME = re.compile(r'^(inbox|drafts|sent|starred|archive|spam|trash|all mail|folders|labels|more|less|settings|new message|search messages|'
+                         r'search|upgrade|proton mail|mail|calendar|drive|vpn|pass|wallet|unread|select all|refresh|jena|\d+ ?(messages?|unread)?|'
+                         r'filters|snoozed|scheduled|almost all mail|categories|newsletters|transactions|updates|forums|promotions|social|'
+                         r'get the app|get proton|move to|label as|delete|mark as read|mark as unread|get started|help|feedback)$', re.I)
+MAIL_TIME = re.compile(r'^(\d{1,2}:\d{2}\s*(am|pm)?|yesterday|today|(mon|tue|wed|thu|fri|sat|sun)[a-z]*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}(, \d{4})?|\d{1,2}/\d{1,2}(/\d{2,4})?)$', re.I)
+CODE_HINT = re.compile(r'\b(verification|verify|confirm(ation)?|one.?time|security|login|sign.?in|passcode|2fa|otp|pin)\b.*\b(code|pin|passcode)\b|\bcode\b', re.I)
+CODE_DIGITS = re.compile(r'(?<!\d)(\d{4,8}|\d{3}[- ]\d{3})(?!\d)')
+
+def skill_check_my_email(inp):
+    """reads the inbox list of the Proton Mail account mama signed me into (web, in my Firefox). Read-only; private details go to mama's log only."""
+    did('checking my email inbox in my browser (details stay private, only mama sees them)', 'skill')
+    log_activity('check_my_email', MAIL_URL, 'read the inbox list')
+    mama['private_until'] = time.time() + 90      # the public desktop is private while the inbox is on screen
+    set_private_reason('inbox', True)
+    try:
+        wid = firefox(MAIL_URL)
+        if not wid: return {'ok': False, 'summary': 'my browser is busy (mama is driving or signing in), try again in a bit'}
+        time.sleep(12)
+        wid = find('firefox')
+        if not wid: return {'ok': False, 'summary': 'my browser did not open'}
+        focus(wid); key('ctrl+a'); time.sleep(0.3); key('ctrl+c'); time.sleep(0.4)
+        text = clipboard_text() or ''
+        sh('printf "" | xclip -i -selection clipboard', timeout=4)      # the inbox text does not stay on my clipboard
+        key('Escape')
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        low = text.lower()
+        if ('inbox' not in low or re.search(r'sign in to proton|create a proton account|forgot password|sign in\s*$', low, re.M)) and re.search(r'\b(sign in|log in|create (an )?account)\b', low):
+            request_signin('proton', 'I want to read my email inbox but Proton wants me to sign in')
+            return {'ok': False, 'summary': 'Proton Mail wants a sign-in; I asked mama to sign me in once (dev panel)'}
+        if 'inbox' not in low:
+            return {'ok': False, 'summary': 'I could not read my inbox off the page (is Proton Mail open?)'}
+        # group the message list: Proton's rows copy as sender / subject (+ preview) / time; the time ends a row
+        rows, cur = [], []
+        for l in lines:
+            if MAIL_CHROME.match(l): continue
+            cur.append(l)
+            if MAIL_TIME.match(l):
+                rows.append(cur); cur = []
+        msgs = []
+        for r in rows[:30]:
+            if len(r) < 2: continue
+            when = r[-1]; sender = r[0]; subject = ' '.join(r[1:-1])[:160] or '(no subject)'
+            is_code = bool(CODE_HINT.search(subject) and CODE_DIGITS.search(subject))
+            code = CODE_DIGITS.search(subject).group(1) if is_code else None
+            msgs.append({'from': sender[:80], 'subject': subject, 'when': when, 'code': code})
+        codes = [m for m in msgs if m['code']]
+        for m in msgs[:12]:
+            log_activity('email', f"{m['from']} — {m['subject']} ({m['when']})", 'inbox list, read only')
+        for m in codes:
+            log_activity('email_code', f"code from {m['from']}: {m['code']}", 'verification code (only here, never on the site)')
+        public = f'checked my inbox: {len(msgs)} message{"s" if len(msgs) != 1 else ""} in the list' + (', got a code from ' + ', '.join(sorted({m['from'] for m in codes})) + ' ✔' if codes else '') + ' — details are in mama\'s log'
+        did(public, 'skill')
+        return {'ok': True, 'summary': public, 'messages_seen': len(msgs), 'codes_seen': len(codes), 'note': 'senders, subjects and any code digits are in mama\'s activity log only', 'raw_lines': len(lines)}
+    except HandsPaused:
+        return {'ok': False, 'summary': 'mama took over, so I stopped reading my email'}
+    finally:
+        try:
+            if find('firefox'):   # never leave the inbox on my public desktop
+                focus(find('firefox')); key('ctrl+l'); time.sleep(0.2); type_('about:blank\n', delay=20); time.sleep(1)
+        except Exception: pass
+        mama['private_until'] = 0
+        set_private_reason('inbox', False)
+skills.desktop_skills['check_my_email'] = skill_check_my_email
 
 # terminal self-discovery: she explores her own box in her visible terminal, only from a fixed list of
 # read-only commands (no sudo, no rm, nothing typed from chat), and writes what she found to her notes.
@@ -538,6 +658,16 @@ def use_skill(name, text):
         log_activity('open', url, f'{name}: {text}')
         firefox(url); time.sleep(3); scroll_some()
     return res
+
+PRIVATE_PAGE = re.compile(r'proton|mail\b|inbox|sign ?in|log ?in|login|account|password|verify|verification|authenticat|checkout|bank', re.I)
+def tidy_private_pages():
+    """after mama drove or signed in: if Firefox was left on a mailbox / login page, move it to a blank tab (the censor
+    would cover it anyway, but the page itself should not stay up on her public desktop)"""
+    for w in windows():
+        if 'firefox' in w['cls'] and PRIVATE_PAGE.search(w['title'] or ''):
+            did('mama left a private page open in my browser, closing it before I go on', 'help')
+            focus(w['id']); key('ctrl+l'); time.sleep(0.2); type_('about:blank\n', delay=20); time.sleep(0.8)
+            break
 
 def unstick():
     """close dialogs that would freeze her apps (e.g. mousepad's 'Externally Modified')"""
@@ -660,11 +790,14 @@ def hands():
     while True:
         try:
             ev = None
-            if mama['driving']:
+            if hands_blocked():
                 time.sleep(2); continue          # mama has her desktop: hands off
             with lock:
                 if events_in: ev = events_in.popleft()
             unstick()
+            if after_private['tidy']:
+                after_private['tidy'] = False
+                tidy_private_pages()
             if ev and ev.get('show_url'):
                 log_activity('open', ev['show_url'], ev.get('why', ''))
                 firefox(ev['show_url']); time.sleep(3); scroll_some()
@@ -740,9 +873,9 @@ def eyes():
     global shot_jpg
     lasthash = None
     while True:
-        if mama['driving']:   # mama is driving (e.g. signing in somewhere): no screenshot, no OCR, nothing published
+        if private_now():   # mama is driving / signing in somewhere: no screenshot, no OCR, nothing published
             with lock:
-                screen.update({'ts': int(time.time() * 1000), 'summary': 'mama is driving my desktop, so I am not looking (private)', 'text': ''})
+                screen.update({'ts': int(time.time() * 1000), 'summary': 'private moment on my desktop, so I am not looking', 'text': ''})
             time.sleep(2); continue
         try:
             raw = os.path.join(STATE, 'screen.png')
@@ -795,6 +928,54 @@ MAMA_HASH = os.path.join(STATE, 'mama.sha256')
 takeover_tokens = {}          # token -> expiry
 public_viewers = set()        # open view-only stream connections (closed the moment mama takes over)
 mama = {'driving': 0, 'private_until': 0}
+after_private = {'tidy': False}   # after mama drove / a sign-in window closed: her hands move Firefox off any private page
+
+def private_now():
+    return bool(mama['driving'] or private_session or time.time() < mama['private_until'] or (signin is not None and signin.active()))
+
+# ---- censor: every public frame is OCR'd and redacted on the box before it leaves (jena_censor.py); no raw VNC for the public
+CENSOR = None
+if jena_censor is not None:
+    try:
+        CENSOR = jena_censor.Censor(display=DISPLAY)
+        CENSOR.start()
+    except Exception as _e:
+        CENSOR = None; print('censor could not start:', _e, flush=True)
+
+def set_private_reason(reason, on):
+    try:
+        if CENSOR is not None: CENSOR.set_private(reason, bool(on))
+    except Exception as e: print('censor set_private', e, flush=True)
+
+# ---- private sign-in windows (jena_signin.py): mama signs in to a site in a hidden window with Jena's own Firefox profile
+signin = None
+def _signin_started(site):
+    global private_session
+    with input_gate:
+        private_session = True
+        stop_her_inputs()
+    set_private_reason('signin', True)
+    did(f'mama is signing me in to {site} in a private window, hands off 🙌', 'help')
+
+def _signin_ended(site, result):
+    global private_session
+    with input_gate: private_session = False
+    set_private_reason('signin', False)
+    after_private['tidy'] = True
+    did(f'sign-in window for {site} closed ({result})', 'help')
+
+if jena_signin is not None:
+    try: signin = jena_signin.SignIn(home=HOME, on_start=_signin_started, on_end=_signin_ended, log=log_activity)
+    except Exception as _e:
+        signin = None; print('signin module could not start:', _e, flush=True)
+
+def request_signin(site, reason):
+    """Jena asks mama to sign her in somewhere (shows as a card in the dev panel; never on stream)"""
+    if signin is not None:
+        try: return signin.request(site, reason)
+        except Exception as e: print('signin.request', e, flush=True)
+    ask_mama(f'please sign me in to {site} once (dev panel): {reason}')
+    return None
 def is_mama(hdrs):
     try: want = open(MAMA_HASH).read().strip()
     except Exception: return False
@@ -903,7 +1084,7 @@ def thoughts_since(since=0, last=8):
         lines = open(THOUGHTS, encoding='utf-8', errors='replace').read().split('\n')
     except FileNotFoundError:
         return {'file': '~/notes/thoughts.txt', 'exists': False, 'total': 0, 'lines': []}
-    rows = [{'n': i + 1, 'text': l.rstrip()[:500]} for i, l in enumerate(lines) if l.strip()]
+    rows = [{'n': i + 1, 'text': mask_text(l.rstrip()[:500])} for i, l in enumerate(lines) if l.strip()]
     if since > 0:
         rows = [r for r in rows if r['n'] >= since][:60]     # >= so the site sees a line that grew since last read
     else:
@@ -911,13 +1092,38 @@ def thoughts_since(since=0, last=8):
     return {'file': '~/notes/thoughts.txt', 'exists': True, 'total': len(lines), 'mtime': int(st.st_mtime * 1000), 'lines': rows}
 
 # ---------------------------------------------------------------- the door (http + websocket passthrough)
+# ---- anything that leaves the box as TEXT (screen OCR, window titles, her actions, thoughts.txt) is masked the same way
+# the censor masks the picture: emails, IP addresses, 6-8 digit codes, key-like strings, phone numbers -> ▇▇▇
+MASK_RULES = [
+    ('email', re.compile(r'[A-Za-z0-9._%+\-]+\s?@\s?[A-Za-z0-9.\-]+\.[A-Za-z]{2,}')),
+    ('key', re.compile(r'(?:sk|pk|rk)[-_](?:live[-_]|test[-_]|proj[-_]|ant[-_])?[A-Za-z0-9_\-]{8,}|gh[pousr]_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,}|xox[abprs]-[A-Za-z0-9\-]{8,}|AKIA[0-9A-Z]{12,}|AIza[0-9A-Za-z_\-]{20,}|hf_[A-Za-z0-9]{10,}|glpat-[A-Za-z0-9_\-]{10,}|eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{5,}|(?<![A-Za-z0-9])(?=[A-Za-z0-9+/_\-]*\d)(?=[A-Za-z0-9+/_\-]*[A-Za-z])[A-Za-z0-9+/_\-]{28,}={0,2}(?![A-Za-z0-9])')),
+    ('ip', re.compile(r'(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d])|(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{1,4}:){3,7}[0-9A-Fa-f]{0,4}(?![0-9A-Fa-f:])')),
+    ('phone', re.compile(r'(?<![\d])(?:\+?\d{1,3}[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}(?![\d])')),
+    ('code', re.compile(r'(?<![\dA-Za-z])(?:\d[ \-]?){5,7}\d(?![\dA-Za-z])')),
+]
+def mask_text(t):
+    if not t: return t
+    t = str(t)
+    for kind, rx in MASK_RULES:
+        t = rx.sub('▇▇▇', t)
+    return t
+
 def payload():
     with lock:
-        if mama['driving']:
+        if private_now():
             return {'ok': True, 'summary': 'mama is driving my desktop (private)', 'text': '', 'active': {}, 'windows': [],
-                    'actions': [], 'video': None, 'now': int(time.time() * 1000), 'mama_driving': True, 'private': True, 'updating': {}}
-        return dict(screen, actions=list(actions)[-8:], video=watching['video'], now=int(time.time() * 1000),
-                    mama_driving=mama['driving'] > 0, private=(time.time() < mama['private_until'] or mama['driving'] > 0), updating=updating.copy())
+                    'actions': [], 'video': None, 'now': int(time.time() * 1000), 'mama_driving': mama['driving'] > 0, 'private': True, 'updating': {}}
+        pub = dict(screen, actions=[dict(a, text=mask_text(a.get('text'))) for a in list(actions)[-8:]], video=watching['video'], now=int(time.time() * 1000),
+                   mama_driving=mama['driving'] > 0, private=False, updating=updating.copy())
+    pub['summary'] = mask_text(pub.get('summary'))
+    pub['text'] = mask_text(pub.get('text'))
+    if pub.get('active'): pub['active'] = dict(pub['active'], title=mask_text(pub['active'].get('title')))
+    pub['windows'] = [dict(w, title=mask_text(w.get('title'))) for w in pub.get('windows') or []]
+    if CENSOR is not None:   # the picture is private right now (login page, inbox, keys on screen...): the words stay private too
+        try:
+            if CENSOR.status().get('state') != 'live': pub['text'] = ''; pub['windows'] = []; pub['active'] = {}
+        except Exception: pub['text'] = ''
+    return pub
 
 CORS = b'Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
 
@@ -956,8 +1162,17 @@ async def mama_door(p, method, body):
         try: helps = open(HELP).read().strip().splitlines()[-20:]
         except Exception: helps = []
         return 200, json.dumps({'activity': [json.loads(l) for l in lines if l.strip()], 'help': [json.loads(l) for l in helps if l.strip()]}).encode()
+    if p.startswith('/box/mama/signin/'):
+        if signin is None: return 503, json.dumps({'ok': False, 'summary': 'the private sign-in module is not on my box yet'}).encode()
+        try:
+            st, out = await signin.mama_door(p, b)
+            return st, (out if isinstance(out, (bytes, bytearray)) else json.dumps(out).encode())
+        except Exception as e:
+            return 500, json.dumps({'ok': False, 'summary': f'sign-in door: {str(e)[:160]}'}).encode()
     if p == '/box/mama/notify':
-        mama_popup(b.get('text', '')); return 200, json.dumps({'ok': True, 'shown_for_s': 28}).encode()
+        try: mama_popup(b.get('text', ''))
+        except HandsPaused: return 409, json.dumps({'ok': False, 'summary': 'her desktop is private right now (takeover / sign-in); try again after'}).encode()
+        return 200, json.dumps({'ok': True, 'shown_for_s': 28}).encode()
     if p == '/box/mama/takeover':
         tok = secrets.token_urlsafe(24); takeover_tokens[tok] = time.time() + 60
         return 200, json.dumps({'ok': True, 'token': tok, 'path': '/websockify-mama?t=' + tok, 'valid_s': 60}).encode()
@@ -1024,17 +1239,30 @@ async def client(reader, writer):
         except Exception:
             writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         uw.write(head.replace(path.encode(), b'/websockify', 1)); await uw.drain()
-        mama['driving'] += 1; did('mama took over my desktop, my hands are off (and my screen is private while she drives)', 'help')
+        with input_gate:
+            mama['driving'] += 1
+            stop_her_inputs()
+        set_private_reason('mama_takeover', True)
+        did("mama's driving, hands off 🙌", 'skill')
+        did('mama took over my desktop (private)', 'help')
         for v in list(public_viewers):   # the public view-only stream stops while mama drives
             try: v.close()
             except Exception: pass
         try: await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
         finally:
             mama['driving'] = max(0, mama['driving'] - 1)
-            if not mama['driving']: did('mama gave my desktop back', 'help')
+            if not mama['driving']:
+                set_private_reason('mama_takeover', False); after_private['tidy'] = True
+                did('mama gave my desktop back', 'help')
         return
+    if p == '/websockify-signin':
+        if signin is None:
+            writer.write(b'HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
+        await signin.ws_proxy(reader, writer, head); return
     if p.startswith('/websockify'):
-        if mama['driving']:   # private while mama drives; the page's viewer retries by itself afterwards
+        if CENSOR is not None:   # no raw public stream any more: the public sees censored frames (/box/shot.jpg) only
+            writer.write(b'HTTP/1.1 410 Gone\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
+        if private_now():   # private while mama drives / signs in; the page's viewer retries by itself afterwards
             writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return
         try:
             ur, uw = await asyncio.open_connection(*WS_UPSTREAM)
@@ -1053,16 +1281,27 @@ async def client(reader, writer):
     n = int(hdrs.get('content-length') or 0)
     if 0 < n < 8192:
         body = await reader.readexactly(n)
-    status, ctype, out = 200, 'application/json', b''
+    status, ctype, out, extra = 200, 'application/json', b'', {}
     if method == 'OPTIONS':
         status, out = 204, b''
     elif p in ('/box/screen.json', '/box/screen', '/screen.json'):
         out = json.dumps(payload()).encode()
     elif p in ('/box/shot.jpg', '/shot.jpg'):
-        if mama['driving']: status, out = 403, b'{"error":"private while mama drives"}'
+        if CENSOR is not None:
+            try:
+                out, extra_h = CENSOR.jpeg(); ctype = 'image/jpeg'
+                if isinstance(extra_h, dict): extra = extra_h
+            except Exception as e:
+                status, out = 503, json.dumps({'error': 'censor: ' + str(e)[:80]}).encode()
+        elif private_now(): status, out = 403, b'{"error":"private moment"}'
         else: ctype, out = 'image/jpeg', shot_jpg
+    elif p == '/box/censor.json':
+        try: out = (CENSOR.status_json() if CENSOR is not None else json.dumps({'state': 'off', 'reason': 'censor module not loaded; public stream is private-gated only'}))
+        except Exception as e: out = json.dumps({'state': 'error', 'reason': str(e)[:80]})
+        if isinstance(out, str): out = out.encode()
     elif p in ('/box/desktop.json', '/box', '/box/'):
-        out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
+        if CENSOR is not None: out = json.dumps({'websockify': None, 'mode': 'censored', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg', 'censor': '/box/censor.json'}).encode()
+        else: out = json.dumps({'websockify': '/websockify', 'screen': '/box/screen.json', 'shot': '/box/shot.jpg'}).encode()
     elif p == '/box/thoughts':
         qs_ = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
         try: since = int(qs_.get('since', ['0'])[0]); last = int(qs_.get('last', ['8'])[0])
@@ -1143,8 +1382,9 @@ async def client(reader, writer):
         out = json.dumps({'ok': True, 'who': "Jena's desktop"}).encode()
     else:
         status, out = 404, b'{"error":"not here"}'
-    reason = {200: 'OK', 204: 'No Content', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found'}.get(status, 'OK')
-    writer.write(f'HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {len(out)}\r\nCache-Control: no-store\r\nConnection: close\r\n'.encode() + CORS + b'\r\n' + out)
+    reason = {200: 'OK', 204: 'No Content', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 410: 'Gone', 503: 'Service Unavailable'}.get(status, 'OK')
+    xh = ''.join(f'{k}: {v}\r\n' for k, v in extra.items() if k.lower() not in ('content-type', 'content-length', 'cache-control', 'connection'))
+    writer.write(f'HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {len(out)}\r\nCache-Control: no-store\r\nConnection: close\r\n{xh}'.encode() + CORS + b'\r\n' + out)
     try: await writer.drain()
     except Exception: pass
     writer.close()

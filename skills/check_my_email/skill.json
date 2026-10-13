@@ -1,0 +1,17 @@
+{
+ "name": "check_my_email",
+ "description": "Reads the inbox list of her own Proton Mail account (web only, in her own Firefox, after mama signed her in once in a private window): sender, subject, time, and whether a mail is a verification code. Read-only, never sends mail. Senders, subjects and code digits go to mama's activity log only; the public site and her thought chain only ever see 'got a code from X'.",
+ "triggers": [
+  "\\b(check|read|look at|open|any|new|got|see)\\b[^.?!]{0,30}\\b(e-?mails?|inbox|mailbox)\\b",
+  "\\b(verification|verify|confirmation|security|login|sign-?in) code\\b",
+  "\\bdid (you|u) get (a|the|my) (code|email)\\b",
+  "\\bproton ?mail\\b"
+ ],
+ "kind": "desktop",
+ "entry": null,
+ "timeout": 120,
+ "needs": [],
+ "example": {
+  "text": "jena check your email, did you get a code?"
+ }
+}
