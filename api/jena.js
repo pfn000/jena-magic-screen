@@ -13,7 +13,7 @@
 import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
-import { boxLink, boxAuth, ttsToken, accept as acceptBox } from './_lib/boxlink.js';
+import { boxLink, boxAuth, ttsToken, accept as acceptBox, relayBox } from './_lib/boxlink.js';
 import { multiSearch, hotUrls } from './_lib/search.js';
 
 function routeOf(req) {
@@ -416,7 +416,7 @@ async function handle(req) {
   try {
     if (route === 'config') return json(await config());
     if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
-    if (route === 'box' && req.method === 'POST') { const p = acceptBox(await body(req)); if (p) checkHealth(); return p ? json({ ok: true, url: p.url }) : json({ error: 'bad signature' }, 401); }
+    if (route === 'box' && req.method === 'POST') { const env = await body(req), p = acceptBox(env); if (p) checkHealth(); const relay = p ? await relayBox(env, p) : null; return p ? json({ ok: true, url: p.url, relay }) : json({ error: 'bad signature' }, 401); }
     if (route === 'box') return await boxProxy(req);
     if (route === 'deploys') return await deploys();
     if (route === 'incident' && req.method === 'POST') return await incident(req);
