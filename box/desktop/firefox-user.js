@@ -12,3 +12,6 @@ user_pref("network.cookie.lifetimePolicy", 0);
 user_pref("browser.link.open_newwindow", 1);
 user_pref("browser.link.open_newwindow.restriction", 0);
 user_pref("browser.tabs.loadInBackground", false);
+
+// phone mode (jena_takeover.py): firefox-userChrome.css (-> <profile>/chrome/userChrome.css) lets Firefox fit a ~350 px portrait screen
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);

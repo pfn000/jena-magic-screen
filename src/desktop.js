@@ -85,6 +85,24 @@ export class Desktop {
     setInterval(() => { if (this.mode === 'mama' && !this.rfb && !document.hidden && Date.now() - (this.mamaTried || 0) > 20000) this.startMama(); }, 10000);
     this.setUrl(url, true);
     setInterval(() => this.pollStatus(), 2500);
+    this.bindTakeover();
+  }
+
+  // Saidie (1:39 PM): double-click her desktop -> mama has it for a whole hour, Jena's own hands pause, and the
+  // changes stay. A double-tap does the same on a phone (then her desktop turns phone-shaped: phone mode).
+  bindTakeover() {
+    if (OBS) return;
+    const isMama = () => this.mode === 'mama' || !!localStorage.getItem('jena.dmKey');
+    const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ minutes: 60, source: 'double_click' })); };
+    this.screen.addEventListener('dblclick', (e) => { if (e.target === this.mamaBtn) return; e.preventDefault(); go(); });
+    let last = 0, lx = 0, ly = 0;
+    this.screen.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0]; if (!t || e.touches.length) return;
+      const now = Date.now();
+      if (now - last < 350 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { last = 0; if (e.cancelable) e.preventDefault(); go(); }
+      else { last = now; lx = t.clientX; ly = t.clientY; }
+    }, { passive: false });
+    if (isMama()) this.screen.title = 'double-click: take over her desktop for an hour (her hands pause)';
   }
 
   wantsMama() { return !OBS && qs.get('public') !== '1' && !!localStorage.getItem('jena.dmKey'); }

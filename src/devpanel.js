@@ -3,7 +3,7 @@
 // GitHub's deploy statuses, and this page's own state. Nothing is simulated; a source that does not
 // answer is shown as not answering.
 import { renderSecurity, handleSecurityClick } from './mamasec.js';
-import RFB from '@novnc/novnc';
+import { openTakeover } from './takeover.js';
 import { asks, startAsks, renderAsks, handleAskClick, pendingCount } from './signin.js';
 // styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
 const STUDIO_CSS = `#devpanel .dp-card{border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.04)}
@@ -62,6 +62,7 @@ export class DevPanel {
         const mo = this.body.querySelector('#dp-mama-out');
         if (!key) { mo.textContent = 'unlock the private DM drawer with your passcode first'; return; }
         const act = e.target.dataset.mama;
+        if (act === 'takeover') { openTakeover({ source: 'devpanel' }); mo.textContent = 'you have her desktop (full screen). ✓ Done gives it back.'; return; }
         const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key }, body: JSON.stringify({ action: act, text: this.body.querySelector('#dp-pop')?.value || '' }) }).then((x) => x.json()).catch((er) => ({ error: er.message }));
         if (act === 'notify') mo.textContent = r.ok ? 'popped up on her desktop (covered on the public page + stream while it is up)' : JSON.stringify(r);
         if (act === 'apikey') mo.textContent = r.ok ? `Jena's API key (keep it secret; only you can see this):\n${r.key}\n\nOpenAI-compatible:\ncurl ${location.origin}/api/v1/chat/completions -H "Authorization: Bearer ${r.key}" -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"hi jena"}]}'` : JSON.stringify(r);
@@ -108,19 +109,7 @@ export class DevPanel {
     if (new URLSearchParams(location.search).get('dev') === '1') setTimeout(() => this.open(), 500);
   }
   // mama drives her real desktop (full mouse + keyboard) through a one-time token; her own hands pause meanwhile
-  takeover(ws) {
-    document.getElementById('takeover')?.remove();
-    const box = document.createElement('section');
-    box.id = 'takeover';
-    box.innerHTML = '<header>🖐 You are driving Jena\'s desktop (her hands are paused) <span class="to-st">connecting…</span><button style="margin-left:auto">give it back ✕</button></header><div class="to-screen"></div>';
-    document.body.appendChild(box);
-    const rfb = new RFB(box.querySelector('.to-screen'), ws, { shared: true });
-    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.showDotCursor = true;
-    const st = box.querySelector('.to-st');
-    rfb.addEventListener('connect', () => (st.textContent = 'connected'));
-    rfb.addEventListener('disconnect', (ev) => (st.textContent = ev.detail?.clean ? 'disconnected' : 'connection dropped (token used or expired? press take over again)'));
-    box.querySelector('button').onclick = () => { try { rfb.disconnect(); } catch {} box.remove(); };
-  }
+  takeover() { openTakeover({ source: 'devpanel' }); }   // the shared takeover screen (takeover.js)
   showAsks() { this.tab = 'asks'; this.el.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === 'asks')); if (this.el.hidden) this.open(); else this.render(); }
   open() { this.el.hidden = false; this.refresh(); this.timer = setInterval(() => this.refresh(), 4000); }
   close() { this.el.hidden = true; clearInterval(this.timer); }

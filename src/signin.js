@@ -3,7 +3,7 @@
 // Mama types everything herself; nothing here automates a login, a CAPTCHA or an account. The public page, OBS
 // and the public desktop never see the private window (her public desktop shows the lock card meanwhile).
 // Other asks (permission for something she wants to do) get Approve / Deny, recorded on her box.
-import RFB from '@novnc/novnc';
+import { mountTakeover, isPhoneView } from './takeover.js';   // the shared takeover screen: phone keyboard, our own cursor, touch, phone mode
 import qrcode from 'qrcode-generator';
 
 const KEY = 'jena.dmKey';
@@ -183,10 +183,11 @@ async function takeoverFor(pass) {
   // her tunnel can be mid-restart (the answer is then an HTML error page, not JSON): try 3 times over ~8 s
   let last = null;
   for (let i = 0; i < 3; i++) {
-    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover' }) })
+    const vv = window.visualViewport, phone = isPhoneView() ? { w: Math.round(vv?.width || innerWidth), h: Math.round((vv?.height || innerHeight) - 96) } : null;
+    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover', source: 'signin', phone }) })
       .then(async (x) => { const t = await x.text(); try { return JSON.parse(t); } catch { return { ok: false, retry: true, summary: 'her box is reconnecting' }; } })
       .catch(() => ({ ok: false, retry: true, summary: 'her box is reconnecting' }));
-    if (r.ok && r.ws) { localStorage.setItem(KEY, pass); return { ok: true, ws: r.ws, until: Date.now() + 60 * 60000 }; }
+    if (r.ok && r.ws) { if (pass) localStorage.setItem(KEY, pass); return { ok: true, ws: r.ws, until: Date.now() + 60 * 60000 }; }
     if (r.error === 'wrong key') return { ok: false, summary: 'wrong passcode' };
     last = r;
     await new Promise((res) => setTimeout(res, 1500 + i * 2000));
@@ -210,13 +211,14 @@ export function openSignin(req) {
     <form class="si-pass" style="margin:auto;max-width:330px;padding:20px;text-align:center"><p>You take over Jena's own desktop (her hands pause) and sign in right in her browser. You type everything yourself.</p>
       <input type="password" autocomplete="off" placeholder="passcode" style="font-size:16px;padding:10px;border-radius:10px;border:1px solid #888;width:100%;box-sizing:border-box">
       <button style="margin-top:10px;width:100%;padding:11px;border-radius:10px;border:0;background:#b48cff;color:#1d1b2e;font:700 15px system-ui">Open ${label}</button><p class="si-err" style="color:#ff8a8a"></p></form>
-    <div class="si-screen" hidden style="flex:1;min-height:0;background:#000;touch-action:none"></div>
-    <input class="si-kbin" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" style="position:absolute;left:-9999px;top:0;opacity:0;width:1px;height:1px">`;
+    <div class="si-screen" hidden style="flex:1;min-height:0;background:#000;touch-action:none"></div>`;
   document.body.appendChild(w);
   const st = w.querySelector('.si-st'), form = w.querySelector('.si-pass'), screen = w.querySelector('.si-screen');
-  const kbBtn = w.querySelector('.si-kb'), doneBtn = w.querySelector('.si-done'), kbIn = w.querySelector('.si-kbin');
-  let rfb = null, timer = null, until = 0;
-  const close = () => { clearInterval(timer); try { rfb?.disconnect(); } catch {} w.remove(); };
+  const kbBtn = w.querySelector('.si-kb'), doneBtn = w.querySelector('.si-done');
+  let rfb = null, ctl = null, timer = null, until = 0;
+  const mount = (d) => { ctl?.destroy(); ctl = mountTakeover(screen, { ws: d.ws, protocol: d.protocol, onState: (s) => { if (s === 'connected') { connected = true; st.textContent = 'connected'; } else st.textContent = s === 'closed' ? 'closed' : 'connection dropped: tap ✕ and Open again'; } }); rfb = ctl.rfb; w.ctl = ctl; };
+  let connected = false;
+  const close = () => { clearInterval(timer); try { ctl?.destroy(); } catch {} w.remove(); };
   w.querySelector('.si-x').onclick = close;   // the window on her box keeps running until Done or 10 min; reopen from the card
   const useLink = !!req.link && !key();   // mama with her passcode on this device always takes over her real desktop
   let ownWindow = useLink;   // true = her Firefox on its own screen (box 'start'); Done closes it and saves the session
@@ -238,10 +240,7 @@ export function openSignin(req) {
     if (d.label) w.querySelector('header b').textContent = `🖐 Sign Jena in to ${d.label}`;
     form.remove(); screen.hidden = false; kbBtn.hidden = false; doneBtn.hidden = false;
     until = d.until || Date.now() + 600000;
-    rfb = new RFB(screen, d.ws, { shared: true, wsProtocols: d.protocol ? [d.protocol, 'binary'] : ['binary'] });
-    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.clipViewport = false; rfb.showDotCursor = true;
-    let connected = false;
-    rfb.addEventListener('connect', () => { connected = true; st.textContent = 'connected'; });
+    mount(d);
     if (!ownWindow && req.id) setTimeout(async () => {   // takeover never connected (her :99 is down): switch to her own Firefox window
       if (connected || !w.isConnected) return;
       try { rfb.disconnect(); } catch {}
@@ -249,28 +248,15 @@ export function openSignin(req) {
       const s2 = await mamaSignin('start', { id: req.id }, key());
       if (!s2.ok) { st.textContent = s2.summary || s2.error || 'could not open her browser'; return; }
       ownWindow = true; until = s2.until || Date.now() + 600000;
-      screen.innerHTML = '';
-      rfb = new RFB(screen, s2.ws, { shared: true, wsProtocols: s2.protocol ? [s2.protocol, 'binary'] : ['binary'] });
-      rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.showDotCursor = true;
-      rfb.addEventListener('connect', () => { connected = true; st.textContent = 'connected'; });
+      mount(s2);
     }, 9000);
-    rfb.addEventListener('disconnect', (ev) => { st.textContent = ev.detail?.clean ? 'closed' : 'connection dropped: tap ✕ and Open again'; });
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
   form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
   if (req.link || key()) { form.querySelector('p').textContent = useLink ? 'Opening Jena\'s browser…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
   else form.querySelector('input').focus();
-  // phone keyboard: a hidden input forwards what mama types as key presses (never stored anywhere)
-  kbBtn.onclick = () => { kbIn.focus(); };
-  const sendChar = (ch) => { const c = ch.codePointAt(0); rfb?.sendKey(c < 256 ? c : 0x01000000 + c, null); };
-  kbIn.addEventListener('beforeinput', (e) => {
-    if (!rfb) return;
-    e.preventDefault();
-    if (e.inputType === 'deleteContentBackward') rfb.sendKey(0xff08, 'Backspace');
-    else if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') rfb.sendKey(0xff0d, 'Enter');
-    else { const txt = e.data ?? e.dataTransfer?.getData('text/plain') ?? ''; for (const ch of txt) sendChar(ch); }
-  });
-  kbIn.addEventListener('keydown', (e) => { if (!rfb) return; const m = { Enter: [0xff0d, 'Enter'], Tab: [0xff09, 'Tab'], Backspace: [0xff08, 'Backspace'] }[e.key]; if (m && e.isComposing === false && e.inputType === undefined && e.key !== 'Backspace') { e.preventDefault(); rfb.sendKey(m[0], m[1]); } });
+  // phone keyboard + key row live in the shared takeover screen (takeover.js)
+  kbBtn.onclick = () => ctl?.showKeyboard();
   doneBtn.onclick = async () => {
     doneBtn.disabled = true; st.textContent = 'saving her session (closing Firefox)…';
     try { rfb?.disconnect(); } catch {}

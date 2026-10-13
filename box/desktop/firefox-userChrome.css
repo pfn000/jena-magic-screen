@@ -1,0 +1,7 @@
+/* Phone mode (jena_takeover.py): let Firefox shrink to a portrait phone-width screen (~350 px).
+   Firefox's default minimum window width is ~500 px, wider than her portrait display. Nothing else changes. */
+:root, #main-window { min-width: 200px !important; }
+#nav-bar, #TabsToolbar, #toolbar-menubar, #PersonalToolbar, #navigator-toolbox, #titlebar { min-width: 0 !important; }
+#urlbar-container, #search-container { min-width: 40px !important; width: auto !important; }
+#urlbar { min-width: 0 !important; }
+.tabbrowser-tab { min-width: 40px !important; }

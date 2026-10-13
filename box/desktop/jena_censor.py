@@ -578,6 +578,17 @@ class Censor:
             self._tw_thread.start()
         return self
 
+    def set_hold(self, reason, on=True):
+        """Phone mode (jena_takeover.py): the public / OBS view HOLDS the last censored frame instead of a card,
+        and nothing new is grabbed (her display is portrait for mama meanwhile). The held frame was censored when it
+        was taken, so holding it leaks nothing. Real private reasons (set_private) still win over a hold."""
+        with self.lock:
+            holds = getattr(self, 'holds', None)
+            if holds is None: holds = self.holds = set()
+            if on: holds.add(reason)
+            else: holds.discard(reason)
+        _log({'event': 'hold_on' if on else 'hold_off', 'reason': reason})
+
     def set_private(self, reason, on=True):
         with self.lock:
             if on:
@@ -606,6 +617,8 @@ class Censor:
             return 'private', card, None
         if fr is None:
             return 'private', (self.meta.get('reason') or 'starting'), None
+        if getattr(self, 'holds', None):      # phone mode: the last good censored frame stays up, however old
+            return 'live', None, fr
         if now - max(fr[1], self.last_ok) > (DEAD_CARD_S_LIVE if live else DEAD_CARD_S):
             return 'private', 'censor_lag', None
         return 'live', None, fr
@@ -666,6 +679,8 @@ class Censor:
     def _tick(self):
         with self.lock:
             forced = bool(self.private)
+        if getattr(self, 'holds', None) and not forced:   # phone mode: grab nothing, keep the held frame
+            return
         if forced:
             with self.lock:
                 self.frame = None
