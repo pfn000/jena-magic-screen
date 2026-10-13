@@ -31,8 +31,9 @@ jobs:
           cache-to: type=gha,mode=max
       - name: smoke test (the image starts; her gateway + desktop agent answer; no models are mounted here)
         run: |
-          docker run -d --name jb -p 8088:8088 ghcr.io/${{ github.repository_owner }}/jena-box:${{ github.sha }}
-          ok=0; for i in $(seq 1 40); do if curl -fs http://127.0.0.1:8088/box/health; then ok=1; break; fi; sleep 4; done
+          docker run -d --name jb ghcr.io/${{ github.repository_owner }}/jena-box:${{ github.sha }}
+          # her gateway listens on the container's own 127.0.0.1 (outside reaches it only through her tunnel), so check from inside
+          ok=0; for i in $(seq 1 40); do if docker exec jb curl -fs http://127.0.0.1:8088/health && docker exec jb curl -fs http://127.0.0.1:8088/box/health; then ok=1; break; fi; sleep 4; done
           docker exec jb supervisorctl status || true
           docker logs jb 2>&1 | tail -40
           test "$ok" = 1
