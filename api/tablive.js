@@ -15,7 +15,13 @@ async function viaConfig(req) {
   } catch { return null; }
 }
 async function pass(req, box) {
-  const r = await fetch(box.url + '/box/tab-live', { headers: { ...boxAuth(), 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, signal: AbortSignal.timeout(7000) });
+  const post = req.method === 'POST';
+  const r = await fetch(box.url + (post ? '/box/tab-live/todo' : '/box/tab-live'), {
+    method: post ? 'POST' : 'GET',
+    headers: { ...boxAuth(), 'X-Jena-Key': req.headers.get('x-jena-key') || '', ...(post ? { 'Content-Type': 'application/json' } : {}) },
+    body: post ? JSON.stringify({ text: String((await req.json().catch(() => ({})))?.text || '').slice(0, 1000) }) : undefined,
+    signal: AbortSignal.timeout(7000),
+  });
   return new Response(await r.text(), { status: r.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
@@ -30,5 +36,6 @@ async function handle(req) {
   try { return await pass(req, box); } catch (e) { return json({ error: `her box did not answer: ${e.message}`, offline: true }, 502); }
 }
 export const GET = handle;
+export const POST = handle;   // mama's notepad: POST {text} -> a to-do for Tab
 export const OPTIONS = handle;
 export const maxDuration = 10;
