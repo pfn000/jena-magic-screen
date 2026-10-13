@@ -342,3 +342,22 @@ body.obs #voice-btn{display:none}
 
 /* still picture of her when her 3D body can't load (no WebGL / too slow) */
 #avatar-still { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); height: 92%; max-width: 100%; object-fit: contain; pointer-events: none; -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 60% 55% at 50% 50%, #000 62%, transparent 100%); }
+
+/* ---- composer: frosted glass card (Saidie's reference): input on top, ⊕ 🌐 left, 🎤 ↑ right, no chips ---- */
+#talk.composer, body.m-app #talk.composer { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 8px 10px 10px; padding: 10px 8px 7px 14px; border-radius: 20px;
+  background: rgba(255, 255, 255, .58); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, .75); border-top: 1px solid rgba(255, 255, 255, .75); box-shadow: 0 10px 30px rgba(46, 33, 66, .16), inset 0 1px 0 rgba(255, 255, 255, .85); }
+#talk.composer input, body.m-app #talk.composer input, body:not(.obs) #talk.composer input { height: auto; border: 0; border-radius: 0; background: transparent; padding: 4px 2px 6px; font-size: 16px; color: #2e2142; outline: none; box-shadow: none; }
+#talk.composer input::placeholder { color: rgba(46, 33, 66, .45); }
+#talk.composer input:focus, body.m-app #talk.composer input:focus { background: transparent; border: 0; }
+#talk.composer .cmp-row { display: flex; align-items: center; gap: 2px; }
+#talk.composer .cmp-gap { flex: 1; }
+#talk.composer button, body.m-app #talk.composer button { flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #5c5470; font-size: 19px; font-weight: 400; cursor: pointer; line-height: 1; box-shadow: none; }
+#talk.composer .cmp-btn { font-size: 21px; }
+#talk.composer #cmp-web.on { background: rgba(180, 140, 255, .28); }
+#talk.composer .mic-btn, body.m-app #talk.composer .mic-btn { font-size: 17px; border: 0; background: transparent; }
+#talk.composer .mic-btn.is-rec, body.m-app #talk.composer .mic-btn.is-rec { background: #ff4f86; color: #fff; }
+#talk.composer .cmp-send, body.m-app #talk.composer button[type="submit"] { width: 36px; height: 36px; margin-left: 4px; background: rgba(255, 255, 255, .95); color: #2e2142; font-size: 18px; font-weight: 700; box-shadow: 0 2px 10px rgba(46, 33, 66, .18); }
+#talk.composer #gift { display: none; }   /* ⊕ does the same */
+.m-chips { display: none !important; }
+body.obs #talk.composer { display: none !important; }

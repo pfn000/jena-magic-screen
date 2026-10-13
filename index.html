@@ -50,12 +50,18 @@
     <section id="chat" class="panel" aria-label="Stream chat">
       <header class="panel-head"><h2>Chat <span class="sub">· Twitch</span></h2><span id="chat-channel" class="chip">not connected</span></header>
       <ul id="chat-list" aria-live="off"></ul>
-      <form id="talk" autocomplete="off">
+      <form id="talk" class="composer" autocomplete="off">
         <label class="sr" for="talk-input">Talk to Jena</label>
         <input id="talk-input" maxlength="300" placeholder="talk to Jena…">
-        <button type="button" id="mic" class="mic-btn" aria-label="talk to Jena with your voice" aria-pressed="false" title="talk with your voice (tap to start, tap to send, or hold)">🎤</button>
-        <button type="submit" aria-label="send">➤</button>
+        <div class="cmp-row">
+          <button type="button" class="cmp-btn" id="cmp-attach" aria-label="send Jena a file" title="send Jena a file">⊕</button>
+          <button type="button" class="cmp-btn" id="cmp-web" aria-pressed="false" aria-label="ask her to look it up on the web" title="ask her to look it up on the web">🌐</button>
+          <span class="cmp-gap"></span>
+          <button type="button" id="mic" class="mic-btn" aria-label="talk to Jena with your voice" aria-pressed="false" title="talk with your voice (tap to start, tap to send, or hold)">🎤</button>
+          <button type="submit" class="cmp-send" aria-label="send">↑</button>
+        </div>
       </form>
+      <script type="module" src="/src/composer.js"></script>
       <p id="mic-status" class="mic-status" role="status" hidden></p>
       <p class="mic-note" id="mic-note" hidden><span>🎤 voice → text on her own computer, audio deleted</span> · <button type="button" id="mic-learn-toggle">learning: off</button></p>
     </section>
