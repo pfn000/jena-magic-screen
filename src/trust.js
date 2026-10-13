@@ -50,7 +50,7 @@ async function sync(first = false) {
     if (!d) return;
     if (d.trusted) {
       trust.state = d;
-      if (!v && d.token) {   // localStorage was cleared but the cookie remembers this device: restore mama mode
+      if (!v && d.token && first) {   // localStorage was cleared but the cookie remembers this device: restore mama mode (on load only; 'lock' stays locked until reload)
         set(d.token);
         if (first && !sessionStorage.getItem('jena.trustReload')) { sessionStorage.setItem('jena.trustReload', '1'); location.reload(); return; }
       }
@@ -108,25 +108,80 @@ window.fetch = async (input, init = {}) => {
     if (again.status === 401) await askPasscode('Wrong passcode', 'That passcode was not right, so the request was not sent.').catch(() => {});
     return again;
   }
-  if (su === 'mama_only') {   // the request went through as a normal (public) message; the mama-only part was blocked
-    if (Date.now() - lastPublicAsk < 60000) return res;
-    lastPublicAsk = Date.now();
-    let said = '';
-    try { said = JSON.parse(init.body || '{}').message || ''; } catch {}
-    const src = (() => { try { return JSON.parse(init.body || '{}').source; } catch { return ''; } })();
-    const pass = await askPasscode('Mama-only command blocked', `${src === 'twitch' ? 'Someone on stream' : 'The public chat'} asked Jena: “${said.slice(0, 120)}”. Only mama can do that. Type the passcode to run it as mama.`);
-    if (!pass) return res;
-    const again = await retry(pass, { user: 'mama', source: 'stage' });
-    if (again.ok && !get()) trustWithPasscode(pass);   // and remember this device as mama's from now on
-    return again;
+  if (su === 'mama_only') {   // went through as a normal public message (her gateway refused the mama-only part); never hold the reply
+    if (Date.now() - lastPublicAsk > 60000) {
+      lastPublicAsk = Date.now();
+      let said = '', src = '';
+      try { const j = JSON.parse(init.body || '{}'); said = j.message || ''; src = j.source || ''; } catch {}
+      askPasscode('Mama-only command blocked', `${src === 'twitch' ? 'Someone on stream' : 'The public chat'} asked Jena: “${said.slice(0, 120)}”. Only mama can do that, so it was not done. Type the passcode to run it as mama.`).then(async (pass) => {
+        if (!pass) return;
+        const t = await trustWithPasscode(pass);   // right passcode -> this device is mama's from now on
+        if (!t.ok) { askPasscode('Wrong passcode', 'That passcode was not right, so nothing ran.'); return; }
+        window.jena?.think?.(said, 'mama');
+      });
+    }
+    return res;
   }
   return res;
 };
 
+// ---------------- passkeys (Face ID on iPhone Safari, Touch ID, Windows Hello) ----------------
+const toBuf = (s) => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '==='.slice((s.length + 3) % 4); return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer; };
+const toB64u = (b) => { const a = new Uint8Array(b); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+export const passkeySupported = () => !!(window.PublicKeyCredential && navigator.credentials?.create);
+const pkApi = (b) => nativeFetch('/api/passkey', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': get() }, body: JSON.stringify(b) }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+// options are fetched ahead of the tap: Safari only shows Face ID from a fresh tap, so the tap must go straight to it
+const pre = { reg: null, login: null };
+export async function preparePasskey(kind) {
+  const o = await pkApi({ action: kind === 'reg' ? 'register-options' : 'login-options' });
+  pre[kind] = o.ok ? { ...o, at: Date.now() } : null;
+  return o;
+}
+const fresh = (kind) => (pre[kind] && Date.now() - pre[kind].at < 150000 ? pre[kind] : null);
+export async function addPasskey(label) {
+  const o = fresh('reg') || (await preparePasskey('reg'));
+  pre.reg = null;
+  if (!o.ok) return o;
+  const pk = o.publicKey;
+  const cred = await navigator.credentials.create({ publicKey: { ...pk, challenge: toBuf(pk.challenge), user: { ...pk.user, id: toBuf(pk.user.id) }, excludeCredentials: (pk.excludeCredentials || []).map((c) => ({ ...c, id: toBuf(c.id) })) } }).catch((e) => ({ error: e.name === 'NotAllowedError' ? 'cancelled' : e.message }));
+  if (cred.error) return { ok: false, error: cred.error };
+  return pkApi({ action: 'register', token: o.token, label: label || deviceLabel(), credential: { id: cred.id, rawId: toB64u(cred.rawId), type: cred.type, response: { clientDataJSON: toB64u(cred.response.clientDataJSON), attestationObject: toB64u(cred.response.attestationObject), transports: cred.response.getTransports?.() || [] } } });
+}
+export async function loginWithPasskey() {
+  const o = fresh('login') || (await preparePasskey('login'));
+  pre.login = null;
+  if (!o.ok) return o;
+  const pk = o.publicKey;
+  const cred = await navigator.credentials.get({ publicKey: { ...pk, challenge: toBuf(pk.challenge), allowCredentials: (pk.allowCredentials || []).map((c) => ({ ...c, id: toBuf(c.id) })) } }).catch((e) => ({ error: e.name === 'NotAllowedError' ? 'cancelled' : e.message }));
+  if (cred.error) return { ok: false, error: cred.error };
+  const d = await pkApi({ action: 'login', token: o.token, label: deviceLabel() + ' · passkey', credential: { id: cred.id, rawId: toB64u(cred.rawId), type: cred.type, response: { clientDataJSON: toB64u(cred.response.clientDataJSON), authenticatorData: toB64u(cred.response.authenticatorData), signature: toB64u(cred.response.signature), userHandle: cred.response.userHandle ? toB64u(cred.response.userHandle) : null } } });
+  if (d.ok && d.token) { set(d.token); trust.state = { trusted: true, ...d }; emit(); }
+  return d;
+}
+// a "Face ID / passkey" button on the private drawer's unlock form (the passcode box stays as the fallback)
+function passkeyOnLock() {
+  const f = document.getElementById('dm-unlock');
+  if (!f || f.querySelector('.pk-btn') || !passkeySupported()) return;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'pk-btn';
+  btn.textContent = '🔑 use Face ID / passkey';
+  btn.style.cssText = 'margin-top:8px;width:100%;padding:9px;border-radius:12px;border:1px solid #b48cff;background:none;color:inherit;font:600 14px system-ui;cursor:pointer';
+  btn.onclick = async () => {
+    const err = document.getElementById('dm-err');
+    const d = await loginWithPasskey();
+    if (d.ok) location.reload();
+    else if (err) err.textContent = d.error === 'cancelled' ? '' : `passkey: ${d.error}`;
+  };
+  f.appendChild(btn);
+  btn.addEventListener('pointerenter', () => { if (!fresh('login')) preparePasskey('login'); }, { once: true });
+  document.getElementById('dm-toggle')?.addEventListener('click', () => { if (!get()) preparePasskey('login'); });
+}
+
 if (!OBS) {
   sync(true);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', passkeyOnLock); else setTimeout(passkeyOnLock, 0);
   setInterval(() => { const v = get(); if (v && !v.startsWith(PREFIX)) sync(); }, 2000);   // passcode just typed somewhere -> trust it
   setInterval(() => sync(), 10 * 60000);
   window.addEventListener('storage', (e) => { if (e.key === KEY) sync(); });
 }
-window.jenaTrust = { trust, forgetDevice, trustWithPasscode, askPasscode };
+window.jenaTrust = { trust, forgetDevice, trustWithPasscode, askPasscode, addPasskey, loginWithPasskey, passkeySupported };

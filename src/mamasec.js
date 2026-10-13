@@ -1,6 +1,6 @@
 // Dev panel → "🔐 Mama: devices & keys" (mama only). This device's trust (forget it), mama's other trusted devices.
 // More sections (passkeys, Accounts vault, GitHub sign-in) plug in below as they ship.
-import { trust, forgetDevice } from './trust.js';
+import { trust, forgetDevice, addPasskey, loginWithPasskey, preparePasskey, passkeySupported } from './trust.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const day = (t) => (t ? new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '?');
@@ -52,3 +52,31 @@ export async function handleSecurityClick(e, rerender) {
   return false;
 }
 trust.listeners.add(() => sec.rerender?.());
+
+// ---------------- Passkeys ----------------
+const pk = { list: null, out: '', prepAt: 0 };
+sec.sections.push({
+  render() {
+    const sup = passkeySupported();
+    if (!key()) {
+      if (sup && Date.now() - pk.prepAt > 120000) { pk.prepAt = Date.now(); preparePasskey('login'); }
+      return `<div class="dp-card" id="sec-passkey"><h3>🔑 Passkey</h3><p>${sup ? '<button data-pk="login">🔑 Unlock with Face ID / passkey</button>' : 'This browser has no passkey support.'}</p>${pk.out ? `<p><small>${esc(pk.out)}</small></p>` : ''}</div>`;
+    }
+    if (!pk.list) { pk.list = { loading: true }; api('/api/passkey', { action: 'list' }).then((d) => { pk.list = d; sec.rerender?.(); }); }
+    if (sup && Date.now() - pk.prepAt > 120000) { pk.prepAt = Date.now(); preparePasskey('reg'); }
+    const L = pk.list;
+    const rows = L?.credentials?.length ? `<ul>${L.credentials.map((c) => `<li>🔑 ${esc(c.label || 'passkey')} · added ${day(c.created)}${c.used ? ' · last used ' + day(c.used) : ''} <button data-pk="del" data-id="${esc(c.id)}">remove</button></li>`).join('')}</ul>` : L?.loading ? '<p>loading…</p>' : L?.ok === false ? `<p class="dp-warn">${esc(L.error)}</p>` : '<p>No passkey yet.</p>';
+    return `<div class="dp-card" id="sec-passkey"><h3>🔑 Passkeys (Face ID / Touch ID / Windows Hello)</h3>
+      <p><small>For ${esc(L?.rpId || location.host)}. Add one on your iPhone in Safari: tap the button, then Face ID. After that, any new device (or this one after “forget”) unlocks with Face ID instead of the passcode.</small></p>
+      ${rows}<p>${sup ? '<button data-pk="add">➕ Add a passkey on this device</button>' : '<i>this browser has no passkey support</i>'}</p>${pk.out ? `<p><small>${esc(pk.out)}</small></p>` : ''}</div>`;
+  },
+  async click(e, rerender) {
+    const b = e.target.closest?.('[data-pk]');
+    if (!b) return false;
+    const a = b.dataset.pk;
+    if (a === 'add') { pk.out = 'waiting for Face ID / your device…'; rerender(); const d = await addPasskey(); pk.out = d.ok ? '✅ passkey added' : d.error === 'cancelled' ? 'cancelled' : `couldn't add it: ${d.error}`; pk.list = null; pk.prepAt = 0; rerender(); return true; }
+    if (a === 'login') { pk.out = 'waiting for Face ID / your device…'; rerender(); const d = await loginWithPasskey(); pk.out = d.ok ? '✅ unlocked: this device is trusted now' : d.error === 'cancelled' ? 'cancelled' : `couldn't unlock: ${d.error}`; pk.prepAt = 0; rerender(); if (d.ok) setTimeout(() => location.reload(), 900); return true; }
+    if (a === 'del') { if (!confirm('Remove this passkey? That device will need the passcode again.')) return true; const d = await api('/api/passkey', { action: 'delete', id: b.dataset.id }); pk.out = d.ok ? 'removed' : d.error; pk.list = null; rerender(); return true; }
+    return false;
+  },
+});

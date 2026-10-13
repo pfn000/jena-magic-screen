@@ -17,6 +17,7 @@ import { boxLink, boxAuth, ttsToken, accept as acceptBox, relayBox } from './_li
 import { multiSearch, hotUrls } from './_lib/search.js';
 import { elevate, issue, verify, isPasscode, setCookie, clearCookie, noteDevice, mamaAuth } from './_lib/mama.js';
 import { intent as sayIntent, MAMA_ONLY } from '../box/jena-intent.mjs';
+import { registrationOptions, verifyRegistration, loginOptions, verifyLogin, rpOf } from './_lib/webauthn.js';
 
 function routeOf(req) {
   const u = new URL(req.url);
@@ -452,6 +453,50 @@ async function trust(req) {
   return json({ ok: false, error: 'unknown action' }, 400);
 }
 
+// mama's passkeys (Face ID / Touch ID / Windows Hello). Login is public (that's the point) and gives a trusted-device
+// token; adding/removing passkeys needs mama. Public keys live on her box (/box/mama/sec/passkeys).
+async function passkey(req) {
+  const a = req.mamaAuth || (await mamaAuth(req));
+  const mama = a.via === 'passcode' || a.via === 'device';
+  const b = req.method === 'POST' ? await body(req) : {};
+  const action = clip(b.action, 30) || 'list';
+  const boxPk = async (op, extra = {}) => {
+    const bx = await boxLink().catch(() => null);
+    if (!bx) throw new Error("her box is offline, so passkeys can't be checked right now");
+    const r = await fetch(`${bx.url}/box/mama/sec/passkeys`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': (process.env.JENA_DM_KEY || '').trim() }, body: JSON.stringify({ op, ...extra }), signal: AbortSignal.timeout(8000) });
+    if (!(r.headers.get('content-type') || '').includes('json')) throw new Error('her box did not answer');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.summary || 'her box refused');
+    return d.credentials || [];
+  };
+  try {
+    if (action === 'login-options') {
+      const creds = await boxPk('list');
+      if (!creds.length) return json({ ok: false, error: 'no passkey added yet: add one in the dev panel (🔐 tab) on a trusted device first' }, 404);
+      return json({ ok: true, ...loginOptions(req, creds) });
+    }
+    if (action === 'login') {
+      const v = verifyLogin(req, b, await boxPk('list'));
+      boxPk('used', { id: v.id, counter: v.counter }).catch(() => {});
+      const t = issue(clip(b.label, 40) || 'passkey', 'passkey');
+      noteDevice(t, 'add');
+      return json({ ok: true, token: t.token, device: t.d, label: t.l, since: t.iat * 1000, expires: t.exp * 1000, via: 'passkey' }, 200, { 'Set-Cookie': setCookie(t.token) });
+    }
+    if (!mama) return json({ ok: false, error: 'mama only' }, 401);
+    if (action === 'list') return json({ ok: true, rpId: rpOf(req).id, credentials: (await boxPk('list')).map((c) => ({ id: c.id, label: c.label, created: c.created, used: c.used, transports: c.transports })) });
+    if (action === 'register-options') return json({ ok: true, ...registrationOptions(req, await boxPk('list')) });
+    if (action === 'register') {
+      const c = verifyRegistration(req, b);
+      await boxPk('add', { credential: { ...c, label: clip(b.label, 40) } });
+      return json({ ok: true, id: c.id });
+    }
+    if (action === 'delete') { await boxPk('delete', { id: clip(b.id, 600) }); return json({ ok: true }); }
+    return json({ ok: false, error: 'unknown action' }, 400);
+  } catch (e) {
+    return json({ ok: false, error: e.message }, 400);
+  }
+}
+
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
   const route = routeOf(req);
@@ -459,6 +504,7 @@ async function handle(req) {
     const stepUp = await elevate(req, route);   // a trusted mama device -> the real key on this request (or a step-up)
     if (stepUp) return stepUp;
     if (route === 'trust') return await trust(req);
+    if (route === 'passkey') return await passkey(req);
     if (route === 'config') return json(await config());
     if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
     if (route === 'box' && req.method === 'POST') { const env = await body(req), p = acceptBox(env); if (p) checkHealth(); const relay = p ? await relayBox(env, p) : null; return p ? json({ ok: true, url: p.url, relay }) : json({ error: 'bad signature' }, 401); }
