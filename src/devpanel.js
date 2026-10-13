@@ -59,6 +59,7 @@ export class DevPanel {
         if (act === 'notify') mo.textContent = r.ok ? 'popped up on her desktop (covered on the public page + stream while it is up)' : JSON.stringify(r);
         if (act === 'apikey') mo.textContent = r.ok ? `Jena's API key (keep it secret; only you can see this):\n${r.key}\n\nOpenAI-compatible:\ncurl ${location.origin}/api/v1/chat/completions -H "Authorization: Bearer ${r.key}" -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"hi jena"}]}'` : JSON.stringify(r);
         if (act === 'takeover') { if (r.ok) this.takeover(r.ws); else mo.textContent = JSON.stringify(r); }
+        if (act === 'live') mo.textContent = r.ok ? (r.live ? `🔴 LIVE (${r.why.join(' + ')}): her public desktop view is strict now` : '⚪ OFF-AIR: public view stays privacy-filtered, just relaxed') : JSON.stringify(r);
         this.mamaOut = mo.textContent;
         return;
       }
@@ -186,7 +187,7 @@ export class DevPanel {
       else if (!a) h += notOn;
       else {
         const flagged = a.activity.filter((x) => x.flag);
-        h += `<h3>Mama's controls</h3><p><input id="dp-pop" placeholder="message to pop up on her desktop" size="40"> <button data-mama="notify">💌 pop it up</button> <button data-mama="takeover">🖐 take over her desktop</button> <button data-mama="apikey">🔑 her API key</button></p><pre id="dp-mama-out"></pre>
+        h += `<h3>Mama's controls</h3><p><input id="dp-pop" placeholder="message to pop up on her desktop" size="40"> <button data-mama="notify">💌 pop it up</button> <button data-mama="takeover">🖐 take over her desktop</button> <button data-mama="live" title="public desktop view goes strict while you stream">🔴 Live now on/off</button> <button data-mama="apikey">🔑 her API key</button></p><pre id="dp-mama-out"></pre>
           <h3>Jena asked for help (${a.help.length})</h3><ol>${a.help.slice().reverse().map((x) => `<li><small>${ago(x.ts)}</small> ${esc(x.text)}</li>`).join('') || '<li>nothing yet</li>'}</ol>
           <h3>Flagged (${flagged.length})</h3><ol>${flagged.slice().reverse().map((x) => `<li class="dp-warn"><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)} · ${esc(x.flag)}</small></li>`).join('') || '<li>nothing flagged</li>'}</ol>
           <h3>Everything she searched / opened (newest first)</h3><ol>${a.activity.slice().reverse().slice(0, 120).map((x) => `<li${x.flag ? ' class="dp-warn"' : ''}><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)}</small></li>`).join('') || '<li>nothing yet</li>'}</ol>`;

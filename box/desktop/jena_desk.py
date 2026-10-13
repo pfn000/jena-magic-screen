@@ -1251,6 +1251,16 @@ async def client(reader, writer):
     except ValueError:
         writer.close(); return
     p = path.split('?')[0]
+    if CENSOR is not None and hasattr(jena_censor, 'route'):
+        # the censor's own doors: /box/shot.jpg (?since= long-poll, ?obs=1), /box/censor.json, /box/live,
+        # POST /box/mama/live + /box/mama/watch, and mama's view-only /websockify-watch (jena_censor.route)
+        try:
+            if await jena_censor.route(CENSOR, method, path, head, reader, writer, is_mama): return
+        except Exception as e:
+            print('censor route', e, flush=True)
+            try: writer.close()
+            except Exception: pass
+            return
     if p == '/websockify-mama':
         tok = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '').get('t', [''])[0]
         exp = takeover_tokens.pop(tok, 0)

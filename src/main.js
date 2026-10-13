@@ -573,6 +573,7 @@ window.jena = {
   // everything she feels of her own body right now: all bones (degrees), all expressions (0-1), eyes, and what it means
   get selfState() { return selfSense.snapshot(); },
   desktop: (url) => desktop.setUrl(url),
+  desktopStats: () => desktop.stats(),   // {mode: mama|public, fps measured here, box censor status}
   config: cfg,
 };
 // ?debug=1 only: lets a test harness trigger her own autonomy moves to check self-vision left/right

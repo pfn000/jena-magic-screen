@@ -90,7 +90,7 @@ async function mamaDo(req) {
   const box = await boxLink();
   if (!box) return json({ error: 'her box is offline' }, 503);
   const b = await body(req);
-  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct' }[b.action];
+  const action = { notify: 'notify', takeover: 'takeover', apikey: 'apikey', merge: 'merge', rollback: 'rollback', discard: 'discard', correct: 'correct', watch: 'watch', live: 'live' }[b.action];
   if (!action) return json({ error: 'unknown action' }, 400);
   if (action === 'correct') {   // mama's ✎ correct on a reply -> verified fact + corrections training chat (her gateway)
     try {
@@ -103,7 +103,7 @@ async function mamaDo(req) {
     const studio = ['merge', 'rollback', 'discard'].includes(action);
     const r = await fetch(studio ? `${box.url}/box/studio/mama/${action}` : `${box.url}/box/mama/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': req.headers.get('x-jena-key') || '' }, body: JSON.stringify(b), signal: AbortSignal.timeout(studio ? 28000 : 10000) });
     const d = await r.json();
-    if (action === 'takeover' && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
+    if ((action === 'takeover' || action === 'watch') && d.ok) d.ws = box.url.replace(/^http/, 'ws') + d.path;
     return json(d, r.status);
   } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
 }

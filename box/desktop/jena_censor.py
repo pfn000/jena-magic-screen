@@ -64,7 +64,9 @@ TEXT_SECRETS = re.compile(
     r'[A-Z0-9_]*(?:API_KEY|_TOKEN|_SECRET|PASSWORD|SECRET_KEY)\s*=|(?<![\w/])\.env\b|ssh-(?:rsa|ed25519)\s')
 TEXT_LOGIN = re.compile(
     r'(?i)/log[-_]?in\b|/sign[-_]?in\b|\bsign\s?in\s+to\b|\blog\s?in\s+to\b|\bpassword\b|passwort|verification\s+code|'
-    r'one[-\s]?time\s+(?:pass)?code|security\s+code|\b2fa\b|two[-\s]factor|authenticator|recovery\s+(?:phrase|code|kit)|seed\s+phrase')
+    r'one[-\s]?time\s+(?:pass)?code|security\s+code|\b2fa\b|two[-\s]factor|authenticator|recovery\s+(?:phrase|code|kit)|seed\s+phrase|'
+    r'email\s+or\s+(?:user\s?name|phone)|(?:user\s?name|phone)\s+or\s+email|phone,\s*email|forgot\s+(?:your\s+)?password|'
+    r'enter\s+(?:your\s+)?(?:password|code)')
 TEXT_PRIVATE = re.compile(r'(?i)proton\s*\.?\s*me|proton\s*mail|account\.proton|accounts\.[a-z0-9-]+\.[a-z]|\binbox\b')
 # a terminal whose screen is an env dump: many NAME=value lines
 ENV_LINE = re.compile(r'^[A-Z][A-Z0-9_]{2,}=\S')
@@ -122,8 +124,32 @@ def make_card(reason='private_page', w=OUT_W, h=None):
 
 
 # ------------------------------------------------------------------ OCR + decisions (pure functions, testable)
+_TLS = threading.local()
+try:
+    os.environ.setdefault('OMP_THREAD_LIMIT', os.environ.get('JENA_CENSOR_THREADS', '1'))
+    import tesserocr   # apt python3-tesserocr: same engine in-process, saves ~0.3 s of start-up per read
+except Exception:
+    tesserocr = None
+
+
+def _tsv(g, timeout):
+    if tesserocr is not None and os.environ.get('JENA_CENSOR_CLI') != '1':
+        api = getattr(_TLS, 'api', None)
+        if api is None:
+            api = _TLS.api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.AUTO, lang='eng')
+        api.SetImage(g)
+        return api.GetTSVText(0)
+    buf = io.BytesIO(); g.save(buf, 'PNG', compress_level=1)
+    env = dict(os.environ, OMP_THREAD_LIMIT=os.environ.get('JENA_CENSOR_THREADS', '1'))  # 1: 0.7 s at load 9; 2-4 threads thrash (2.5 s to >20 s)
+    p = subprocess.run(['tesseract', 'stdin', 'stdout', '--psm', '3', '-l', 'eng', 'tsv'], input=buf.getvalue(),
+                       capture_output=True, timeout=timeout, env=env)
+    if p.returncode != 0:
+        raise RuntimeError('tesseract exit %d' % p.returncode)
+    return p.stdout.decode('utf-8', 'replace')
+
+
 def ocr_words(img, timeout=OCR_TIMEOUT_S, scale=None, offset=(0, 0)):
-    """tesseract TSV on an in-memory image (stdin). Returns [{'t','x','y','w','h','line'}]. Raises on lag/error."""
+    """tesseract TSV on an in-memory image. Returns [{'t','x','y','w','h','line'}] in screen coords. Raises on error."""
     k = scale or OCR_SCALE
     g = img.convert('L')
     if sum(g.resize((32, 32)).tobytes()) / 1024 < 110:   # dark theme / terminal: tesseract reads dark-on-light best
@@ -131,18 +157,13 @@ def ocr_words(img, timeout=OCR_TIMEOUT_S, scale=None, offset=(0, 0)):
         g = ImageOps.invert(g)
     if k != 1:   # desktop UI text is ~12-13 px; tesseract misses most of it at 1x, reads it at 1.5x
         g = g.resize((int(g.width * k), int(g.height * k)), Image.BILINEAR)
-    buf = io.BytesIO(); g.save(buf, 'PNG', compress_level=1)
-    env = dict(os.environ, OMP_THREAD_LIMIT=os.environ.get('JENA_CENSOR_THREADS', '1'))  # 1: 0.7 s at load 9; 2-4 threads thrash (2.5 s to >20 s)
-    p = subprocess.run(['tesseract', 'stdin', 'stdout', '--psm', '3', '-l', 'eng', 'tsv'], input=buf.getvalue(),
-                       capture_output=True, timeout=timeout, env=env)
-    if p.returncode != 0:
-        raise RuntimeError('tesseract exit %d' % p.returncode)
     words = []
-    for row in p.stdout.decode('utf-8', 'replace').splitlines()[1:]:
+    for row in _tsv(g, timeout).splitlines():
         c = row.split('\t')
         if len(c) < 12 or c[0] != '5' or not c[11].strip():
             continue
-        words.append({'t': c[11], 'x': int(int(c[6]) / k) + offset[0], 'y': int(int(c[7]) / k) + offset[1], 'w': int(int(c[8]) / k) + 1, 'h': int(int(c[9]) / k) + 1,
+        words.append({'t': c[11], 'x': int(int(c[6]) / k) + offset[0], 'y': int(int(c[7]) / k) + offset[1],
+                      'w': int(int(c[8]) / k) + 1, 'h': int(int(c[9]) / k) + 1,
                       'line': (offset, c[1], c[2], c[3], c[4])})
     return words
 
@@ -325,39 +346,128 @@ def terminal_rects(display):
     return out
 
 
-def read_screen(img, display=None, rects=None, cache=None):
-    """Full-frame OCR + a bigger OCR pass on each terminal window, in parallel. Terminal crops are cached by
-    their exact pixels (a terminal that did not change is not re-read)."""
+STRIP_MARGIN = 26          # px above/below a change that are re-read too (whole text lines)
+FULL_EVERY_S = 8.0         # a full re-read at least this often, whatever changed
+BAND_MAX_FRAC = 0.5        # more than this much of the screen changed -> just read it all
+
+
+def changed_bands(prev_img, img):
+    """-> 'all' | [] (nothing changed) | [(y0, y1, cy0, cy1), ...]: full-width bands to re-read (changed rows +
+    margin) and, inside each, the rows whose pixels actually changed. Words of the previous read that do not
+    touch a changed row sit on identical pixels, so their reading (and their blackouts) still hold."""
+    import numpy as np
+    from PIL import ImageChops
+    if prev_img is None or prev_img.size != img.size:
+        return 'all'
+    d = np.asarray(ImageChops.difference(prev_img.convert('L'), img.convert('L')))
+    rows = np.flatnonzero(d.max(axis=1) > 0)
+    if rows.size == 0:
+        return []
+    H = img.height
+    runs, a, b = [], int(rows[0]), int(rows[0])
+    for y in rows[1:]:
+        y = int(y)
+        if y - b > 2 * STRIP_MARGIN:
+            runs.append((a, b)); a = y
+        b = y
+    runs.append((a, b))
+    bands = []
+    for a, b in runs:
+        y0, y1 = max(0, a - STRIP_MARGIN), min(H, b + 1 + STRIP_MARGIN)
+        if bands and y0 <= bands[-1][1]:
+            p = bands.pop(); bands.append((p[0], y1, p[2], b)); continue
+        bands.append((y0, y1, a, b))
+    if sum(y1 - y0 for y0, y1, _, _ in bands) > H * BAND_MAX_FRAC:
+        return 'all'
+    return bands
+
+
+def changed_strip(prev_img, img):
+    """Back-compat: one band covering every change, None if nothing changed, or 'all'."""
+    b = changed_bands(prev_img, img)
+    if b == 'all':
+        return 'all'
+    if not b:
+        return None
+    return (0, b[0][0], img.width, b[-1][1])
+
+
+def read_screen(img, display=None, rects=None, cache=None, prev=None):
+    """Full-frame OCR, or (when little changed since the last read) OCR of only the changed bands, plus a bigger
+    OCR pass on each terminal window, in parallel. Terminal crops are cached by their exact pixels.
+    Kept words + band words are a SUPERSET of a full read (a line at a band edge may appear twice; that only
+    doubles a blackout). Returns (all_words, full_pass_words)."""
     import concurrent.futures as cf
     rects = terminal_rects(display) if rects is None else rects
     W, H = img.size
     jobs = {}
+    bands = 'all'
+    if prev and prev.get('img') is not None and time.time() - prev.get('full_at', 0) < FULL_EVERY_S:
+        bands = changed_bands(prev['img'], img)
     with cf.ThreadPoolExecutor(max_workers=1 + len(rects)) as ex:
-        full = ex.submit(ocr_words, img)
+        if bands == 'all':
+            futs = [ex.submit(ocr_words, img)]
+        else:
+            futs = [ex.submit(ocr_words, img.crop((0, y0, W, y1)), OCR_TIMEOUT_S, None, (0, y0)) for y0, y1, _, _ in bands]
+        term_prev = (prev or {}).get('term', {}) if bands != 'all' else {}
+        term_now = {}
         for r in rects:
             r = (max(0, r[0]), max(0, r[1]), min(W, r[2]), min(H, r[3]))
             if r[2] - r[0] < 20 or r[3] - r[1] < 10:
                 continue
             crop = img.crop(r)
-            key = hashlib.blake2b(crop.tobytes(), digest_size=16).hexdigest() + str(r)
+            key = hashlib.blake2b(crop.tobytes(), digest_size=12).hexdigest()
             if cache is not None and key in cache:
                 jobs[key] = cache[key]
+            elif r in term_prev and bands != 'all':
+                # same terminal window, a few lines changed: re-read only those lines (2.2x OCR of a whole
+                # terminal is the slowest part of a read); untouched lines keep their last reading
+                kept = [w for w in term_prev[r] if all(w['y'] + w['h'] < cy0 - 2 or w['y'] > cy1 + 2 for _, _, cy0, cy1 in bands)]
+                subs = [ex.submit(ocr_words, img.crop((r[0], max(r[1], y0), r[2], min(r[3], y1))), OCR_TIMEOUT_S, TERM_SCALE, (r[0], max(r[1], y0)))
+                        for y0, y1, _, _ in bands if min(r[3], y1) - max(r[1], y0) >= 8]
+                jobs[key] = ('sub', kept, subs)
             else:
                 jobs[key] = ex.submit(ocr_words, crop, OCR_TIMEOUT_S, TERM_SCALE, (r[0], r[1]))
-        words = list(full.result())
+            term_now[key] = r
+        if bands == 'all':
+            fw = list(futs[0].result())
+        else:
+            def untouched(w):
+                return all(w['y'] + w['h'] < cy0 - 2 or w['y'] > cy1 + 2 for _, _, cy0, cy1 in bands)
+            fw = [w for w in prev['words'] if untouched(w)]
+            for f in futs:
+                fw += f.result()
+        words = list(fw)
+        term_words = {}
         for key, j in jobs.items():
-            ws = j if isinstance(j, list) else j.result()
+            if isinstance(j, tuple):
+                ws = list(j[1])
+                for f in j[2]:
+                    ws += f.result()
+            else:
+                ws = j if isinstance(j, list) else j.result()
+            if key in term_now:
+                term_words[term_now[key]] = ws
             if cache is not None:
                 cache[key] = ws
                 while len(cache) > 8:
                     cache.pop(next(iter(cache)))
             words += ws
-    return words
+    if prev is not None:
+        prev['img'] = img
+        prev['words'] = fw
+        prev['term'] = term_words
+        if bands == 'all':
+            prev['full_at'] = time.time()
+        prev['strip'] = 'all' if bands == 'all' else ('band' if bands else None)
+        prev['read_rows'] = H if bands == 'all' else sum(y1 - y0 for y0, y1, _, _ in bands)
+    return words, fw
 
 
 def pointer_xy(display):
     try:
-        p = subprocess.run(['xdotool', 'getmouselocation', '--shell'], capture_output=True, timeout=0.5, env=dict(os.environ, DISPLAY=display))
+        p = subprocess.run(['timeout', '0.4', 'xdotool', 'getmouselocation', '--shell'], capture_output=True, timeout=0.6,
+                           env=dict(os.environ, DISPLAY=display))
         g = dict(l.split('=', 1) for l in p.stdout.decode().split() if '=' in l)
         return int(g['X']), int(g['Y'])
     except Exception:
@@ -365,22 +475,97 @@ def pointer_xy(display):
 
 
 # ------------------------------------------------------------------ the loop
+# Public picture rules (2026-10-13, after mama saw the card flash on every slow read):
+#  * a frame that is merely LATE never becomes a card: the last good censored frame stays up until the next one
+#    is ready (it was censored when it was taken, so holding it leaks nothing).
+#  * the whole-screen card is only for real private states: sign-in page, inbox, keys/env terminal, mama's
+#    takeover, a private sign-in window, or the censor itself dead for a long time. It comes on at once, stays
+#    at least CARD_MIN_S, and leaves only after CARD_CLEAN_N clean reads in a row (no strobing).
+#  * LIVE (OBS open, her Twitch live, or mama's "Live now" switch) = strict: longer card hold, more clean reads.
+CARD_MIN_S, CARD_CLEAN_N = 3.0, 2
+CARD_MIN_S_LIVE, CARD_CLEAN_N_LIVE = 5.0, 3
+DEAD_CARD_S, DEAD_CARD_S_LIVE = 45.0, 15.0     # no fresh read at all for this long -> card (censor stuck/crashed)
+OBS_SEEN_S = 20.0                               # an OBS (?obs=1) viewer polled within this -> live
+LIVE_FILE = os.path.expanduser(os.environ.get('JENA_LIVE_FILE', '~/.jena/live.json'))
+NICE = int(os.environ.get('JENA_CENSOR_NICE', '10'))
+
+
 class Censor:
     def __init__(self, display=':99', fps=TARGET_FPS):
         self.display, self.period = display, 1.0 / max(0.2, fps)
         self.lock = threading.Lock()
-        self.private = {}                 # reason -> True
-        self.frame = None                 # (jpeg, captured_at, meta)
+        self.private = {}                 # reason -> True (forced: takeover, private sign-in, ...)
+        self.frame = None                 # (jpeg, captured_at, meta) = the last GOOD censored frame
+        self.seq = 0                      # bumps whenever what /box/shot.jpg serves changes
         self.meta = {'state': 'private', 'reason': 'starting', 'redactions': {}}
+        self.card_reason, self.card_since, self.clean_run = None, 0.0, 0   # page-level card + hysteresis
+        self.last_ok = 0.0                # last successful read (any verdict)
         self.cards = {}
         self.term_cache = {}
-        self.cache = {}                   # pixel hash -> (jpeg|None, meta)  (exact-same pixels only, last 4)
-        self.times = []                   # recent frame completion times, for fps
+        self.prev = {}                    # last read frame + its words (memory only) for band re-reads
+        self.cache = {}                   # pixel hash -> (img|None, meta)  (exact-same pixels only, last 4)
+        self.times = []                   # publish times of NEW public frames, for the honest public fps
+        self.reads = []                   # (t, ms, rows_read) of recent reads
         self.ocr_ms = None
         self.errors = 0
         self.thread = None
         self._last_logged = None
         self.stop = False
+        self.obs_seen = 0.0
+        self.live_cfg = self._load_live()
+        self.twitch_live = None           # None = unknown / not configured
+        self._tw_thread = None
+
+    # -- live flag
+    def _load_live(self):
+        try:
+            return json.load(open(LIVE_FILE))
+        except Exception:
+            return {'mama_live': False, 'twitch': None}
+
+    def set_live(self, on=None, twitch=None):
+        cfg = dict(self.live_cfg)
+        if on is not None:
+            cfg['mama_live'] = bool(on); cfg['mama_live_at'] = time.time()
+        if twitch is not None:
+            cfg['twitch'] = (re.sub(r'[^A-Za-z0-9_]', '', str(twitch))[:25] or None)
+            self.twitch_live = None
+        self.live_cfg = cfg
+        try:
+            os.makedirs(os.path.dirname(LIVE_FILE), exist_ok=True)
+            tmp = LIVE_FILE + '.tmp'; json.dump(cfg, open(tmp, 'w')); os.replace(tmp, LIVE_FILE)
+        except Exception:
+            pass
+        _log({'event': 'live_cfg', 'mama_live': cfg.get('mama_live'), 'twitch': bool(cfg.get('twitch'))})
+        return self.live()
+
+    def saw_obs(self):
+        self.obs_seen = time.time()
+
+    def live(self):
+        why = []
+        if time.time() - self.obs_seen < OBS_SEEN_S:
+            why.append('obs')
+        if self.twitch_live:
+            why.append('twitch')
+        if self.live_cfg.get('mama_live'):
+            why.append('mama')
+        return {'live': bool(why), 'why': why, 'mama_live': bool(self.live_cfg.get('mama_live')),
+                'twitch': self.live_cfg.get('twitch'), 'twitch_live': self.twitch_live}
+
+    def _twitch_loop(self):
+        import urllib.request
+        while not self.stop:
+            ch = self.live_cfg.get('twitch')
+            if ch:
+                try:   # public, no key: "<ch> is offline" or an uptime like "1 hour, 2 minutes"
+                    t = urllib.request.urlopen('https://decapi.me/twitch/uptime/' + ch, timeout=8).read().decode()[:200]
+                    self.twitch_live = not re.search(r'(?i)offline|not found|error', t)
+                except Exception:
+                    pass
+            else:
+                self.twitch_live = None
+            time.sleep(60)
 
     # -- control
     def start(self):
@@ -388,15 +573,19 @@ class Censor:
             return self
         self.thread = threading.Thread(target=self._run, name='jena-censor', daemon=True)
         self.thread.start()
+        if self._tw_thread is None:
+            self._tw_thread = threading.Thread(target=self._twitch_loop, name='jena-censor-twitch', daemon=True)
+            self._tw_thread.start()
         return self
 
     def set_private(self, reason, on=True):
         with self.lock:
             if on:
                 self.private[reason] = True
-                self.frame = None             # drop the last live frame at once
+                self.frame = None             # drop the last live frame at once: nothing from before is shown again
             else:
                 self.private.pop(reason, None)
+            self.seq += 1
         _log({'event': 'private_on' if on else 'private_off', 'reason': reason})
 
     def card(self, reason):
@@ -404,62 +593,72 @@ class Censor:
             self.cards[reason] = make_card(reason)
         return self.cards[reason]
 
+    def _verdict(self, now=None):
+        """-> (state, reason, frame). The single place that decides what the public sees."""
+        now = now or time.time()
+        with self.lock:
+            forced = next(iter(self.private), None)
+            fr, card = self.frame, self.card_reason
+        live = self.live()['live']
+        if forced:
+            return 'private', forced, None
+        if card:
+            return 'private', card, None
+        if fr is None:
+            return 'private', (self.meta.get('reason') or 'starting'), None
+        if now - max(fr[1], self.last_ok) > (DEAD_CARD_S_LIVE if live else DEAD_CARD_S):
+            return 'private', 'censor_lag', None
+        return 'live', None, fr
+
     # -- public outputs (never raw)
     def jpeg(self):
         hdr = {'Cache-Control': 'no-store, max-age=0', 'Content-Type': 'image/jpeg'}
         try:
             if self.thread is None or not self.thread.is_alive():
                 self.start()
-            with self.lock:
-                forced = next(iter(self.private), None)
-                fr = self.frame
-            if forced:
-                return self.card(forced), {**hdr, 'X-Censor-State': 'private', 'X-Censor-Reason': forced}
-            if fr is None:
-                r = self.meta.get('reason') or 'starting'
-                return self.card(r), {**hdr, 'X-Censor-State': 'private', 'X-Censor-Reason': r}
-            jpg, at, meta = fr
-            if time.time() - at > MAX_AGE_S:
-                return self.card('censor_lag'), {**hdr, 'X-Censor-State': 'private', 'X-Censor-Reason': 'censor_lag'}
-            return jpg, {**hdr, 'X-Censor-State': 'live', 'X-Censor-Age-Ms': str(int((time.time() - at) * 1000))}
+            now = time.time()
+            state, reason, fr = self._verdict(now)
+            hdr['X-Censor-Seq'] = str(self.seq)
+            if state != 'live':
+                return self.card(reason), {**hdr, 'X-Censor-State': 'private', 'X-Censor-Reason': reason}
+            return fr[0], {**hdr, 'X-Censor-State': 'live', 'X-Censor-Age-Ms': str(int((now - fr[1]) * 1000))}
         except Exception:
             return make_card('censor_error'), {**hdr, 'X-Censor-State': 'private', 'X-Censor-Reason': 'censor_error'}
 
     def status(self):
-        with self.lock:
-            forced = next(iter(self.private), None)
-            fr = self.frame
         now = time.time()
+        state, reason, fr = self._verdict(now)
         ts = [t for t in self.times if now - t < 10]
-        age = int((now - fr[1]) * 1000) if fr else None
-        state, reason = 'live', None
-        if forced:
-            state, reason = 'private', forced
-        elif fr is None:
-            state, reason = 'private', self.meta.get('reason') or 'starting'
-        elif now - fr[1] > MAX_AGE_S:
-            state, reason = 'private', 'censor_lag'
+        rd = [r for r in self.reads if now - r[0] < 30]
+        lv = self.live()
         return {'state': state, 'reason': reason, 'reason_text': REASON_WORDS.get(reason) if reason else None,
-                'age_ms': age, 'fps': round(len(ts) / 10, 2), 'ocr_ms': self.ocr_ms,
+                'age_ms': int((now - fr[1]) * 1000) if fr else None,
+                'fps': round(len(ts) / 10, 2),                       # NEW public frames per second (honest)
+                'ocr_ms': self.ocr_ms,
+                'ocr_ms_avg': int(sum(r[1] for r in rd) / len(rd)) if rd else None,
+                'read_frac': round(sum(r[2] for r in rd) / (len(rd) * 704), 2) if rd else None,
                 'redactions': (fr[2].get('redactions') if fr and state == 'live' else {}),
-                'max_age_ms': int(MAX_AGE_S * 1000), 'mode': 'censored'}
+                'seq': self.seq, 'live': lv['live'], 'live_why': lv['why'], 'strict': lv['live'],
+                'hold': 'last_good_frame', 'mode': 'censored'}
 
     def status_json(self):
         return json.dumps(self.status()).encode()
 
     # -- worker
     def _run(self):
+        try:   # this thread only: OCR must never starve her brain / voice
+            os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), NICE)
+        except Exception:
+            pass
         while not self.stop:
             t0 = time.time()
             try:
                 self._tick()
                 self.errors = 0
             except Exception as e:
+                # a failed or slow read is NOT a private moment: the last good frame stays up (DEAD_CARD_S guards a stuck censor)
                 self.errors += 1
-                with self.lock:
-                    self.frame = None
-                self.meta = {'state': 'private', 'reason': 'censor_lag' if isinstance(e, subprocess.TimeoutExpired) else 'censor_error', 'redactions': {}}
-                self._log_state(self.meta, err=type(e).__name__)
+                self._log_state({'state': 'error', 'reason': 'censor_error'}, err=type(e).__name__)
                 time.sleep(min(5, 0.5 * self.errors))
             dt = time.time() - t0
             time.sleep(max(0.02, self.period - dt))
@@ -470,6 +669,7 @@ class Censor:
         if forced:
             with self.lock:
                 self.frame = None
+            self.prev.clear()
             return
         captured_at = time.time()
         img = grab(self.display)
@@ -480,30 +680,46 @@ class Censor:
         hit = self.cache.get(key)
         if hit is None:
             t = time.time()
-            words = read_screen(img, self.display, cache=self.term_cache)
+            words, _ = read_screen(img, self.display, cache=self.term_cache, prev=self.prev)
             self.ocr_ms = int((time.time() - t) * 1000)
+            self.reads = [r for r in self.reads[-60:] if time.time() - r[0] < 30] + [(time.time(), self.ocr_ms, self.prev.get('read_rows', img.height))]
             hit = sanitize_image(img, title, words)
             self.cache[key] = hit
             while len(self.cache) > 4:
                 self.cache.pop(next(iter(self.cache)))
+            fresh = True
+        else:
+            fresh = False
         W = img.width
         del img
         im, meta = hit
+        now = time.time()
+        self.last_ok = now
+        lv = self.live()['live']
+        min_s, clean_n = (CARD_MIN_S_LIVE, CARD_CLEAN_N_LIVE) if lv else (CARD_MIN_S, CARD_CLEAN_N)
         ptr = pointer_xy(self.display)
         jpg = encode(im, (ptr[0], ptr[1], W) if ptr else None) if im is not None else None
-        if time.time() - captured_at > MAX_AGE_S:
-            # the read took too long (box busy): this frame is stale and is NOT served. Its verdict stays cached,
-            # so the next identical frame (most desktop frames are) goes out at once.
-            self.meta = {'state': 'private', 'reason': 'censor_lag', 'redactions': {}}
-            self._log_state(self.meta)
-            return
         with self.lock:
             if self.private:          # mama grabbed the wheel while we were reading: drop it
                 self.frame = None
                 return
-            self.frame = (jpg, captured_at, meta) if jpg else None
+            if jpg is None:           # a real private page: card on at once, clock restarts
+                if self.card_reason != meta.get('reason'):
+                    self.seq += 1
+                self.card_reason, self.card_since, self.clean_run = meta.get('reason') or 'private_page', now, 0
+                self.frame = None     # nothing from before the private page is shown again
+            else:
+                if self.card_reason:
+                    self.clean_run += 1
+                    if now - self.card_since >= min_s and self.clean_run >= clean_n:
+                        self.card_reason = None
+                if not self.card_reason:
+                    same = self.frame is not None and self.frame[0] == jpg
+                    self.frame = (jpg, captured_at, meta)
+                    if not same:
+                        self.seq += 1
+                        self.times = [t for t in self.times[-60:] if now - t < 10] + [now]
         self.meta = meta
-        self.times = [t for t in self.times[-40:] if time.time() - t < 10] + [time.time()]
         self._log_state(meta)
 
     def _log_state(self, meta, err=None):
@@ -512,6 +728,131 @@ class Censor:
             self._last_logged = sig
             _log({'event': 'state', 'state': meta.get('state'), 'reason': meta.get('reason'),
                   'redactions': meta.get('redactions') or {}, **({'error': err} if err else {})})
+
+
+# ------------------------------------------------------------------ doors for jena_desk.py (one hook in its client())
+# GET  /box/shot.jpg[?since=SEQ][&obs=1]  censored frame; with since= it waits up to ~1.5 s for a newer one, 204 if none
+# GET  /box/censor.json                   state / reason / honest public fps / live flag (no text, no values)
+# GET  /box/live                          {live, why}
+# POST /box/mama/live   {on, twitch}       mama only: her "Live now" switch (+ optional Twitch channel to watch)
+# POST /box/mama/watch                    mama only: one-time 60 s token for /websockify-watch
+# WS   /websockify-watch?t=TOKEN          mama's smooth VIEW-ONLY stream: the view-only x11vnc (5900 via 6080),
+#                                         raw and full fps, never public, does NOT pause her or lock the public view
+WS_VIEW = ('127.0.0.1', int(os.environ.get('WEBSOCKIFY_VIEW_PORT', '6080')))
+watch_tokens = {}
+CORS = (b'Access-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: X-Censor-State, X-Censor-Reason, '
+        b'X-Censor-Age-Ms, X-Censor-Seq\r\n')
+
+
+async def _send(writer, status, body, ctype='application/json', extra=None):
+    reason = {200: 'OK', 204: 'No Content', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 502: 'Bad Gateway'}.get(status, 'OK')
+    h = 'HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nCache-Control: no-store, max-age=0\r\nConnection: close\r\n' % (status, reason, ctype, len(body))
+    for k, v in (extra or {}).items():
+        if k.lower() not in ('content-type', 'cache-control'):
+            h += '%s: %s\r\n' % (k, v)
+    writer.write(h.encode('latin1') + CORS + b'\r\n' + body)
+    try:
+        await writer.drain()
+    finally:
+        writer.close()
+
+
+async def _pipe(r, w):
+    try:
+        while True:
+            b = await r.read(65536)
+            if not b:
+                break
+            w.write(b); await w.drain()
+    except Exception:
+        pass
+    finally:
+        try: w.close()
+        except Exception: pass
+
+
+async def route(c, method, path, head, reader, writer, is_mama):
+    """Handle the censor's own doors. Returns True when it answered (jena_desk.py then returns)."""
+    import asyncio, secrets, urllib.parse
+    p = path.split('?')[0]
+    if p not in ('/box/shot.jpg', '/shot.jpg', '/box/censor.json', '/box/live', '/box/mama/live', '/box/mama/watch', '/websockify-watch'):
+        return False
+    if method == 'OPTIONS':
+        return False                  # jena_desk answers preflights
+    q = urllib.parse.parse_qs(path.split('?', 1)[1] if '?' in path else '')
+    hdrs = {}
+    for l in head.decode('latin1').split('\r\n')[1:]:
+        if ':' in l:
+            k, v = l.split(':', 1); hdrs[k.strip().lower()] = v.strip()
+    if p == '/websockify-watch':
+        tok = q.get('t', [''])[0]
+        exp = watch_tokens.pop(tok, 0)
+        if not tok or exp < time.time():
+            writer.write(b'HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return True
+        try:
+            ur, uw = await asyncio.open_connection(*WS_VIEW)
+        except Exception:
+            writer.write(b'HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); await writer.drain(); writer.close(); return True
+        uw.write(head.replace(path.encode('latin1'), b'/websockify', 1)); await uw.drain()
+        _log({'event': 'mama_watch_on'})
+        try:
+            await asyncio.gather(_pipe(reader, uw), _pipe(ur, writer))
+        finally:
+            _log({'event': 'mama_watch_off'})
+        return True
+    if p in ('/box/mama/live', '/box/mama/watch'):
+        body = b''
+        n = int(hdrs.get('content-length') or 0)
+        if 0 < n < 8192:
+            body = await reader.readexactly(n)
+        if not is_mama(hdrs):
+            await _send(writer, 401, json.dumps({'ok': False, 'summary': "mama's passcode is needed for this"}).encode()); return True
+        if p == '/box/mama/watch':
+            for t_, e_ in list(watch_tokens.items()):
+                if e_ < time.time(): watch_tokens.pop(t_, None)
+            tok = secrets.token_urlsafe(24); watch_tokens[tok] = time.time() + 60
+            await _send(writer, 200, json.dumps({'ok': True, 'token': tok, 'path': '/websockify-watch?t=' + tok, 'valid_s': 60,
+                                                 'private': bool(c.private.get('signin'))}).encode())
+            return True
+        try:
+            b = json.loads(body or b'{}')
+        except Exception:
+            b = {}
+        on = b.get('on') if 'on' in b else (None if 'twitch' in b else not c.live_cfg.get('mama_live'))   # bare call = toggle
+        lv = c.set_live(on, b.get('twitch'))
+        await _send(writer, 200, json.dumps({'ok': True, **lv}).encode()); return True
+    if p == '/box/live':
+        await _send(writer, 200, json.dumps(c.live()).encode()); return True
+    if p == '/box/censor.json':
+        await _send(writer, 200, c.status_json()); return True
+    # the picture
+    if q.get('obs', [''])[0] == '1':
+        c.saw_obs()
+    since = q.get('since', [None])[0]
+    if since is not None:
+        try:
+            since = int(since)
+        except ValueError:
+            since = None
+    if since is not None:
+        t_end = time.time() + 1.5
+        while c.seq == since and time.time() < t_end:
+            await asyncio.sleep(0.04)
+        if c.seq == since:
+            await _send(writer, 204, b'', extra={'X-Censor-Seq': str(c.seq)}); return True
+    body, hdr = c.jpeg()
+    await _send(writer, 200, tag_jpeg(body, hdr), 'image/jpeg', hdr)
+    return True
+
+
+def tag_jpeg(body, hdr):
+    """Put seq/state/reason in a JPEG comment right after SOI: proxies on the way (her gateway, the tunnel) drop
+    custom headers, the bytes always arrive. The site reads it to long-poll (?since=seq). No screen content."""
+    if not body or body[:2] != b'\xff\xd8':
+        return body
+    txt = ('jena-censor seq=%s state=%s reason=%s' % (hdr.get('X-Censor-Seq', ''), hdr.get('X-Censor-State', ''),
+                                                      hdr.get('X-Censor-Reason', ''))).encode('ascii', 'replace')
+    return body[:2] + b'\xff\xfe' + (len(txt) + 2).to_bytes(2, 'big') + txt + body[2:]
 
 
 # ------------------------------------------------------------------ standalone
