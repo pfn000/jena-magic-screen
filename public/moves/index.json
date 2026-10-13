@@ -16,7 +16,7 @@
    "mirror": false,
    "source": {
     "url": "https://www.youtube.com/watch?v=CNHJ72oDG_s",
-    "title": "3D people animation : Casual Donna Standing and speaking \u00a9cg-people.com",
+    "title": "3D people animation : Casual Donna Standing and speaking ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -44,11 +44,11 @@
     "relaxed",
     "sad"
    ],
-   "duration": 16.73,
+   "duration": 16.8,
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=DRyaRp3COvE",
-    "title": "3D people animation : Casual Jessica standing and waiting \u00a9cg-people.com",
+    "title": "3D people animation : Casual Jessica standing and waiting ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -60,9 +60,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "EYDDtTJ6TtQ_112",
@@ -90,9 +91,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "EYDDtTJ6TtQ_18",
@@ -120,9 +122,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "Eu_jgIfi7SQ",
@@ -134,7 +137,7 @@
     "neutral",
     "relaxed"
    ],
-   "duration": 22.27,
+   "duration": 22.2,
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=Eu_jgIfi7SQ",
@@ -151,8 +154,9 @@
    "has": {
     "body": true,
     "fingers": false,
-    "face": false
-   }
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "WrJsrsVWkGA",
@@ -168,7 +172,7 @@
    "mirror": false,
    "source": {
     "url": "https://www.youtube.com/watch?v=WrJsrsVWkGA",
-    "title": "3D people animation : Casual Sharon standing and speaking \u00a9cg-people.com",
+    "title": "3D people animation : Casual Sharon standing and speaking ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -195,11 +199,11 @@
     "neutral",
     "relaxed"
    ],
-   "duration": 16.73,
+   "duration": 16.8,
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=cIdMN8szJps",
-    "title": "3D people animation : Casual Julia standing and waiting \u00a9cg-people.com",
+    "title": "3D people animation : Casual Julia standing and waiting ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -211,9 +215,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "clp3Ysai6w0",
@@ -230,7 +235,7 @@
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=clp3Ysai6w0",
-    "title": "3D people animation : Casual Melissa Standing and speaking \u00a9cg-people.com",
+    "title": "3D people animation : Casual Melissa Standing and speaking ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -242,9 +247,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "lgupcR-BIW0",
@@ -260,7 +266,7 @@
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=lgupcR-BIW0",
-    "title": "3D people animation : Casual Sharon standing and waiting \u00a9cg-people.com",
+    "title": "3D people animation : Casual Sharon standing and waiting ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -272,9 +278,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "ohASxT9tTbg",
@@ -286,11 +293,11 @@
     "neutral",
     "happy"
    ],
-   "duration": 15.53,
+   "duration": 15.67,
    "mirror": true,
    "source": {
     "url": "https://www.youtube.com/watch?v=ohASxT9tTbg",
-    "title": "3D people animation : Casual Jessica Standing and speaking \u00a9cg-people.com",
+    "title": "3D people animation : Casual Jessica Standing and speaking ©cg-people.com",
     "channel": "cg-people.com",
     "start": null,
     "end": null
@@ -302,9 +309,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "rVBHH5DwYFA_30",
@@ -331,9 +339,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "vetLPqfhXCc",
@@ -361,9 +370,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "ymigWt5TOV8_30",
@@ -419,9 +429,10 @@
    },
    "has": {
     "body": true,
-    "fingers": false,
-    "face": false
-   }
+    "fingers": true,
+    "face": true
+   },
+   "sides": "performer"
   },
   {
    "id": "macarena",
