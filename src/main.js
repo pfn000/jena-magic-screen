@@ -193,7 +193,7 @@ function runEvent(e, run, { privateRun = false } = {}) {
   if (run?._dev) run._dev.events.push(e);
   if (e.type === 'meta') { if (typeof e.online === 'boolean') chain.setHealth({ online: e.online }); }
   else if (e.type === 'status') run.step('status', e.text);
-  else if (e.type === 'step') run.step(e.kind, e.text);
+  else if (e.type === 'step') run.step(e.kind, e.text, e.img);
   else if (e.type === 'mood' || e.type === 'action') autonomy.fromBrain(e);
   else if (e.type === 'say') {
     const raw = e;

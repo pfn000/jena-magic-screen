@@ -205,6 +205,8 @@ export async function* thinkEvents(input) {
   // garbles citations and numbers), so the chain shows every finding + fix + source and she says the skill's words
   if (input.skill?.ok && input.skill.say) {
     for (const s of input.skill.steps || []) yield { type: 'step', kind: 'think', text: s };
+    const a = input.skill.asset;   // make_asset: show the real file she just made (served from her box)
+    if (a && /^[\w.-]+\.(png|svg)$/.test(a.png || a.svg || '')) yield { type: 'step', kind: 'tool', text: `made ${a.title || a.kind || 'an asset'} (in her assets gallery)`, img: `/api/asset?name=${encodeURIComponent(a.png || a.svg)}` };
     yield { type: 'step', kind: 'status', text: `${input.skill.name} wrote this answer from real ${input.skill.name === 'library_lookup' ? 'passages in her library' : 'measurements + her library'} (her small brain is not trusted with numbers and citations yet)` };
     yield { type: 'meta', brain: 'jenaxi', model: `skill:${input.skill.name}`, online: true };
     yield { type: 'mood', value: input.skill.name === 'roast_critique' ? (/Score: (10|9|8)\//.test(input.skill.say) ? 'surprised' : 'angry') : 'happy' };

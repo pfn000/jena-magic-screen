@@ -1,0 +1,17 @@
+{
+ "name": "make_asset",
+ "description": "Jena makes real assets: SVG icons (restyled from the open Lucide ISC / Tabler MIT sets), buttons (text color picked by WCAG contrast math, CSS included), badges, her own drawn logos, procedural backgrounds. Saved as .svg + locally rendered .png in her assets gallery. No photos/paintings: this box has no GPU.",
+ "triggers": [
+  "\\b(make|draw|design|create|generate|give me)\\b.{0,40}\\b(icon|button|badge|logo|sigil|monogram|emblem|svg|pill|sticker|wallpaper|background|pattern|asset)s?\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 40,
+ "needs": [
+  "rsvg-convert",
+  "her library (icon sets)"
+ ],
+ "example": {
+  "text": "jena make a pink app icon of a rocket"
+ }
+}

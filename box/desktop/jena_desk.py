@@ -1064,7 +1064,7 @@ async def client(reader, writer):
                 if res.get('ok') and url and safe(url):
                     with lock: events_in.append({'show_url': url, 'why': f'{name}: {text[:80]}', 'ts': time.time()})
                 top = {'title': (items[0].get('title') or items[0].get('name')) if items else res.get('title') or u, 'url': url} if url else None
-                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms'), 'steps': [str(x)[:300] for x in (res.get('steps') or [])][:8], 'say': str(res.get('say') or '')[:600] or None}).encode()
+                out = json.dumps({'name': name, 'ok': bool(res.get('ok')), 'summary': str(res.get('summary', ''))[:300], 'facts': facts[:1500], 'top': top, 'ms': res.get('ms'), 'steps': [str(x)[:300] for x in (res.get('steps') or [])][:8], 'say': str(res.get('say') or '')[:600] or None, 'asset': {k: str(res['asset'].get(k) or '')[:80] for k in ('png', 'svg', 'title', 'kind')} if isinstance(res.get('asset'), dict) else None}).encode()
         except Exception as e:
             out = json.dumps({'name': None, 'error': str(e)[:200]}).encode()
     elif p.startswith('/box/studio/'):

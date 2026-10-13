@@ -112,15 +112,17 @@ export class ThoughtChain {
     this.scroll();
     const steps = card.querySelector('.steps');
     return {
-      step: (kind, text) => this.addStep(steps, kind, text),
+      step: (kind, text, img) => this.addStep(steps, kind, text, img),
       done: () => card.classList.add('is-done'),
     };
   }
 
-  addStep(steps, kind, text) {
+  addStep(steps, kind, text, img) {
     const li = document.createElement('li');
     li.className = `step k-${kind}`;
-    li.innerHTML = `<span class="ico">${ICON[kind] || '•'}</span><span class="txt">${esc(text)}</span>`;
+    // img: only an asset she made on her box (make_asset), never an outside image
+    const pic = typeof img === 'string' && /^\/api\/asset\?name=[\w.%-]+$/.test(img) ? `<img class="thumb asset" src="${esc(img)}" alt="${esc(text)}" loading="lazy">` : '';
+    li.innerHTML = `<span class="ico">${ICON[kind] || '•'}</span><span class="txt">${esc(text)}${pic}</span>`;
     steps.appendChild(li);
     this.scroll();
   }
