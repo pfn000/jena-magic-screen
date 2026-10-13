@@ -232,18 +232,30 @@ def params(b):
     return out
 
 def _open_site(url):
+    """bring the sign-in page up in her own Firefox (~/.ffprofile): reuse the running window (address bar), else start it"""
     try:
-        subprocess.Popen(['firefox-esr', '--profile', os.path.join(HOME, '.ffprofile'), url], env=ENV,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        for _ in range(20):
-            time.sleep(0.5)
-            rc, out = _run('xdotool', 'search', '--onlyvisible', '--classname', 'Navigator')
-            wids = [w for w in out.split() if w.isdigit()]
-            if wids: break
+        def ff():
+            rc, out = _run('xdotool', 'search', '--class', '^firefox-esr$')   # her browser only (the N•OS shell is class NOS)
+            return [w for w in out.split() if w.isdigit()]
+        wids = ff()
         if wids:
             w = wids[-1]
-            if S['mode'] == 'phone': _run('wmctrl', '-i', '-r', hex(int(w)), '-b', 'add,maximized_vert,maximized_horz')
-            _run('xdotool', 'windowactivate', w)
+            _run('xdotool', 'windowactivate', '--sync', w)
+            time.sleep(0.3)
+            _run('xdotool', 'key', '--window', w, '--clearmodifiers', 'ctrl+l')
+            time.sleep(0.2)
+            _run('xdotool', 'type', '--delay', '15', '--', url)
+            _run('xdotool', 'key', '--clearmodifiers', 'Return')
+        else:
+            subprocess.Popen(['firefox-esr', '--new-instance', '--profile', os.path.join(HOME, '.ffprofile'), url], env=ENV,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            for _ in range(30):
+                time.sleep(0.5)
+                wids = ff()
+                if wids: break
+        if wids:
+            if S['mode'] == 'phone': _run('wmctrl', '-i', '-r', hex(int(wids[-1])), '-b', 'add,maximized_vert,maximized_horz')
+            _run('xdotool', 'windowactivate', wids[-1])
         _log('signin site', url, 'window', wids[-1] if wids else None)
     except Exception as e: _log('signin site', e)
 

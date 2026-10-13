@@ -533,7 +533,7 @@ CODE_DIGITS = re.compile(r'(?<!\d)(\d{4,8}|\d{3}[- ]\d{3})(?!\d)')
 
 def skill_check_my_email(inp):
     """reads the inbox list of the Proton Mail account mama signed me into (web, in my Firefox). Read-only; private details go to mama's log only."""
-    did('checking my email inbox in my browser (details stay private, only mama sees them)', 'skill')
+    did('checking my email inbox in my browser (the details stay between me and mama)', 'skill')
     log_activity('check_my_email', MAIL_URL, 'read the inbox list')
     mama['private_until'] = time.time() + 90      # the public desktop is private while the inbox is on screen
     set_private_reason('inbox', True)
@@ -695,7 +695,7 @@ def tidy_private_pages():
     would cover it anyway, but the page itself should not stay up on her public desktop)"""
     for w in windows():
         if 'firefox' in w['cls'] and PRIVATE_PAGE.search(w['title'] or ''):
-            did('mama left a private page open in my browser, closing it before I go on', 'help')
+            did('mama left a sign-in page open in my browser, closing it before I go on', 'help')
             focus(w['id']); key('ctrl+l'); time.sleep(0.2); type_('about:blank\n', delay=20); time.sleep(0.8)
             break
 
@@ -1067,7 +1067,7 @@ def eyes():
     while True:
         if private_now() or re.search(r'log[ -]?in|sign[ -]?in|password|authenticat', sh(['xdotool','getactivewindow','getwindowname']), re.I):   # never save a raw login screen
             with lock:
-                screen.update({'ts': int(time.time() * 1000), 'summary': 'private moment on my desktop, so I am not looking', 'text': ''})
+                screen.update({'ts': int(time.time() * 1000), 'summary': "mama's using my desktop, I'm hands-off till she's done", 'text': ''})
             time.sleep(2); continue
         try:
             raw = os.path.join(STATE, 'screen.png')
@@ -1159,7 +1159,7 @@ def _signin_started(site):
         private_session = True
         stop_her_inputs()
     set_private_reason('signin', True)
-    did(f'mama is signing me in to {site} in a private window, hands off 🙌', 'help')
+    did(f'mama is signing me in to {site} on my desktop, hands off 🙌', 'help')
 
 def _signin_ended(site, result):
     global private_session
@@ -1270,7 +1270,7 @@ def mama_popup(text):
     mama['private_until'] = time.time() + 30
     spawn(['xmessage', '-center', '-timeout', '28', '-buttons', 'ok mama:0', '-title', 'message from mama',
            '-bg', '#ffe3f3', '-fg', '#3b1d4a', '-fn', '-*-dejavu sans-bold-r-*-*-20-*-*-*-*-*-*-*', 'mama says: ' + text])
-    did('got a private message from mama (popped up on my screen)', 'help')
+    did('got a message from mama (popped up on my screen)', 'help')
 
 # ---------------------------------------------------------------- memory service (persistent, on her box)
 # What people tell her to remember, names, favorites; plus what she learned (Grok notes, exploring her box).
@@ -1393,7 +1393,7 @@ def mask_text(t):
 def payload():
     with lock:
         if private_now():
-            return {'ok': True, 'summary': 'mama is driving my desktop (private)', 'text': '', 'active': {}, 'windows': [],
+            return {'ok': True, 'summary': "mama's using my desktop, I'm hands-off till she's done", 'text': '', 'active': {}, 'windows': [],
                     'actions': [], 'video': None, 'now': int(time.time() * 1000), 'mama_driving': mama['driving'] > 0, 'private': True, 'updating': {}}
         pub = dict(screen, actions=[dict(a, text=mask_text(a.get('text'))) for a in list(actions)[-8:]], video=watching['video'], now=int(time.time() * 1000),
                    mama_driving=mama['driving'] > 0, private=False, updating=updating.copy())
@@ -1469,7 +1469,7 @@ async def mama_door(p, method, body):
         except Exception: helps = []
         return 200, json.dumps({'activity': [json.loads(l) for l in lines if l.strip()], 'help': [json.loads(l) for l in helps if l.strip()]}).encode()
     if p.startswith('/box/mama/signin/'):
-        if signin is None: return 503, json.dumps({'ok': False, 'summary': 'the private sign-in module is not on my box yet'}).encode()
+        if signin is None: return 503, json.dumps({'ok': False, 'summary': 'the sign-in module is not on my box yet'}).encode()
         try:
             st, out = await signin.mama_door(p, b)
             return st, (out if isinstance(out, (bytes, bytearray)) else json.dumps(out).encode())
@@ -1477,7 +1477,7 @@ async def mama_door(p, method, body):
             return 500, json.dumps({'ok': False, 'summary': f'sign-in door: {str(e)[:160]}'}).encode()
     if p == '/box/mama/notify':
         try: mama_popup(b.get('text', ''))
-        except HandsPaused: return 409, json.dumps({'ok': False, 'summary': 'her desktop is private right now (takeover / sign-in); try again after'}).encode()
+        except HandsPaused: return 409, json.dumps({'ok': False, 'summary': 'mama is using my desktop right now (takeover / sign-in); try again after'}).encode()
         return 200, json.dumps({'ok': True, 'shown_for_s': 28}).encode()
     if p == '/box/mama/takeover':
         if TK is not None and b.get('op') in ('status', 'end', 'extend'):
@@ -1571,7 +1571,7 @@ async def client(reader, writer):
             except Exception as _e: print('takeover begin', _e, flush=True)
         if not tinfo.get('phone'): set_private_reason('mama_takeover', True)   # phone mode: the public view holds its last frame instead
         did("mama's driving, hands off 🙌", 'skill')
-        did('mama took over my desktop (private)', 'help')
+        did('mama took over my desktop', 'help')
         for v in list(public_viewers):   # the public view-only stream stops while mama drives
             try: v.close()
             except Exception: pass
@@ -1626,7 +1626,7 @@ async def client(reader, writer):
         out = json.dumps(thoughts_since(since, last)).encode()
     elif p == '/box/signin/magic' and method == 'POST':
         # mama's magic sign-in link (/?signin=<token>): the one-request token is the key here, no passcode (jena_signin.magic_door)
-        if signin is None: status, out = 503, json.dumps({'ok': False, 'summary': 'the private sign-in module is not on my box yet'}).encode()
+        if signin is None: status, out = 503, json.dumps({'ok': False, 'summary': 'the sign-in module is not on my box yet'}).encode()
         else: status, out = await signin.magic_door(body)
     elif p == '/box/event' and method == 'POST':
         try: ok = take_event(json.loads(body or b'{}'))

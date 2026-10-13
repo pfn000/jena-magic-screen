@@ -180,7 +180,7 @@ class SignIn:
             if not r: return {'ok': False, 'summary': 'no such sign-in request'}
             if r['status'] not in ('pending', 'open'): return {'ok': False, 'summary': f'that request is {r["status"]}; ask again'}
             if self.sess and self.sess['id'] != rid:
-                return {'ok': False, 'summary': f'another private sign-in ({self.sess["label"]}) is open; finish it first'}
+                return {'ok': False, 'summary': f'another sign-in ({self.sess["label"]}) is open; finish it first'}
             tok = secrets.token_urlsafe(24)
             self.tokens = {t: v for t, v in self.tokens.items() if v[0] > _now()}
             self.tokens[tok] = (_now() + TOKEN_S, rid)
@@ -208,7 +208,7 @@ class SignIn:
                     self.links.pop(r['id'], None)
                     if not self.links: self._write_link(None)
                     return {'ok': True, 'request': self.public_req(r)}
-                return {'ok': False, 'summary': 'no private sign-in is open'}
+                return {'ok': False, 'summary': 'no sign-in is open'}
             if s.get('phase') == 'closing': return {'ok': True, 'closing': True}
             s['phase'] = 'closing'
             self.tokens = {}
