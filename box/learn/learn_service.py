@@ -57,6 +57,12 @@ def learn(r):
     j = retarget.to_json(out, off, len(off))
     json.dump(j, open(os.path.join(LEARNED, cid + '.json'), 'w'), separators=(',', ':'))
     os.chmod(os.path.join(LEARNED, cid + '.json'), 0o664)
+    # the tracking overlay viewers see on the real video: every frame at the video's own fps (VIDEO mode), cached once
+    status(state='learning', id=cid, what=r.get('what'), url=r.get('url'), step='tracking every frame for the overlay')
+    try:
+        subprocess.run(['nice', '-n', '15', 'timeout', '900', PY, os.path.join(PIPE, 'overlay.py'), cid, info.get('webpage_url') or r['url'], str(start), str(end), LEARNED, task], env=env, capture_output=True, text=True)
+        os.chmod(os.path.join(LEARNED, cid + '-overlay.json'), 0o664)
+    except Exception: pass
     return {'ok': True, 'clip': dict(id=cid, file=cid + '.json', label=r.get('label') or cid, what=r.get('what') or 'someone moving', kind=r.get('kind') or 'dance',
             moods=r.get('moods') or ['happy', 'neutral'], duration=j['duration'], mirror=True, learned_on_box=True, learned_at=int(time.time() * 1000),
             source=dict(url=info.get('webpage_url') or r['url'], title=info.get('title') or r.get('found_title'), channel=info.get('channel') or info.get('uploader'), start=start, end=end, search=r.get('search')),

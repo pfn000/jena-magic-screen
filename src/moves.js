@@ -6,6 +6,7 @@
 // slice of it each time (start, length, speed, sometimes mirrored), and blends it over her procedural
 // idle so her breathing and drift never stop. Left/right always mean HER left/right.
 import * as THREE from 'three';
+import { WatchVideo } from './watchvideo.js';
 
 // Her clips were tracked from video at 15 fps, and a pose tracker shakes a little on every frame. Played
 // back with plain frame-to-frame slerp, that shows as tiny kinks 15 times a second. On load each clip is
@@ -78,6 +79,7 @@ export class Moves {
     this.remember = remember; // optional (event) => void: her memory, when there is one
     this.card = card; // optional (trigger) => {step, done}: a thought-chain card (shows the video she learned from)
     this.shown = new Map(); // clip id -> when its source video was last shown
+    this.watch = new WatchVideo(); // the real source video + her tracking on it, while she does the move
     this.guard = { left: 1, right: 1 };
     this._hipInv = new THREE.Matrix4(); this._chestInv = new THREE.Matrix4();
     this.library = [];
@@ -188,6 +190,8 @@ export class Moves {
         a.href = `https://www.youtube.com/watch?v=${vid}${t}`; a.target = '_blank'; a.rel = 'noopener';
         a.title = 'the video Jena learned this move from';
         img.replaceWith(a); a.appendChild(img);
+        // while she does it: the real video at its own frame rate, with the body she tracked drawn on it
+        this.watch.play(a, meta, this.playing, (meta.base || this.base) + meta.id + '-overlay.json').catch(() => {});
       }
       run.step('body', line);
       run.done();
