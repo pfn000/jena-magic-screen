@@ -147,7 +147,7 @@ export function renderAsks(edits) {
   if (p && p.status === 'pending') {
     const link = p.link || '';
     h += `<div class="dp-card ask-card"><b>🔑 Jena wants you to sign in to ${esc(p.label)}</b><p>${esc(p.reason || '')} · ${ago(p.ts)} · expires in ${Math.max(0, Math.round((p.ts + (d.expires_s || 600) * 1000 - Date.now()) / 60000))} min</p>
-      <p><button data-ask-signin="${esc(p.id)}" style="font-weight:700">Open →</button> <button data-ask-cancel="${esc(p.id)}">Not now</button></p>
+      <p><button data-ask-signin="${esc(p.id)}" style="font-weight:700">🖐 Take over →</button> <button data-ask-cancel="${esc(p.id)}">Not now</button></p>
       ${link ? `<p style="word-break:break-all"><small>sign-in link (one use, no passcode): <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a></small></p><details><summary>open it on your phone (QR)</summary><div style="width:150px;background:#fff;padding:6px;border-radius:8px;margin-top:6px">${qrSvg(link)}</div><small>scan it: the private window opens right away</small></details>` : ''}</div>`;
   } else if (!act.active) h += '<p>No sign-in ask right now.</p>';
   const other = (d.asks || []).filter((a) => Date.now() - a.ts < 24 * 3600e3);
@@ -178,6 +178,13 @@ export async function handleAskClick(e, rerender) {
   return false;
 }
 
+// mama's sign-in = a takeover of Jena's real desktop (:99): one-time token from her box, passcode checked there
+async function takeoverFor(pass) {
+  const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': pass || '' }, body: JSON.stringify({ action: 'takeover' }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+  if (r.ok && r.ws) localStorage.setItem(KEY, pass);
+  return r.ok && r.ws ? { ok: true, ws: r.ws, until: Date.now() + 15 * 60000 } : { ok: false, summary: r.error === 'wrong key' ? 'wrong passcode' : (r.summary || r.error || 'her box did not answer') };
+}
+
 // ---------------- the private window ----------------
 export function openSignin(req) {
   if (!req) return;
@@ -187,11 +194,11 @@ export function openSignin(req) {
   w.style.cssText = 'position:fixed;inset:0;z-index:100001;background:#0e0d16;color:#fff;display:flex;flex-direction:column;font:14px system-ui,sans-serif;height:100dvh';
   const label = esc(req.label || 'the site');
   w.innerHTML = `<header style="display:flex;align-items:center;gap:6px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:#1d1b2e;border-bottom:1px solid #b48cff;flex-wrap:wrap">
-      <b style="flex:1;min-width:150px">🔒 Sign Jena in to ${label}</b><span class="si-st" style="font-size:12px;opacity:.8">opening…</span>
+      <b style="flex:1;min-width:150px">🖐 Sign Jena in to ${label}</b><span class="si-st" style="font-size:12px;opacity:.8">opening…</span>
       <button class="si-kb" hidden style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">⌨️</button>
       <button class="si-done" hidden style="padding:6px 12px;border-radius:9px;border:0;background:#38c172;color:#06200f;font-weight:700">✓ Done</button>
       <button class="si-x" style="padding:6px 9px;border-radius:9px;border:1px solid #fff;background:none;color:#fff">✕</button></header>
-    <form class="si-pass" style="margin:auto;max-width:330px;padding:20px;text-align:center"><p>This opens Jena's own browser on a <b>private screen</b> only you can see. Her public desktop shows a lock card meanwhile. You type everything yourself; nothing is saved but her browser session.</p>
+    <form class="si-pass" style="margin:auto;max-width:330px;padding:20px;text-align:center"><p>You take over Jena's own desktop (her hands pause) and sign in right in her browser. Only the public/stream view shows a lock card meanwhile. You type everything yourself.</p>
       <input type="password" autocomplete="off" placeholder="passcode" style="font-size:16px;padding:10px;border-radius:10px;border:1px solid #888;width:100%;box-sizing:border-box">
       <button style="margin-top:10px;width:100%;padding:11px;border-radius:10px;border:0;background:#b48cff;color:#1d1b2e;font:700 15px system-ui">Open ${label}</button><p class="si-err" style="color:#ff8a8a"></p></form>
     <div class="si-screen" hidden style="flex:1;min-height:0;background:#000;touch-action:none"></div>
@@ -205,7 +212,9 @@ export function openSignin(req) {
   const call = (op, pass) => (req.link ? linkSignin(op, req.link) : mamaSignin(op, { id: req.id }, pass || key()));
   const go = async (pass) => {
     form.querySelector('button').disabled = true; st.textContent = 'opening…';
-    const d = await call('start', pass);
+    // mama (passcode on this device): sign in right on Jena's own desktop through a takeover. She sees it raw;
+    // Jena's hands pause; only the public/OBS view gets the lock card meanwhile. The one-use link keeps the old window.
+    const d = req.link ? await call('start', pass) : await takeoverFor(pass || key());
     if (!d.ok) {
       form.querySelector('button').disabled = false; st.textContent = '';
       form.querySelector('.si-err').textContent = d.summary || d.error || 'could not open';
@@ -216,14 +225,14 @@ export function openSignin(req) {
     if (d.label) w.querySelector('header b').textContent = `🔒 Sign Jena in to ${d.label}`;
     form.remove(); screen.hidden = false; kbBtn.hidden = false; doneBtn.hidden = false;
     until = d.until || Date.now() + 600000;
-    rfb = new RFB(screen, d.ws, { shared: true, wsProtocols: [d.protocol, 'binary'] });
-    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.clipViewport = false;
+    rfb = new RFB(screen, d.ws, { shared: true, wsProtocols: d.protocol ? [d.protocol, 'binary'] : ['binary'] });
+    rfb.viewOnly = false; rfb.scaleViewport = true; rfb.focusOnClick = true; rfb.clipViewport = false; rfb.showDotCursor = true;
     rfb.addEventListener('connect', () => { st.textContent = 'connected'; });
     rfb.addEventListener('disconnect', (ev) => { st.textContent = ev.detail?.clean ? 'closed' : 'connection dropped: tap ✕ and Open again'; });
     timer = setInterval(() => { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); if (st.textContent.startsWith('connected') || st.textContent.includes('left')) st.textContent = `connected · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) close(); }, 1000);
   };
   form.onsubmit = (e) => { e.preventDefault(); const pass = form.querySelector('input').value.trim(); if (pass) go(pass); };
-  if (req.link || key()) { form.querySelector('p').textContent = 'Opening Jena\'s browser on a private screen only you can see…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
+  if (req.link || key()) { form.querySelector('p').textContent = req.link ? 'Opening Jena\'s browser on a private screen only you can see…' : 'Taking over Jena\'s desktop…'; form.querySelector('input').hidden = true; form.querySelector('button').hidden = true; go(); }
   else form.querySelector('input').focus();
   // phone keyboard: a hidden input forwards what mama types as key presses (never stored anywhere)
   kbBtn.onclick = () => { kbIn.focus(); };
@@ -239,7 +248,8 @@ export function openSignin(req) {
   doneBtn.onclick = async () => {
     doneBtn.disabled = true; st.textContent = 'saving her session (closing Firefox)…';
     try { rfb?.disconnect(); } catch {}
-    const r = await call('done');
+    const r = req.link ? await call('done') : { ok: true, request: { note: 'her own browser keeps the session (same Firefox profile)' } };
+    if (!req.link) mamaSignin('cancel', { id: req.id }).catch(() => {});   // the ask is handled: clear its card
     st.textContent = r.ok ? 'done ✓' : (r.summary || r.error || 'failed');
     screen.innerHTML = `<p style="padding:20px;color:#fff">${r.ok ? '✓ Closed. Her browser saved the session and went back to her desktop.<br><small>' + esc(r.request?.note || '') + '</small>' : esc(r.summary || r.error || 'failed')}</p>`;
     clearInterval(timer); setTimeout(close, 6000);

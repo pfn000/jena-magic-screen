@@ -1,7 +1,7 @@
 // Jena's virtual desktop panel. Two views, picked per device:
 //  * MAMA VIEW (this device holds mama's dev passcode, not OBS): her smooth, RAW, full-fps desktop through a one-time
 //    view-only token (/api/mama watch -> wss://box/websockify-watch?t=…, the view-only VNC). Never censored, never
-//    public; a private sign-in window only adds a small corner pill. ?public=1 shows mama the public view instead.
+//    public; nothing ever covers it (lock cards are for the public/OBS view only). ?public=1 shows mama the public view instead.
 //  * PUBLIC / OBS: censored frames only (box/desktop/jena_censor.py OCRs + blacks out emails, IPs, codes, keys,
 //    phones on her box). A slow read never flashes the lock card: the last good censored frame stays up until the
 //    next one is ready. The whole-screen card only shows for real private states (sign-in page, inbox, keys on
@@ -69,15 +69,16 @@ export class Desktop {
     this.vnc.className = 'desk-mama';
     this.vnc.style.cssText = 'position:absolute;inset:0;display:none;background:#000;';
     this.screen.appendChild(this.vnc);
-    this.cover = document.createElement('a');   // mama view: a small corner pill while a private sign-in window is open
-    this.cover.className = 'desk-signin-pill';
-    this.cover.style.cssText = 'position:absolute;right:8px;bottom:8px;display:none;padding:5px 10px;border-radius:999px;background:rgba(46,33,66,.88);color:#f8eaff;font:700 12px system-ui;text-decoration:none;z-index:3;';
-    this.cover.textContent = '🔑 sign-in window open';
-    this.cover.addEventListener('click', (e) => {   // opens the sign-in window when the dev panel shows its card
-      const open = document.querySelector('[data-ask-signin]');
-      if (open) { e.preventDefault(); open.click(); } else if (!this.cover.getAttribute('href')) e.preventDefault();
-    });
-    this.screen.appendChild(this.cover);
+    // "I'm mama" key on the panel: one passcode entry on this device -> her raw, uncensored view from then on
+    this.mamaBtn = document.createElement('button');
+    this.mamaBtn.type = 'button';
+    this.mamaBtn.className = 'desk-mama-key';
+    this.mamaBtn.textContent = '🔑 mama view';
+    this.mamaBtn.title = 'mama: enter your passcode once on this device to see her desktop raw, smooth and uncensored';
+    this.mamaBtn.style.cssText = 'position:absolute;left:8px;bottom:8px;z-index:4;padding:4px 10px;border:0;border-radius:999px;background:rgba(46,33,66,.8);color:#f8eaff;font:700 12px system-ui;cursor:pointer;';
+    this.mamaBtn.addEventListener('click', () => this.unlockMama());
+    if (!OBS) this.screen.appendChild(this.mamaBtn);
+    this.syncMamaBtn();
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.mode === 'public') this.kick(); });
     this.setUrl(url, true);
     setInterval(() => this.pollStatus(), 2500);
@@ -97,9 +98,22 @@ export class Desktop {
     if (this.wantsMama()) this.startMama(); else this.startPublic();
   }
 
+  syncMamaBtn() { if (this.mamaBtn) this.mamaBtn.style.display = !OBS && this.mode !== 'mama' ? 'block' : 'none'; }
+
+  async unlockMama() {
+    const k = (window.prompt("mama's passcode (only on your own device)") || '').trim();
+    if (!k) return;
+    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': k }, body: JSON.stringify({ action: 'watch' }) }).then((x) => x.json()).catch(() => null);
+    if (!r || !r.ok) { window.alert(r && r.error === 'wrong key' ? 'wrong passcode' : `couldn't check it: ${(r && (r.error || r.summary)) || 'no answer'}`); return; }
+    localStorage.setItem('jena.dmKey', k);   // same key the private DM drawer + dev panel use
+    clearTimeout(this.watchRetry);
+    this.startMama();
+  }
+
   // ---------------- MAMA VIEW: raw, smooth, view-only ----------------
   async startMama() {
     this.mode = 'mama';
+    this.syncMamaBtn();
     clearTimeout(this.timer);
     const key = localStorage.getItem('jena.dmKey');
     const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key || '' }, body: JSON.stringify({ action: 'watch' }) })
@@ -135,10 +149,10 @@ export class Desktop {
   // ---------------- PUBLIC / OBS: censored frames, no flashing ----------------
   startPublic() {
     this.mode = 'public';
+    this.syncMamaBtn();
     try { this.rfb?.disconnect(); } catch {}
     this.rfb = null;
     this.vnc.style.display = 'none';
-    this.cover.style.display = 'none';
     this.kick();
   }
 
@@ -215,11 +229,7 @@ export class Desktop {
     const priv = s.state === 'private';
     this.privRun = priv === this.privLast ? (this.privRun || 0) + 1 : 1; this.privLast = priv;
     if (this.privRun >= 2) this.root.classList.toggle('is-private', this.mode === 'public' && priv);
-    if (this.mode === 'mama') {
-      const on = s.reason === 'signin';
-      this.cover.style.display = on ? 'block' : 'none';
-      if (on) this.cover.textContent = document.querySelector('[data-ask-signin]') ? '🔑 sign-in window open, tap to open it' : '🔑 sign-in window open';
-    }
+    // mama view is ALWAYS raw: no lock card, no sign-in text, nothing censored (Saidie's rule). Lock cards are public/OBS only.
     this.paintBadge();
   }
 
