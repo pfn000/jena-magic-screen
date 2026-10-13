@@ -61,7 +61,7 @@ function startReporter() {
 }
 
 // ---------------- Health view (dev panel only; the box answers details only with mama's passcode)
-let cache = '', busy = false, lastAt = 0;
+let cache = '', ver = 0, busy = false, lastAt = 0;
 const dot = (ok) => `<i class="dot ${ok ? 'ok' : 'bad'}"></i>`;
 const ago = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${(s / 3600).toFixed(1)}h ago`; };
 function renderHealth(d, err) {
@@ -86,14 +86,14 @@ async function pullHealth() {
     const d = await r.json(); d._at = Date.now();
     cache = r.status === 401 ? renderHealth(null, 'Watchdog details are mama-only: unlock the private DM drawer with your passcode first') : d.online === false ? renderHealth(null, 'her box did not answer: ' + (d.error || '')) : renderHealth(d);
   } catch (e) { cache = renderHealth(null, 'could not reach the watchdog: ' + e.message); }
-  busy = false; place();
+  ver++; cache = cache.replace('<div id="wd-health"', `<div data-v="${ver}" id="wd-health"`); busy = false; place();
 }
 function place() {
   const dp = document.getElementById('devpanel'), body = dp?.querySelector('.dp-body');
   const on = dp && !dp.hidden && dp.querySelector('nav button.on')?.dataset.tab === 'health';
   if (!on || !body) return;
   const old = body.querySelector('#wd-health');
-  if (old && old.outerHTML === cache) return;
+  if (old && old.dataset.v === String(ver)) return;   // already showing this read (no re-insert loop)
   if (old) old.remove();
   if (cache) body.insertAdjacentHTML('afterbegin', cache);
 }
