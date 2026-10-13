@@ -140,12 +140,21 @@ export class Desktop {
 
   syncMamaBtn() { if (this.mamaBtn) this.mamaBtn.style.display = !OBS && this.mode !== 'mama' ? 'block' : 'none'; }
 
+  // the "🔑 mama view" key. A trusted device never gets a passcode box here: the cookie hands its key back first.
+  // Only a device that was never trusted (or was locked on purpose) sees the shared passcode card (trust.js).
   async unlockMama() {
-    const k = (window.prompt("mama's passcode (only on your own device)") || '').trim();
-    if (!k) return;
-    const r = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': k }, body: JSON.stringify({ action: 'watch' }) }).then((x) => x.json()).catch(() => null);
-    if (!r || !r.ok) { window.alert(r && r.error === 'wrong key' ? 'wrong passcode' : `couldn't check it: ${(r && (r.error || r.summary)) || 'no answer'}`); return; }
-    localStorage.setItem('jena.dmKey', k);   // same key the private DM drawer + dev panel use
+    const { restoreTrust } = await import('./takeover.js');
+    if (await restoreTrust()) { clearTimeout(this.watchRetry); this.startMama(); return; }
+    const T = window.jenaTrust;
+    const k = T?.askPasscode ? await T.askPasscode("Mama's desktop", 'Type it once on this device. After that it stays trusted, with no more prompts.')
+      : (window.prompt("mama's passcode (only on your own device)") || '');
+    if (!k || !String(k).trim()) return;
+    const r = T?.trustWithPasscode ? await T.trustWithPasscode(String(k).trim()) : null;
+    if (!r || !r.ok) {
+      const c = await fetch('/api/mama', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': String(k).trim() }, body: JSON.stringify({ action: 'watch' }) }).then((x) => x.json()).catch(() => null);
+      if (!c || !c.ok) { window.alert(c && c.error === 'wrong key' ? 'wrong passcode' : `couldn't check it: ${(c && (c.error || c.summary)) || 'no answer'}`); return; }
+      localStorage.setItem('jena.dmKey', String(k).trim());   // same key the private DM drawer + dev panel use
+    }
     clearTimeout(this.watchRetry);
     this.startMama();
   }
@@ -161,7 +170,10 @@ export class Desktop {
       .then((x) => x.json().then((d) => ({ status: x.status, ...d }))).catch(() => null);
     if (!r || !r.ok || !r.ws) {
       this.mamaWhy = r ? (r.error || r.summary || `status ${r.status}`) : 'no answer';
-      if (r && r.status === 401) { this.startPublic(); return; }   // wrong/old passcode: the public view
+      if (r && r.status === 401) {   // the saved key was refused: a trusted device gets it back from its cookie, silently
+        if (!this.reTrusted) { this.reTrusted = true; const { restoreTrust } = await import('./takeover.js'); if (await restoreTrust()) { this.startMama(); return; } }
+        this.startPublic(); return;   // never trusted (or locked on purpose): the public view
+      }
       // her box didn't answer this time (tunnel blip, cold server): stay on mama view, keep the last picture, try again soon
       this.mamaFails = (this.mamaFails || 0) + 1;
       if (this.state === 'live' && this.rfb) this.root.classList.add('is-reconnecting');
@@ -173,6 +185,7 @@ export class Desktop {
       return;
     }
     this.mamaFails = 0;
+    this.reTrusted = false;
     let RFB;
     try { RFB = (await import('@novnc/novnc')).default; } catch { this.startPublic(); return; }
     try { this.rfb?.disconnect(); } catch {}

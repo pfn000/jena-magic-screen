@@ -265,6 +265,15 @@ async function mama(body) {
     .then(async (x) => { const t = await x.text(); try { return { status: x.status, ...JSON.parse(t) }; } catch { return { ok: false, retry: true, summary: 'her box is reconnecting' }; } })
     .catch(() => ({ ok: false, retry: true, summary: 'her box is reconnecting' }));
 }
+// mama's trusted device lives in an HttpOnly cookie too: when the saved key is gone, ask the site to hand it back.
+// true = this device is mama's again (nothing typed). Only an explicit 'lock' in the private drawer keeps it locked.
+export async function restoreTrust() {
+  try { if (sessionStorage.getItem('jena.locked') === '1') return false; } catch {}
+  const r = await fetch('/api/trust', { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
+  const d = r && r.ok ? await r.json().catch(() => null) : null;
+  if (d?.trusted && d.token) { try { localStorage.setItem(KEY, d.token); } catch {} return true; }
+  return false;
+}
 // a one-use token for her full-control desktop; her tunnel can be mid-restart (HTML answer): 3 tries over ~8 s
 export async function takeoverToken(extra = {}) {
   let last = null;
@@ -272,10 +281,15 @@ export async function takeoverToken(extra = {}) {
   if (body.phone === undefined && isPhoneView()) {   // the stage size the picture will get (minus header + key row)
     const vv = window.visualViewport; body.phone = { w: Math.round(vv?.width || innerWidth), h: Math.round((vv?.height || innerHeight) - 96) };
   }
+  let restored = false;
   for (let i = 0; i < 3; i++) {
     const r = await mama(body);
     if (r.ok && r.ws) return r;
-    if (r.status === 401 || r.error === 'wrong key') return { ok: false, auth: true, summary: 'mama sign-in needed' };
+    if (r.status === 401 || r.error === 'wrong key') {
+      // a trusted device whose saved key went missing (iPhone Safari can drop localStorage): the cookie puts it back, no prompt
+      if (!restored && (restored = true) && await restoreTrust()) { i--; continue; }
+      return { ok: false, auth: true, summary: 'mama sign-in needed' };
+    }
     last = r;
     await new Promise((res) => setTimeout(res, 1500 + i * 2000));
   }
