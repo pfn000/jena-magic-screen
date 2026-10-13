@@ -1,0 +1,17 @@
+[Unit]
+Description=Jena site-edit checker (branch -> checks -> Vercel preview; only mama merges) on 127.0.0.1:6085, own user jenaci
+After=network-online.target
+
+[Service]
+User=jenaci
+Group=jenaci
+WorkingDirectory=/home/jenaci
+ExecStart=/usr/bin/python3 /home/jenaci/ci/jena_ci.py
+Restart=always
+RestartSec=5
+Nice=10
+CPUWeight=40
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

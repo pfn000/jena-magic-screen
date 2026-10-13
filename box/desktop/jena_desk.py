@@ -937,6 +937,27 @@ async def mama_door(p, method, body):
         return 200, json.dumps({'ok': True, 'key': open(API_KEY).read().strip()}).encode()
     return 404, json.dumps({'ok': False, 'summary': 'no such mama door'}).encode()
 
+def watch_site_edit(pid):
+    """follow my site-edit checker for one proposal and put each check result in my log (-> the site's thought chain)"""
+    seen, t_end = set(), time.time() + 900
+    while time.time() < t_end:
+        time.sleep(6)
+        try:
+            with urllib.request.urlopen('http://127.0.0.1:6085/status', timeout=8) as r: st = json.loads(r.read())
+        except Exception: continue
+        p = next((x for x in st.get('proposals', []) if x.get('id') == pid), None)
+        if not p: continue
+        for c in p.get('checks', []):
+            k = c['name']
+            if k in seen: continue
+            seen.add(k); did(f"site edit check {'✅' if c['ok'] else '❌'} {k}{(' — ' + c['detail'][:120]) if c.get('detail') and not c['ok'] else ''}", 'skill')
+        if p.get('state') == 'failed':
+            did(f"my site edit “{p.get('title', '')[:60]}” failed the checks, so it was NOT pushed (nothing changed on the site)", 'skill'); return
+        if p.get('state') == 'ready' and p.get('preview'):
+            did(f"my site edit passed every check; Vercel preview: {p['preview']} (only mama can merge it)", 'skill'); return
+        if p.get('state') == 'ready' and 'pushed' not in seen:
+            seen.add('pushed'); did('my site edit passed every check, branch pushed; waiting for the Vercel preview', 'skill')
+
 # her studio (library, assets, site edits) lives in its own module, reloaded from her repo when it changes
 _studio = {'mod': None, 'mtime': 0}
 def studio():
@@ -1056,6 +1077,8 @@ async def client(reader, writer):
                 did(f'using skill: {name}', 'skill')
                 res = await asyncio.get_running_loop().run_in_executor(None, skills.run, name, {'text': text, 'query': text, 'question': text, 'url': u or ''})
                 did(f'{name}: {res.get("summary", "")[:180]}{"" if res.get("ok") else " (failed)"}', 'skill')
+                if name == 'edit_my_site' and res.get('ok') and res.get('id'):
+                    threading.Thread(target=watch_site_edit, args=(res['id'],), daemon=True).start()
                 items = (res.get('hits') or res.get('repos') or [])[:4]
                 facts = res.get('summary', '') + ''.join(f' | {x.get("title") or x.get("name") or ""} {x.get("url", "")} {str(x.get("about") or x.get("snippet") or "")[:100]}' for x in items)
                 if name == 'fetch_page': facts += ' | ' + str(res.get('text', ''))[:600]

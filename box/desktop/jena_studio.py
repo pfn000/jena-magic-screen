@@ -39,9 +39,11 @@ def asset_file(name):
     if not os.path.exists(p): return _j({'error': 'no such asset'}, 404)
     return 200, mimetypes.guess_type(name)[0] or 'application/octet-stream', open(p, 'rb').read()
 
-def ci(path, body=None, timeout=20):
+def ci(path, body=None, timeout=20, key=None):
     try:
-        req = urllib.request.Request(CI + path, data=json.dumps(body).encode() if body is not None else None, headers={'Content-Type': 'application/json'})
+        h = {'Content-Type': 'application/json'}
+        if key: h['X-Jena-Key'] = key   # the checker checks mama's passcode itself too (it runs as its own user)
+        req = urllib.request.Request(CI + path, data=json.dumps(body).encode() if body is not None else None, headers=h)
         with urllib.request.urlopen(req, timeout=timeout) as r: return 200, json.loads(r.read())
     except urllib.error.HTTPError as e:
         try: return e.code, json.loads(e.read())
@@ -61,6 +63,6 @@ def handle(p, method, body, hdrs, qs, is_mama):
         if op not in ('merge', 'rollback', 'discard'): return _j({'ok': False, 'error': 'no such door'}, 404)
         try: b = json.loads(body or b'{}')
         except Exception: b = {}
-        st, d = ci('/' + op, {'id': str(b.get('id', ''))[:80], 'by': 'mama'}, timeout=240)
+        st, d = ci('/' + op, {'id': str(b.get('id', ''))[:80], 'by': 'mama'}, timeout=25, key=hdrs.get('x-jena-key') or hdrs.get('X-Jena-Key'))
         return _j(d, st)
     return _j({'error': 'not here'}, 404)

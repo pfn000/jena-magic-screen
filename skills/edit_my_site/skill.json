@@ -1,0 +1,19 @@
+{
+ "name": "edit_my_site",
+ "description": "Jena proposes a small change to her own website (text or CSS, find → replace in src/*.js|css or index.html). Before proposing she looks it up in her library and runs her own roast_critique on the new code; then her site-edit checker puts it on its own git branch, runs parse + lint + build + a headless smoke test vs main (desktop, phone 390 px, OBS) and pushes ONLY a passing branch for a Vercel preview. She can never merge: mama approves (or discards / rolls back) in the dev panel.",
+ "triggers": [
+  "\\b(edit|change|fix|update|tweak|modify)\\b.{0,30}\\b(your|ur|her|my)\\s+(own\\s+)?(site|website|web ?page|page|css|code|ui)\\b",
+  "\\b(change|replace|swap)\\s+[\"'“‘`].{1,200}[\"'”’`]\\s+(to|with|into|for)\\s+[\"'“‘`]"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 45,
+ "needs": [
+  "her site-edit checker (jena-ci, 127.0.0.1:6085)",
+  "library_lookup",
+  "roast_critique"
+ ],
+ "example": {
+  "text": "jena edit your site: change \"talk to Jena…\" to \"say hi to Jena…\" because it sounds friendlier"
+ }
+}
