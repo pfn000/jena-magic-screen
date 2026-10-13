@@ -38,12 +38,26 @@ const avatar = new Avatar($('#avatar-canvas'), {
     status.hidden = s === 'ready';
   },
 });
+// Her body loads beside everything else and never holds the page: no WebGL, or nothing after 8 s, shows a
+// still picture of her (chat, desktop and mama tools keep working); a body that turns up late replaces it.
+const avatarStill = (why) => {
+  if (avatar.ready || $('#avatar-still')) return;
+  const img = Object.assign(document.createElement('img'), { id: 'avatar-still', src: '/jena-fallback.jpg', alt: 'Jena' });
+  img.title = why;
+  $('#avatar-canvas')?.after(img);
+  status.hidden = true;
+  document.body.classList.add('avatar-still');
+};
+const avatarTimer = setTimeout(() => avatarStill('her 3D body is taking long to load'), 8000);
 (async () => {
   try { await avatar.load(cfg.vrmUrl); }
   catch (e) {
+    if (avatar.noGL) { clearTimeout(avatarTimer); avatarStill(e.message); return; }
     try { await avatar.load(cfg.vrmFallbackUrl); }
-    catch (e2) { status.textContent = `couldn't load her body (${e2.message})`; }
+    catch (e2) { clearTimeout(avatarTimer); avatarStill(`couldn't load her body (${e2.message})`); return; }
   }
+  clearTimeout(avatarTimer);
+  $('#avatar-still')?.remove(); document.body.classList.remove('avatar-still');
   document.body.classList.add('avatar-ready');
 })();
 
@@ -193,8 +207,8 @@ const selfSense = new SelfSense(avatar, {
   readout: params.get('selfview') !== '0' ? $('#self-readout') : null,
   faceReadout: params.get('selfview') !== '0' ? $('#face-readout') : null,
 });
-if (params.get('selfview') !== '0') new FacePanel(avatar, $('#self-face'));
-if (params.get('selfview') !== '0') {
+if (params.get('selfview') !== '0' && !avatar.noGL) new FacePanel(avatar, $('#self-face'));
+if (params.get('selfview') !== '0' && !avatar.noGL) {
   const view = $('#self-view'), label = $('#self-view-label');
   const startVision = () => (window.__jenaVision = new SelfVision($('#avatar-canvas'), {
     log: (kind, text) => chain.self(kind, text),

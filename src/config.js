@@ -18,7 +18,7 @@ const DEFAULTS = {
 
 async function getJSON(url) {
   try {
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) }); // a stalled server never holds the page
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; }

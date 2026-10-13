@@ -44,7 +44,15 @@ export class Avatar {
     // preserveDrawingBuffer makes the GPU keep a copy of every frame (costly on phones); only browsers
     // without WebGL2 still need it (their self-view crops the stage canvas directly)
     const gl2 = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: !gl2 });
+    // No WebGL (blocked, crashed GPU process, weak device): keep a do-nothing renderer so the rest of the page
+    // (chat, desktop, mama tools) still runs; main.js shows a still picture of her instead (avatar.noGL).
+    try { this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: !gl2 }); }
+    catch (e) {
+      console.warn('avatar: no WebGL', e);
+      this.noGL = true; this.glError = String(e?.message || e);
+      const nop = () => {};
+      this.renderer = { noGL: true, domElement: canvas, setClearColor: nop, setPixelRatio: nop, getPixelRatio: () => 1, setSize: nop, setAnimationLoop: nop, render: nop, getRenderTarget: () => null, setRenderTarget: nop, readRenderTargetPixels: nop, dispose: nop, capabilities: { isWebGL2: false } };
+    }
     this.renderer.setClearColor(0x000000, 0);
     // sharpness vs speed: phones top out at 1.5x pixels (a 3x screen draws 4x fewer pixels than full res),
     // computers at 2x; ?dpr=<n> pins it. If frames still run slow, frame() steps it down (never below 1x).
@@ -110,6 +118,7 @@ export class Avatar {
   }
 
   async load(url) {
+    if (this.noGL) throw new Error('WebGL unavailable: ' + this.glError);
     this.onStatus('loading', 0);
     const loader = new GLTFLoader();
     loader.register((p) => new VRMLoaderPlugin(p));
