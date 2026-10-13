@@ -1,0 +1,44 @@
+{
+ "fetch": {
+  "command": "~/.local/bin/mcp-server-fetch",
+  "args": [],
+  "what": "fetch any web page as clean text (official MCP fetch server)"
+ },
+ "filesystem": {
+  "command": "~/.npm-global/node_modules/.bin/mcp-server-filesystem",
+  "args": [
+   "~"
+  ],
+  "what": "read/list files (and write her own notes), sandboxed to Jena's home folder by the server itself (official MCP filesystem server); move/edit tools blocked",
+  "allow": [
+   "read_text_file",
+   "read_file",
+   "read_multiple_files",
+   "list_directory",
+   "list_directory_with_sizes",
+   "directory_tree",
+   "search_files",
+   "get_file_info",
+   "list_allowed_directories",
+   "write_file",
+   "create_directory"
+  ]
+ },
+ "git": {
+  "command": "~/.local/bin/mcp-server-git",
+  "args": [
+   "--repository",
+   "~/jena-repo"
+  ],
+  "what": "read the history of her own repo (official MCP git server; only its read tools are allowed \u2014 commit/add/reset/checkout are blocked)",
+  "allow": [
+   "git_status",
+   "git_log",
+   "git_show",
+   "git_diff",
+   "git_branch",
+   "git_diff_unstaged",
+   "git_diff_staged"
+  ]
+ }
+}

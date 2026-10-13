@@ -1,0 +1,12 @@
+{
+ "name": "env_probe",
+ "description": "Terminal self-discovery: find out what machine and environment she is running in and its limits.",
+ "triggers": [
+  "\\b(environment|what (machine|computer|system)|your (limits|specs|hardware)|where (are you|do you) run)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [],
+ "example": {}
+}

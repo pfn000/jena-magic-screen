@@ -1,0 +1,13 @@
+{
+ "name": "explore_my_box",
+ "description": "Terminal self-discovery: she explores her own computer in her visible terminal using a fixed list of read-only commands (who she is, OS, CPU/RAM/disk, her files, tools, running programs) and saves what she found to notes/my_box.md.",
+ "triggers": [
+  "\\bexplore (your|my|ur) (own )?(box|computer|pc|system|machine)\\b",
+  "\\b(look around|poke around) (your|my|ur) (computer|box|system)\\b"
+ ],
+ "kind": "desktop",
+ "entry": null,
+ "timeout": 60,
+ "needs": [],
+ "example": {}
+}

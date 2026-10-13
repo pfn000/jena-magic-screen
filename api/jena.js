@@ -13,7 +13,7 @@ import { json, cors, checkKey, body } from './_lib/http.js';
 import { pushItem, listItems, saveFile, memFile, backends } from './_lib/store.js';
 import { thinkEvents, thinkAll, brainName, brainChain, brainHealth, checkHealth } from './_lib/brain.js';
 import { boxLink, accept as acceptBox } from './_lib/boxlink.js';
-import { multiSearch } from './_lib/search.js';
+import { multiSearch, hotUrls } from './_lib/search.js';
 
 function routeOf(req) {
   const u = new URL(req.url);
@@ -68,12 +68,38 @@ async function deploys() {
   }
 }
 
+// Mama-only actions on her box (passcode): run a skill, draft a new skill.
+async function boxDo(req) {
+  const k = checkKey(req);
+  if (!k.ok) return json({ error: k.why }, 401);
+  const box = await boxLink();
+  if (!box) return json({ error: 'her box is offline' }, 503);
+  const b = await body(req);
+  const path = b.action === 'create' ? '/box/skills/create' : '/box/skills/run';
+  try {
+    const r = await fetch(box.url + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b), signal: AbortSignal.timeout(25000) });
+    return json(await r.json(), r.status);
+  } catch (e) { return json({ ok: false, summary: `box did not answer: ${e.message}` }, 502); }
+}
+
+// Public, read-only list of the skills she has (names, what they do, how often they worked). No inputs/outputs.
+async function publicSkills() {
+  const box = await boxLink();
+  if (!box) return json({ online: false, error: 'her box is offline, so her skills list cannot be read right now' }, 503);
+  try {
+    const r = await fetch(box.url + '/box/skills', { signal: AbortSignal.timeout(8000) });
+    const d = await r.json();
+    return json({ online: true, skills: d.skills.map((s) => ({ name: s.name, description: s.description, source: s.source, status: s.status, runs: s.runs, ok: s.ok, fail: s.fail, last_used: s.last_used || null })), mcp: Object.keys(d.mcp || {}) });
+  } catch (e) { return json({ online: false, error: `her box did not answer: ${e.message}` }, 502); }
+}
+
 // Her box's own live facts (models, last raw request/response, desktop, training) through the tunnel.
 async function boxProxy(req) {
   const box = await boxLink();
   if (!box) return json({ online: false, error: 'her box has not announced itself in the last 30 min (box or tunnel down)' }, 503);
   const what = new URL(req.url).searchParams.get('what') || 'status';
-  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json' }[what] || '/status';
+  if (what === 'activity' && !checkKey(req).ok) return json({ online: true, locked: true, error: "her activity log is mama-only: unlock the private DM drawer with your passcode on this device first" }, 401);
+  const path = { status: '/status', log: '/brain/log?n=20', screen: '/box/screen.json', skills: '/box/skills', activity: '/box/activity' }[what] || '/status';
   try {
     const r = await fetch(box.url + path, { signal: AbortSignal.timeout(8000) });
     const d = await r.json();
@@ -197,6 +223,9 @@ async function handle(req) {
     if (route === 'box' && req.method === 'POST') { const p = acceptBox(await body(req)); if (p) checkHealth(); return p ? json({ ok: true, url: p.url }) : json({ error: 'bad signature' }, 401); }
     if (route === 'box') return await boxProxy(req);
     if (route === 'deploys') return await deploys();
+    if (route === 'skills') return await publicSkills();
+    if (route === 'hot') { try { return json({ list: await hotUrls(), source: 'Hot URLS/URLS.md in her repo (read live)' }); } catch (e) { return json({ error: e.message }, 502); } }
+    if (route === 'boxdo' && req.method === 'POST') return await boxDo(req);
     if (route === 'search') { const u = new URL(req.url); return json(await multiSearch(clip(u.searchParams.get('q'), 200), clip(u.searchParams.get('src'), 60))); }
     if (route === 'desktop' && req.method === 'POST') return await announceDesktop(req);
     if (route === 'think' && req.method === 'POST') return await think(req);

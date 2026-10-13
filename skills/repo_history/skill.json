@@ -1,0 +1,14 @@
+{
+ "name": "repo_history",
+ "description": "Read the recent history of her own GitHub repo through the MCP git server (read-only).",
+ "triggers": [
+  "\\b(commit|commits|history|changelog|what changed)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [
+  "mcp:git"
+ ],
+ "example": {}
+}

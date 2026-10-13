@@ -1,0 +1,14 @@
+{
+ "name": "github_repos",
+ "description": "Find GitHub repositories about something (GitHub search API, read-only).",
+ "triggers": [
+  "\\b(github|repo|repos|repository)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [],
+ "example": {
+  "query": "vrm avatar three.js"
+ }
+}

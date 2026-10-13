@@ -1,0 +1,14 @@
+{
+ "name": "web_search",
+ "description": "Search the web from several real sources at once (DuckDuckGo, GitHub, Wikipedia, her hot-URL list) and return the hits.",
+ "triggers": [
+  "\\b(search|look up|lookup|google)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [],
+ "example": {
+  "query": "transformers from scratch"
+ }
+}

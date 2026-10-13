@@ -69,6 +69,38 @@ async function pollHealth() {
 pollHealth();
 setInterval(pollHealth, 15000);
 
+// her desktop's own log (the same lines her desktop agent writes on her box) flows into this chain,
+// so desktop thoughts = site thoughts. Skills show as "using skill: X". Help requests to mama stay in the dev panel.
+let deskSeen = 0;
+async function pollDesk() {
+  if (!cfg.api || document.hidden) return;
+  const d = await fetch('/api/box?what=screen', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+  const acts = d?.data?.actions || [];
+  if (!deskSeen) { deskSeen = acts.length ? acts[acts.length - 1].ts - 1 : 1; acts.splice(0, Math.max(0, acts.length - 2)); }
+  for (const a of acts) {
+    if (a.ts <= deskSeen) continue;
+    deskSeen = a.ts;
+    if (a.kind === 'help') continue;
+    chain.desk(a.kind === 'skill' ? 'tool' : 'see', a.text, a.ts);
+  }
+}
+pollDesk();
+setInterval(pollDesk, 8000);
+
+// public list of her skills, read live from her box when opened (nothing listed that doesn't run there)
+const skillsPub = $('#skills-pub');
+if (skillsPub) {
+  if (cfg.obs) skillsPub.remove();
+  else skillsPub.addEventListener('toggle', async () => {
+    if (!skillsPub.open) return;
+    const body = skillsPub.querySelector('.skills-pub-body');
+    const d = await fetch('/api/skills', { cache: 'no-store' }).then((r) => r.json()).catch((e) => ({ error: e.message }));
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    if (!d.online) { body.textContent = d.error || 'her box is not answering, so her skills cannot be listed right now'; return; }
+    body.innerHTML = `<ul>${d.skills.map((s) => `<li><b>${esc(s.name)}</b>${s.status !== 'enabled' ? ` <i>(${esc(s.status)})</i>` : ''} — ${esc(s.description)} <small>${s.runs ? `used ${s.runs}× · ${s.ok} worked` : 'not used yet'}${s.source === 'self-made' ? ' · she made this one' : ''}</small></li>`).join('')}</ul><small>MCP servers on her box: ${esc(d.mcp.join(', ') || 'none')}</small>`;
+  });
+}
+
 // ---------------- her own body: autonomy + self-vision ----------------
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
 // moves she learned by watching videos of real people move (pose-tracked into her own clips, /moves/)

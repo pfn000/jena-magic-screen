@@ -14,7 +14,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['live', 'brain', 'sees', 'learned', 'memory', 'training', 'health'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ live: 'Live updates', brain: 'Brain', sees: 'What she sees', learned: 'What she learned', memory: 'Memories & chats', training: 'Training', health: 'Server health' }[t]}</button>`).join('')}</nav>
+      <nav>${['live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -27,6 +27,22 @@ export class DevPanel {
     const tick = (t) => { n++; if (t - t0 >= 1000) { this.fps = Math.round((n * 1000) / (t - t0)); n = 0; t0 = t; } requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
     this.armCorner();
+    this.body.addEventListener('click', async (e) => {
+      const key = localStorage.getItem('jena.dmKey');
+      const out = this.body.querySelector('#dp-skill-out');
+      const post = async (b) => { const r = await fetch('/api/boxdo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jena-Key': key || '' }, body: JSON.stringify(b) }); return r.json(); };
+      if (e.target.dataset.run) {
+        if (!key) { out.textContent = 'unlock the private DM drawer with your passcode first'; return; }
+        const v = this.body.querySelector('#dp-skill-in').value;
+        out.textContent = `running ${e.target.dataset.run}…`;
+        out.textContent = JSON.stringify(await post({ action: 'run', name: e.target.dataset.run, input: { text: v, query: v, question: v, url: v } }), null, 1).slice(0, 4000);
+      }
+      if (e.target.dataset.create) {
+        if (!key) { out.textContent = 'unlock the private DM drawer with your passcode first'; return; }
+        out.textContent = 'she is drafting it…';
+        out.textContent = JSON.stringify(await post({ action: 'create', name: this.body.querySelector('#dp-new-name').value, goal: this.body.querySelector('#dp-new-goal').value }), null, 1).slice(0, 4000);
+      }
+    });
   }
   armCorner() {
     let taps = [];
@@ -44,11 +60,13 @@ export class DevPanel {
   open() { this.el.hidden = false; this.refresh(); this.timer = setInterval(() => this.refresh(), 4000); }
   close() { this.el.hidden = true; clearInterval(this.timer); }
   async refresh() {
-    const get = (u) => fetch(u, { cache: 'no-store' }).then((r) => r.json()).catch((e) => ({ error: e.message }));
+    const get = (u, h) => fetch(u, { cache: 'no-store', headers: h || {} }).then((r) => r.json()).catch((e) => ({ error: e.message }));
     const want = [get('/api/health'), get('/api/box?what=status')];
-    if (!this.data.deploysAt || Date.now() - this.data.deploysAt > 15000) want.push(get('/api/deploys'));
-    if (!this.data.moves) want.push(get('/moves/index.json'));
-    const [health, box, deploys, moves] = await Promise.all(want);
+    if (!this.data.deploysAt || Date.now() - this.data.deploysAt > 15000) want.push(get('/api/deploys')); else want.push(null);
+    if (!this.data.moves) want.push(get('/moves/index.json')); else want.push(null);
+    want.push(this.tab === 'skills' ? get('/api/box?what=skills') : null, this.tab === 'mama' ? get('/api/box?what=activity', { 'X-Jena-Key': localStorage.getItem('jena.dmKey') || '' }) : null, this.tab === 'learned' && !this.data.hot ? get('/api/hot') : null);
+    const [health, box, deploys, moves, sk, act, hot] = await Promise.all(want);
+    if (sk) this.data.skills = sk; if (act) this.data.activity = act; if (hot) this.data.hot = hot;
     Object.assign(this.data, { health, box });
     if (deploys) { this.data.deploys = deploys; this.data.deploysAt = Date.now(); }
     if (moves && !moves.error) this.data.moves = moves;
@@ -90,7 +108,30 @@ export class DevPanel {
           <h3>What her hands did</h3><ol>${(ds.actions || []).slice().reverse().map((a) => `<li><small>${ago(a.ts)}</small> ${esc(a.kind)}: ${esc(a.text)}</li>`).join('')}</ol>`;
       } else h += notOn;
     }
+    if (this.tab === 'skills') {
+      const s = this.data.skills?.data;
+      if (!s) h += notOn;
+      else {
+        h += `<h3>Skills she can use (${s.skills.length}) · from her repo (skills/) + ones she drafted herself</h3><table class="dp-t"><tr><th>skill</th><th>what it does</th><th>status</th><th>runs ok/fail</th><th>last used</th><th>last result</th><th></th></tr>${s.skills.map((k) => `<tr><td><b>${esc(k.name)}</b><br><small>${esc(k.source)} · ${esc(k.kind)}${k.needs?.length ? ' · ' + esc(k.needs.join(', ')) : ''}</small></td><td>${esc(k.description)}</td><td>${esc(k.status)}</td><td>${k.runs} · ${k.ok}/${k.fail}</td><td>${ago(k.last_used)}</td><td><small>${esc(k.last_summary || '')}</small></td><td><button data-run="${esc(k.name)}">run</button></td></tr>`).join('')}</table>
+          <p><input id="dp-skill-in" placeholder="input for run (text / question / url)" size="50"> <small>runs need mama's passcode (the DM one)</small></p><pre id="dp-skill-out"></pre>
+          <h3>Teach her a new skill (she drafts it with her own brain; enabled only if it passes validation on her box)</h3><p><input id="dp-new-name" placeholder="name e.g. coin_flip" size="18"> <input id="dp-new-goal" placeholder="what should it do?" size="50"> <button data-create="1">draft it</button></p>
+          <h3>MCP servers on her box ${s.mcp_checked_at ? '(checked ' + ago(s.mcp_checked_at) + ')' : '(not checked yet)'}</h3><ul>${Object.entries(s.mcp || {}).map(([n, m]) => `<li>${okDot(m.connected)}<b>${esc(n)}</b> — ${esc(m.what || '')}${m.tools ? `<br><small>tools: ${m.tools.map((t) => esc(t.name)).join(', ')}</small>` : `<br><small>${esc(m.error || '')}</small>`}</li>`).join('') || '<li>no MCP check yet</li>'}</ul>`;
+      }
+    }
+    if (this.tab === 'mama') {
+      const a = this.data.activity?.data;
+      if (this.data.activity?.locked) h += `<p class="dp-warn">${esc(this.data.activity.error)}</p>`;
+      else if (!a) h += notOn;
+      else {
+        const flagged = a.activity.filter((x) => x.flag);
+        h += `<h3>Jena asked for help (${a.help.length})</h3><ol>${a.help.slice().reverse().map((x) => `<li><small>${ago(x.ts)}</small> ${esc(x.text)}</li>`).join('') || '<li>nothing yet</li>'}</ol>
+          <h3>Flagged (${flagged.length})</h3><ol>${flagged.slice().reverse().map((x) => `<li class="dp-warn"><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)} · ${esc(x.flag)}</small></li>`).join('') || '<li>nothing flagged</li>'}</ol>
+          <h3>Everything she searched / opened (newest first)</h3><ol>${a.activity.slice().reverse().slice(0, 120).map((x) => `<li${x.flag ? ' class="dp-warn"' : ''}><small>${ago(x.ts)}</small> ${esc(x.kind)}: ${esc(x.what)} <small>${esc(x.why)}</small></li>`).join('') || '<li>nothing yet</li>'}</ol>`;
+      }
+    }
     if (this.tab === 'learned') {
+      const hot = this.data.hot?.list || [];
+      h += `<h3>Her hot-URL list (${hot.length}) · ${esc(this.data.hot?.source || '')}</h3><ul>${hot.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.url)}</a> <small>${esc(x.note)}</small></li>`).join('')}</ul>`;
       const clips = d.moves?.clips || [];
       h += `<h3>Moves library: ${clips.length} clips she built from real videos</h3><p>${esc(d.moves?.note || '')}</p><div class="dp-moves">${clips.map((c) => { const v = (c.source?.url || '').match(/[?&]v=([\w-]{11})/)?.[1]; return `<a class="dp-move" href="${esc(c.source?.url || '#')}" target="_blank" rel="noopener">${v ? `<img src="https://i.ytimg.com/vi/${v}/mqdefault.jpg" alt="">` : ''}<b>${esc(c.label)}</b><small>${esc(c.what)} · ${c.duration}s · ${esc(c.kind)}</small><small>${esc(c.source?.title || '')} · ${esc(c.source?.channel || '')}</small></a>`; }).join('')}</div>`;
     }
@@ -123,9 +164,12 @@ export class DevPanel {
       } else h += notOn;
     }
     h += `<p class="dp-foot">refreshed ${ago(this.data.at)} · auto-refresh every 4 s</p>`;
+    if (this.body.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; // don't wipe what mama is typing
+    const outKeep = this.body.querySelector('#dp-skill-out')?.textContent;
     const keepOpen = [...this.body.querySelectorAll('details[open]')].length;
     this.body.innerHTML = h;
     if (keepOpen) this.body.querySelectorAll('details').forEach((x) => (x.open = true));
+    if (outKeep && this.body.querySelector('#dp-skill-out')) this.body.querySelector('#dp-skill-out').textContent = outKeep;
   }
 }
 

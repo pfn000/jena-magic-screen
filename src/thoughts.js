@@ -3,7 +3,7 @@
 // and what her brain (JenaXI) actually answers. Nothing is invented.
 const ICON = { notice: '📥', think: '🧠', tool: '🔧', feel: '💢', plan: '🗺️', say: '💬', status: '⚠️', body: '🤸', see: '👁️', sense: '🫧', private: '🔒' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const EMPTY = '<p class="empty">Nothing yet. Real events show up here as they happen: what you say to Jena, chat that mentions her, file drops, her own moves, what she sees of herself, and what her brain answers.</p>';
+const EMPTY = '<p class="empty">Nothing yet. Real events show up here as they happen: what you say to Jena, chat that mentions her, file drops, her own moves, what she sees of herself, what she does on her desktop (skills too), and what her brain answers.</p>';
 
 export class ThoughtChain {
   constructor(root, { obs = false } = {}) {
@@ -63,6 +63,21 @@ export class ThoughtChain {
       this.mount(card);
     }
     this.addStep(this.selfCard.querySelector('.steps'), kind, text);
+  }
+
+  // what her desktop agent actually did on her box (polled from /api/box?what=screen), one card per stretch
+  desk(kind, text, ts) {
+    const now = Date.now();
+    if (!this.deskCard || !this.deskCard.isConnected || this.deskCard.querySelectorAll('.step').length >= 6 || now - (this.deskAt || 0) > 180000) {
+      this.list.querySelector('.empty')?.remove();
+      const card = document.createElement('article');
+      card.className = 'run desk is-done';
+      card.innerHTML = `<header><span class="who">Jena</span><span class="src">her desktop</span><span class="time">${new Date(ts || now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></header><ol class="steps"></ol>`;
+      this.deskCard = card;
+      this.mount(card);
+    }
+    this.deskAt = now;
+    this.addStep(this.deskCard.querySelector('.steps'), kind, text);
   }
 
   mount(card) {

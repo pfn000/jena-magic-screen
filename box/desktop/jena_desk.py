@@ -17,6 +17,7 @@ Nothing here logs in anywhere or touches anyone's accounts.
 """
 import asyncio, json, os, random, re, subprocess, threading, time, hashlib, urllib.request, urllib.parse
 from collections import deque
+import jena_skills as skills
 
 DISPLAY = os.environ.get('DISP', ':99')
 PORT = int(os.environ.get('JENA_BOX_PORT', '6081'))
@@ -315,6 +316,7 @@ def act_hot():
     if not lst: return act_read()
     u, note = random.choice(lst)
     did(f'opened {u} from my hot list' + (f' ({note})' if note else ''))
+    log_activity('open', u, 'hot list')
     firefox(u); time.sleep(4); scroll_some()
 
 def act_search(text):
@@ -332,11 +334,127 @@ def act_search(text):
             title, url = hit
             src = {github_for: 'GitHub', ddg_for: 'DuckDuckGo', wiki_for: 'Wikipedia'}[f]
             did(f'opened "{title[:60]}" from {src}')
+            log_activity('search', url, f'{src} for "{q[:60]}"')
             firefox(url); time.sleep(3); scroll_some(); return True
     if hot:
         did(f'opened {hot[0][0]} from my hot list'); firefox(hot[0][0]); return True
     did('my searches came back empty, so I kept the results page open')
     return True
+
+# ---------------------------------------------------------------- activity log (for mama, dev panel only)
+FLAG = re.compile(r"\b(dating|hook ?up|casino|gambl\w*|bet(ting)?|alcohol|beer|vodka|vape|vaping|cigarette\w*|weapon\w*|gun\w*|knife|drugs?|weed|porn\w*|nsfw|onlyfans|nude\w*|sex\w*|self.?harm|suicide|kill\w*|hack(ing)? (into|someone)|password\w*|credit card|buy now|checkout)\b", re.I)
+ACT = os.path.join(STATE, 'activity.jsonl')
+def log_activity(kind, what, why=''):
+    rec = {'ts': int(time.time() * 1000), 'kind': kind, 'what': str(what)[:300], 'why': str(why)[:200]}
+    m = FLAG.search(f'{what} {why}')
+    if m: rec['flag'] = f'matched "{m.group(0)}"'
+    try:
+        with open(ACT, 'a') as f: f.write(json.dumps(rec) + '\n')
+    except Exception: pass
+
+HELP = os.path.join(STATE, 'help.jsonl')
+def ask_mama(text):
+    """she asks mama for help (shows in the dev panel, never on stream)"""
+    try:
+        with open(HELP, 'a') as f: f.write(json.dumps({'ts': int(time.time() * 1000), 'text': text[:400]}) + '\n')
+    except Exception: pass
+    did(f'asked mama for help: {text[:80]}', 'help')
+
+def clipboard_text():
+    return sh(['xclip', '-o', '-selection', 'clipboard'], timeout=4)
+
+def skill_ask_grok(inp):
+    """ask Grok on grok.com in her own Firefox, signed out like any visitor; label the answer as Grok's"""
+    q = (inp.get('question') or inp.get('text') or '').strip()
+    q = re.sub(r'^(jena[, ]+)?(please )?(can you )?(ask grok( to| about)?)\s*', '', q, flags=re.I).strip(' ?') or q
+    if not q: return {'ok': False, 'summary': 'no question for Grok'}
+    url = next((u for u, _ in hot_urls() if 'grok.com' in u.lower()), None)
+    if not url: return {'ok': False, 'summary': 'grok.com is not in my hot-URL list, so I did not go there'}
+    did(f'asking Grok (from my hot list, {url}): "{q[:80]}"', 'skill')
+    log_activity('ask_grok', url, q)
+    firefox(url); time.sleep(8)
+    wid = find('firefox')
+    if not wid: return {'ok': False, 'summary': 'my browser did not open'}
+    g = dict(l.split('=', 1) for l in sh(['xdotool', 'getwindowgeometry', '--shell', str(int(wid, 16))]).splitlines() if '=' in l)
+    X, Y, W, H = (int(g.get(k, 0)) for k in ('X', 'Y', 'WIDTH', 'HEIGHT'))
+    focus(wid)
+    sh(['xdotool', 'mousemove', str(X + W // 2), str(Y + int(H * 0.42)), 'click', '1']); time.sleep(0.6)
+    sh(['xdotool', 'type', '--delay', '35', q[:300]]); time.sleep(0.4); key('Return')
+    before = ''
+    text = ''
+    for _ in range(9):
+        time.sleep(5)
+        focus(wid); key('ctrl+a'); time.sleep(0.3); key('ctrl+c'); time.sleep(0.4)
+        text = clipboard_text()
+        sh(['xdotool', 'mousemove', str(X + W - 30), str(Y + H // 2), 'click', '1'])
+        if text and text == before and q[:30] in text: break
+        before = text
+    ans = ''
+    if q[:30] in text:
+        ans = text.split(q[:30], 1)[1]
+        ans = ans.split(q[30:], 1)[-1] if len(q) > 30 else ans
+        ans = re.split(r'\n\s*(Ask anything|How can Grok help|Grok can make mistakes|DeepSearch|Think\b|Auto\b|By messaging Grok)', ans)[0]
+        ans = re.sub(r'\n{2,}', '\n', ans).strip()
+    wall = re.search(r'sign up to continue|continue your conversation|sign in to continue|log in to continue|create an account', ans or text or '', re.I)
+    if wall: ans = ''
+    if not ans:
+        signed = wall or re.search(r'\b(sign in|log in|sign up)\b', text or '', re.I)
+        why = 'grok.com showed a "sign up to continue" wall, and I do not sign in or make accounts by myself' if signed else 'I could not read an answer off the page'
+        ask_mama(f'I tried asking Grok "{q[:80]}" but {why}.')
+        return {'ok': False, 'summary': why}
+    os.makedirs(os.path.join(HOME, 'learned'), exist_ok=True)
+    rec = {'ts': int(time.time() * 1000), 'question': q, 'answer': ans[:4000], 'source': 'Grok (grok.com, signed out, in her browser)', 'note': 'Grok\'s answer, not Jena\'s own brain'}
+    with open(os.path.join(HOME, 'learned', 'grok_notes.jsonl'), 'a') as f: f.write(json.dumps(rec) + '\n')
+    with open(os.path.join(HOME, 'notes', 'learned_from_grok.md'), 'a') as f: f.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} I asked Grok: {q}\nGrok said: {ans[:1500]}\n")
+    did(f'Grok answered (Grok\'s words, saved to my memory): "{re.sub(chr(10), " ", ans)[:160]}"', 'skill')
+    return {'ok': True, 'summary': f'asked Grok "{q[:60]}" and saved its answer', 'question': q, 'answer': ans[:4000], 'answered_by': 'Grok'}
+skills.desktop_skills['ask_grok'] = skill_ask_grok
+
+# terminal self-discovery: she explores her own box in her visible terminal, only from a fixed list of
+# read-only commands (no sudo, no rm, nothing typed from chat), and writes what she found to her notes.
+EXPLORE = [
+    ('whoami && id', 'who I am on this computer'), ('uname -srm', 'my kernel'), ('head -2 /etc/os-release', 'my operating system'),
+    ('nproc && free -h', 'my CPU cores and memory'), ('df -h ~ | tail -1', 'how much disk I have'), ('ls ~', 'my home folder'),
+    ('ls ~/projects ~/notes', 'my projects and notes'), ('python3 --version && node -v', 'which languages I have'),
+    ('ls ~/jena-repo/skills', 'my skills folder'), ('cat /proc/loadavg', 'how busy my CPU is'), ('uptime -p', 'how long I have been awake'),
+    ('ps -u jena -o comm= | sort | uniq -c | sort -rn | head -6', 'what programs I am running'), ('ls ~/Videos | head -5', 'my saved videos'),
+    ('which git ffmpeg firefox-esr xterm', 'which tools I have'), ('ls ~/.local/bin | head -8', 'my own installed commands'),
+    ('git -C ~/jena-repo log --oneline -3', 'the newest changes to my own code'), ('du -sh ~ 2>/dev/null', 'how much space I take up'),
+]
+def skill_explore(inp):
+    picks = random.sample(EXPLORE, 5)
+    if not terminal(): return {'ok': False, 'summary': 'my terminal did not open'}
+    did('exploring my own computer in my terminal (read-only commands)', 'skill')
+    found = []
+    for cmd, what in picks:
+        type_(f'clear; {cmd}\n', 30); time.sleep(3.5)
+        out = sh(['bash', '-c', cmd], timeout=8).strip()
+        found.append((cmd, what, out[:600]))
+    lines = [f"- {what} (`{cmd}`): {out.splitlines()[0][:140] if out else '(nothing)'}" for cmd, what, out in found]
+    try:
+        with open(os.path.join(HOME, 'notes', 'my_box.md'), 'a') as f:
+            f.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} I explored my computer\n" + '\n'.join(lines) + '\n')
+    except Exception: pass
+    first = found[0]
+    did(f'found out {first[1]}: {(first[2].splitlines() or ["(nothing)"])[0][:100]} (saved to notes/my_box.md)', 'skill')
+    type_('clear\n', 30)
+    return {'ok': True, 'summary': f'explored my box with {len(found)} read-only commands, notes saved', 'found': [{'cmd': c, 'what': w, 'out': o} for c, w, o in found]}
+skills.desktop_skills['explore_my_box'] = skill_explore
+def act_explore():
+    use_skill('explore_my_box', 'explore my own computer')
+
+def use_skill(name, text):
+    did(f'using skill: {name}', 'skill')
+    res = skills.run(name, {'text': text, 'query': text, 'question': text})
+    if name != 'ask_grok':
+        did(f'{name}: {res.get("summary", "")[:180]}{"" if res.get("ok") else " (failed)"}', 'skill')
+    # show it on her screen too
+    url = (res.get('hits') or res.get('repos') or [{}])[0].get('url') if res.get('ok') else None
+    if name == 'fetch_page' and res.get('url'): url = res['url']
+    if url and safe(url):
+        log_activity('open', url, f'{name}: {text}')
+        firefox(url); time.sleep(3); scroll_some()
+    return res
 
 def unstick():
     """close dialogs that would freeze her apps (e.g. mousepad's 'Externally Modified')"""
@@ -432,7 +550,7 @@ def act_tidy():
     elif 'xterm' in w['cls']:
         focus(w['id']); type_('exit\n'); did('closed my terminal')
 
-ROTATION = [act_htop, act_fetch, act_python, act_read, act_hot, act_watch, act_watch, act_note, act_tidy]
+ROTATION = [act_htop, act_fetch, act_python, act_read, act_hot, act_watch, act_watch, act_note, act_tidy, act_explore]
 
 def hands():
     time.sleep(3)
@@ -443,11 +561,17 @@ def hands():
             with lock:
                 if events_in: ev = events_in.popleft()
             unstick()
-            if ev:
+            if ev and ev.get('skill'):
+                use_skill(ev['skill'], ev.get('text', ''))
+            elif ev:
                 text = ev.get('text', '')
                 u = url_in(text)
-                if u:
+                sk = skills.match(text)
+                if sk and not (u and sk not in ('fetch_page', 'ask_grok')):
+                    use_skill(sk, text)
+                elif u:
                     did(f'{ev.get("user") or "someone"} sent me a link, opening exactly {u[:90]}')
+                    log_activity('open', u, f'{ev.get("user") or "someone"} sent the link')
                     firefox(u); time.sleep(4); scroll_some()
                 elif re.search(r'\b(video|watch|dance|dancing|move|moves)\b', text, re.I) and my_videos():
                     dances = [v for v in my_videos() if re.search(r'dance|macarena|zumba|jerusalema', (v[1] + ' ' + v[2]), re.I)]
@@ -635,6 +759,35 @@ async def client(reader, writer):
         try: ok = take_event(json.loads(body or b'{}'))
         except Exception: ok = False
         out = json.dumps({'ok': ok}).encode()
+    elif p == '/box/skills' and method == 'GET':
+        out = json.dumps(skills.listing()).encode()
+    elif p == '/box/skills/run' and method == 'POST':
+        try:
+            b = json.loads(body or b'{}'); name = str(b.get('name', ''))
+            spec = skills.load().get(name, {})
+            if spec.get('kind') == 'desktop':
+                with lock: events_in.append({'text': str(b.get('input', {}).get('question') or b.get('input', {}).get('text') or ''), 'user': 'mama', 'ts': time.time(), 'skill': name})
+                out = json.dumps({'ok': True, 'queued': True, 'summary': f'{name} queued on her desktop'}).encode()
+            else:
+                res = await asyncio.get_running_loop().run_in_executor(None, skills.run, name, b.get('input') or {})
+                did(f'using skill: {name} → {res.get("summary", "")[:140]}', 'skill')
+                out = json.dumps(res).encode()
+        except Exception as e:
+            out = json.dumps({'ok': False, 'summary': str(e)[:200]}).encode()
+    elif p == '/box/skills/create' and method == 'POST':
+        try:
+            b = json.loads(body or b'{}')
+            res = await asyncio.get_running_loop().run_in_executor(None, skills.create, str(b.get('name', '')), str(b.get('goal', ''))[:500])
+            did(f'drafted a new skill "{res["name"]}": {res["status"]}', 'skill')
+            out = json.dumps(res).encode()
+        except Exception as e:
+            out = json.dumps({'ok': False, 'summary': str(e)[:200]}).encode()
+    elif p == '/box/activity':
+        try: lines = open(ACT).read().strip().splitlines()[-200:]
+        except Exception: lines = []
+        try: helps = open(HELP).read().strip().splitlines()[-20:]
+        except Exception: helps = []
+        out = json.dumps({'activity': [json.loads(l) for l in lines if l.strip()], 'help': [json.loads(l) for l in helps if l.strip()]}).encode()
     elif p in ('/', '/health', '/box/health'):
         out = json.dumps({'ok': True, 'who': "Jena's desktop"}).encode()
     else:
@@ -652,6 +805,6 @@ async def door():
         await srv.serve_forever()
 
 if __name__ == '__main__':
-    for f in (eyes, ears, fetch_videos) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
+    for f in (eyes, ears, fetch_videos, skills.sync_loop) + (() if os.environ.get('JENA_HANDS') == '0' else (hands,)):
         threading.Thread(target=f, daemon=True).start()
     asyncio.run(door())

@@ -1,0 +1,16 @@
+{
+ "name": "fetch_page",
+ "description": "Read a web page as clean text through the MCP fetch server.",
+ "triggers": [
+  "\\b(read|fetch|summari[sz]e)\\b.*(https?://|\\.\\w{2,4}/)"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [
+  "mcp:fetch"
+ ],
+ "example": {
+  "url": "https://example.com"
+ }
+}

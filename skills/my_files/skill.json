@@ -1,0 +1,16 @@
+{
+ "name": "my_files",
+ "description": "List or read files in her own home folder through the MCP filesystem server (sandboxed to her home).",
+ "triggers": [
+  "\\b(my|your) (files|folder|notes|projects)\\b"
+ ],
+ "kind": "script",
+ "entry": "run.py",
+ "timeout": 60,
+ "needs": [
+  "mcp:filesystem"
+ ],
+ "example": {
+  "path": "~/notes"
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "name": "ask_grok",
+ "description": "When she is not ready to answer or code something herself, she asks Grok on grok.com in her own desktop browser (signed out, like a person). The answer is labelled as Grok's, never her own, and saved to her memory.",
+ "triggers": [
+  "\\b(ask grok|grok)\\b",
+  "\\bhow (do|would) (i|you) (code|program|write)\\b"
+ ],
+ "kind": "desktop",
+ "entry": null,
+ "timeout": 90,
+ "needs": [],
+ "example": {
+  "question": "In one short paragraph, what is a transformer in AI?"
+ }
+}

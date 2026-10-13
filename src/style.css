@@ -287,3 +287,13 @@ body.obs #self-toggle { display: none; }
 #body-views button { font: 800 8.5px system-ui, sans-serif; padding: 1px 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,.9); background: var(--glass-strong); color: var(--ink-soft); cursor: pointer; }
 #body-views button.on { background: #7a4fd6; color: #fff; }
 body.obs #body-views { display: none; }
+
+#devpanel .dp-t{border-collapse:collapse;width:100%;font-size:12px}
+#devpanel .dp-t td,#devpanel .dp-t th{border-bottom:1px solid #2b2448;padding:4px 6px;vertical-align:top;text-align:left}
+#devpanel input{background:#0a0912;color:#e9e6f5;border:1px solid #4d4185;border-radius:6px;padding:4px 6px;font:inherit}
+
+#skills-pub{margin:6px 8px 4px;font-size:12px;color:#cfc6ea}
+#skills-pub summary{cursor:pointer;opacity:.8}
+#skills-pub ul{margin:4px 0;padding-left:16px;max-height:160px;overflow:auto}
+#skills-pub li{margin:2px 0}
+.run.desk header .src{color:#8fd3ff}
