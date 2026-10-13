@@ -5,6 +5,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/tab-live",
+      "destination": "/tab-live.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/jena?route=:path*"
     }

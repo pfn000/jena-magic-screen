@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="theme-color" content="#07090c"><title>TAB LIVE</title>
+<style>
+:root{--bg:#07090c;--pane:#0d1117;--line:#1d2633;--fg:#d6e2ee;--dim:#7d8b9b;--g:#3ddc84;--y:#f5c542;--r:#ff5f56;--b:#58a6ff;--m:#c58cff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{padding:10px max(10px,env(safe-area-inset-left)) 40px}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--pane);border:1px solid var(--line);border-radius:10px;position:sticky;top:6px;z-index:5}
+.bar b{letter-spacing:.12em;color:var(--g)}.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
+.dot.g{background:var(--g);box-shadow:0 0 8px var(--g)}.dot.y{background:var(--y)}.dot.r{background:var(--r);box-shadow:0 0 8px var(--r)}
+.sub{color:var(--dim);font-size:12px}.pill{border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:12px;white-space:nowrap}
+.pill.g{color:var(--g);border-color:#1f5f3a}.pill.y{color:var(--y);border-color:#5f4f1f}.pill.r{color:var(--r);border-color:#6a2420}.pill.b{color:var(--b);border-color:#1f3f6a}.pill.m{color:var(--m);border-color:#4a2f6a}
+h2{font-size:12px;letter-spacing:.14em;color:var(--dim);margin:16px 2px 6px;font-weight:600;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px}
+.card{background:var(--pane);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
+.card.run{border-color:#1f5f3a}.card.stall{border-color:#6a2420}.card.old{opacity:.62}
+.t{font-weight:700;word-break:break-word}.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.prog{height:12px;background:#0a0e13;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,#1f8f55,var(--g));transition:width .6s ease}
+.steps{margin:6px 0 0;padding:0;list-style:none;font-size:12px;color:var(--dim);max-height:9.5em;overflow:auto}
+.steps li.d{color:#8fd9ae}.steps li.c{color:var(--fg)}.cur{margin-top:6px;color:var(--fg)}.cur:before{content:"› ";color:var(--g)}
+.sha{color:var(--b)}.mono{font-variant-numeric:tabular-nums}
+.ncom{background:#120d1c;border:1px solid #4a2f6a;border-radius:10px;padding:8px 10px}.ncom div{margin:3px 0;word-break:break-word}
+.strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.strip .card{flex:0 0 260px}
+.svc{display:flex;flex-wrap:wrap;gap:6px 12px}.svc span{display:inline-flex;gap:5px;align-items:center;font-size:12px}
+.feed{max-height:240px;overflow:auto;font-size:12px}.feed div{border-bottom:1px dashed #18202b;padding:3px 0;word-break:break-word}
+.lock{max-width:360px;margin:18vh auto;text-align:center}.lock input{width:100%;padding:12px;font:16px ui-monospace,monospace;background:var(--pane);color:var(--fg);border:1px solid var(--line);border-radius:10px;margin:10px 0}
+.lock button,.btn{padding:10px 16px;background:#123524;color:var(--g);border:1px solid #1f5f3a;border-radius:10px;font:inherit;cursor:pointer}
+svg{display:block;width:100%;height:60px}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.two{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+</style></head><body>
+<div id="app"></div>
+<script src="/tablive.js"></script>
+</body></html>

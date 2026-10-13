@@ -26,7 +26,7 @@ export class DevPanel {
     this.getRuns = getRuns; this.avatar = avatar; this.cfg = cfg;
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
-    this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><button class="dp-close" aria-label="close">✕</button></header>
+    this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><a href="/tab-live" target="_blank" rel="noopener" style="margin-left:auto;margin-right:8px;font-size:12px;color:#3ddc84;text-decoration:none;border:1px solid #1f5f3a;border-radius:999px;padding:1px 8px">🖥 Tab Live</a><button class="dp-close" aria-label="close">✕</button></header>
       <nav>${['asks', 'live', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
