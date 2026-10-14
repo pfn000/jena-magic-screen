@@ -273,7 +273,10 @@ export class Avatar {
         const off = { rest: [0, 0], wide: [0.035, 0], narrow: [-0.025, 0], fwd: [0, 0.04], back: [0, -0.035], toe_out: [0.015, 0.015] }[style];
         const sx = side === 'left' ? 1 : -1;
         const rest = this.feetRest[side];
-        const to = new THREE.Vector3(hp.x + rest.x + off[0] * sx, 0, hp.z + rest.z + off[1]);
+        // her stance turns with her body: the rest offset is rotated by how far her hips have turned from her feet
+        const yd = ((rel - this._turnRef) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+        const o = new THREE.Vector3(rest.x + off[0] * sx, 0, rest.z + off[1]).applyAxisAngle(_v[6].set(0, 1, 0), turn > 0.2 ? yd : 0);
+        const to = new THREE.Vector3(hp.x + o.x, 0, hp.z + o.z);
         // keep the other foot as the pivot: never step closer than 12 cm or farther than 45 cm from it
         const other = this.feet[side === 'left' ? 'right' : 'left'], dx = to.x - other.x, dz = to.z - other.z, dd = Math.hypot(dx, dz);
         if (dd < 0.12 || dd > 0.45) { const k = THREE.MathUtils.clamp(dd, 0.12, 0.45) / (dd || 1); to.x = other.x + dx * k; to.z = other.z + dz * k; }
