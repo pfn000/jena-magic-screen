@@ -34,7 +34,7 @@ export class Voice {
     const buf = await this.ctx.decodeAudioData(await r.arrayBuffer());
     this.last = { text: text.slice(0, 80), fetchMs: Math.round(performance.now() - t0), seconds: +buf.duration.toFixed(2), voice: r.headers.get('x-jena-voice') };
     const src = this.ctx.createBufferSource(); src.buffer = buf;
-    const an = this.ctx.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.5;
+    const an = this.ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.5;   // 1024: ~21 ms window, long enough for her pitch (120-700 Hz)
     src.connect(an); an.connect(this.ctx.destination);
     const td = new Float32Array(an.fftSize), fd = new Uint8Array(an.frequencyBinCount);
     const binHz = this.ctx.sampleRate / an.fftSize;
@@ -59,7 +59,16 @@ export class Voice {
       const level = Math.min(1, rms * 5.5), prev = this.avatar.voice?.level || 0;
       // an energy onset (a stressed syllable) is a beat her head and hands can hit (src/motion.js)
       if (level > prev * 1.6 + 0.12 && level > 0.3) this.avatar.voiceBeat = { at: performance.now(), level };
-      this.avatar.voice = { level, round: lo / (lo + hi + 1), mix: sc };
+      // pitch (autocorrelation, 120-700 Hz) -> brows + chin follow her intonation (src/expressions.js prosody)
+      let pitch = 0, conf = 0;
+      if (rms > 0.02) {
+        const sr = this.ctx.sampleRate, lo2 = Math.floor(sr / 700), hi2 = Math.min(td.length >> 1, Math.ceil(sr / 120));
+        let e0 = 0; for (let i = 0; i < td.length - hi2; i++) e0 += td[i] * td[i];
+        let best = 0, bl = 0;
+        for (let lag = lo2; lag <= hi2; lag++) { let c = 0; for (let i = 0; i < td.length - hi2; i++) c += td[i] * td[i + lag]; if (c > best) { best = c; bl = lag; } }
+        if (bl && e0 > 0) { conf = best / e0; if (conf > 0.45) pitch = sr / bl; }
+      }
+      this.avatar.voice = { level, round: lo / (lo + hi + 1), mix: sc, pitch: Math.round(pitch), pitchConf: +conf.toFixed(2) };
       trace.push(this.avatar.voice.level);
       requestAnimationFrame(tick);
     };

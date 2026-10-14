@@ -63,7 +63,7 @@ function buildRoom(scene) {
   });
   planks.wrapS = planks.wrapT = THREE.RepeatWrapping; planks.repeat.set(W / 1.6, D / 1.6);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), lam(0xffffff, { map: planks }));
-  floor.rotation.x = -Math.PI / 2; floor.position.set(cx, 0, cz); floor.renderOrder = -2; g.add(floor);
+  floor.rotation.x = -Math.PI / 2; floor.position.set(cx, 0, cz); floor.renderOrder = -2; floor.name = 'floor'; g.add(floor);
   // walls + ceiling (inside faces only)
   const wallM = lam(0x4a2c78), sideM = lam(0x3f2569), ceilM = lam(0x2b1a47);
   const plane = (w, h, m, x, y, z, ry) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); p.position.set(x, y, z); p.rotation.y = ry; g.add(p); return p; };
@@ -485,6 +485,8 @@ export async function startWorld() {
   try { await avatar.load(cfg.vrmUrl); }
   catch (e) { console.warn('vrm', e); await avatar.load(cfg.vrmFallbackUrl); }
   try { avatar.springSetup = setupSprings(avatar.vrm); } catch (e) { console.warn('springs', e); }
+  // grounding: her feet raycast down onto the room's floor (src/avatar.js updateFeet), so they never float or sink
+  { const fl = room.getObjectByName('floor'); if (fl) avatar.groundObjects = [fl]; }
   motion = new Motion(avatar, {});
   bones = wearGear(avatar, gear);
   avatar.gazeAt('camera', 4000);

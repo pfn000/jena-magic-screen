@@ -31,7 +31,7 @@ export class BodyViews {
     if (this.view === 'front' || this.reading || !shown(this.canvas) || !this.avatar.vrm) return;
     // async GPU read: smooth ~24 Hz without stalling the stage; old browsers: blocking read, 6 Hz like before
     const async = canReadAsync(this.avatar.renderer);
-    if (now - this.last < (async ? this.every : 166)) return;
+    if (now - this.last < (async ? Math.max(1000 / (this.avatar.panelHz?.() || 24), 16) : 166)) return;   // up to 60 Hz when the device keeps up
     this.last = now;
     const a = this.avatar, H = a.vrm.humanoid, hips = H.getNormalizedBoneNode('hips').getWorldPosition(new THREE.Vector3());
     const ht = a.height || 1.5, mid = new THREE.Vector3(hips.x, ht * 0.5, hips.z);

@@ -83,8 +83,15 @@ export function streamDirector(cfg, avatar) {
     if (talking && !wasTalking && !back) set('close', 4500, false, 'talking');
     wasTalking = talking;
     if (!talking && !back && now > nextIdle) {
-      const opts = ['mid', 'wide', 'low', 'mid', 'high'].filter((n) => n !== cam.name);
-      if (set(opts[Math.floor(Math.random() * opts.length)], 0, false, 'idle drift')) nextIdle = now + 14000 + Math.random() * 10000;
+      // long, irregular dwell (log-normal ~20-90 s) and a no-repeat pick, so the framing never settles into a cycle
+      const opts = ['mid', 'wide', 'low', 'high'].filter((n) => n !== cam.name && n !== cam.prevIdle);
+      const pickN = opts[Math.floor(Math.random() * opts.length)];
+      const was = cam.name;
+      if (set(pickN, 0, false, 'idle drift')) {
+        cam.prevIdle = was;
+        nextIdle = now + Math.min(90000, Math.max(20000, 38000 * Math.exp((Math.random() + Math.random() + Math.random() - 1.5) * 1.0)));
+        try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'cam', what: pickN, why: 'idle drift' }); if (L.length > 400) L.shift(); } catch {}
+      }
     }
   }, 50);
 }

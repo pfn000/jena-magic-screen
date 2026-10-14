@@ -219,6 +219,7 @@ export class Moves {
     this.guard = { left: 1, right: 1 };
     this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
     this.rememberPlay(meta.id);
+    try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(performance.now()), kind: 'clip', what: meta.id, why: context }); if (L.length > 400) L.shift(); } catch {}
     this.recent = this.history().slice(0, 8).map((x) => x.id);
     if ((this.plays = (this.plays || 0) + 1) % 10 === 0) { try { console.log('jena move variety', JSON.stringify(this.variety())); } catch {} }
     const what = meta.what || 'someone moving';

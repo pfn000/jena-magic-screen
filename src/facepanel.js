@@ -27,7 +27,7 @@ export class FacePanel {
     if (this.reading || !shown(this.canvas)) return;
     // async GPU read: smooth ~24 Hz without stalling the stage; old browsers: blocking read, 5 Hz like before
     const async = canReadAsync(this.avatar.renderer);
-    if (now - this.last < (async ? this.every : 200)) return;
+    if (now - this.last < (async ? Math.max(1000 / (this.avatar.panelHz?.() || 24), 16) : 200)) return;   // up to 60 Hz when the device keeps up (avatar.adaptPixels)
     this.last = now;
     const H = vrm.humanoid, head = H.getNormalizedBoneNode('head');
     if (!head) return;

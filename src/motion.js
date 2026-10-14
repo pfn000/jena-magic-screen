@@ -123,6 +123,7 @@ export class Motion {
     if (!m) throw new Error('unknown move ' + id + ' (have: ' + Object.keys(MOVES).join(', ') + ')');
     if (!picked) this.nr.note(id, 'manual');
     const now = performance.now();
+    try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'move', what: id, why: trigger }); if (L.length > 400) L.shift(); } catch {}
     const k = this.knobs(this.styleFor(m));
     // a fresh variant every play: size, speed, mirrored L/R, onset jitter, time warp, head bias
     const v = variant || this.nr.variant({ mirror: m.mirror !== false });
@@ -137,6 +138,8 @@ export class Motion {
     if (m.gaze === 'camera') { this.avatar.lookToward?.('center'); this.avatar.gazeAt?.('camera', dur); }
     if (['react', 'direct', 'brag'].includes(m.kind)) {
       this.lastReact = now;
+      // a big reaction moves her weight: she may re-plant a foot (avatar.updateFeet decides)
+      if ((intensity ?? m.intensity ?? 0.6) >= 0.7 || /recoil|hype|shock|lean_in|flex/.test(id)) { try { this.avatar.requestStep?.(id); } catch {} }
       const ev = { type: id.replace(/^(react|direct|brag)_/, ''), move: id, kind: m.kind, intensity: a.intensity, emotion: emotion || m.emotions?.[0] || null,
         trigger, timestamp: Date.now(), t: now, durationMs: Math.round(dur), cam: m.cam || null };
       this.emit(ev);
@@ -220,9 +223,11 @@ export class Motion {
         this.nextTalk = now + (60000 / gpm) * (0.7 + Math.random() * 0.6) / k.tempo;
       }
     } else if (now > this.nextIdle) {
-      this.nextIdle = now + 7000 + Math.random() * 7000;
-      if (!busyBody && !learned) {
-        const pool = Object.entries(MOVES).filter(([id, m]) => m.kind === 'idle' && fits(m)).map(([id]) => id);
+      // idle gestures are rare and irregular (log-normal gap ~9-60 s) and often skipped, so the procedural idle
+      // (noise drift, breathing, weight shifts, steps) carries her; a small fixed pool at a steady beat reads as a loop
+      this.nextIdle = now + Math.min(60000, Math.max(9000, 20000 * Math.exp((Math.random() + Math.random() + Math.random() - 1.5) * 1.1)));
+      if (!busyBody && !learned && Math.random() < 0.55) {
+        const pool = Object.entries(MOVES).filter(([id, m]) => m.kind === 'idle' && id !== 'idle_bob' && fits(m)).map(([id]) => id);
         const id = pool.length ? this.choose(pool, 'idle', { allowNull: true }) : null;
         if (id) this.play(id, { trigger: 'idle', picked: true });
       }

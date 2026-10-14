@@ -1,6 +1,7 @@
 // Jena's body: a VRM rendered live with three.js + @pixiv/three-vrm on a transparent canvas.
 // Idle life (breathing, sway, head drift, eye saccades), natural blinking, mood expressions,
 // lip flap while talking, and target-based arm control. Left/right always mean JENA'S left/right.
+import { NoRepeat } from './nonrepeat.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
@@ -26,8 +27,8 @@ function noise() {
   const n = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return p[i & 255] * (1 - u) + p[(i + 1) & 255] * u; };
   return (x) => n(x) * 0.7 + n(x * 2.3 + 17) * 0.3;
 }
-const _v = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
-const _q = [0, 1, 2].map(() => new THREE.Quaternion());
+const _v = Array.from({ length: 12 }, () => new THREE.Vector3());
+const _q = Array.from({ length: 6 }, () => new THREE.Quaternion());
 const _tgt = new THREE.Vector3(), _hip = new THREE.Vector3();
 // Raised ("hand up, like in class"): upper arm lifted out to the side and up, forearm turned so the
 // palm faces forward (x twist), elbow softly bent so the hand leans in toward her head (y flex).
@@ -206,7 +207,95 @@ export class Avatar {
       this.feet[s] = f.getWorldPosition(new THREE.Vector3());
     }
     this.floorY = 0;
+    // grounding: world up is +y, the floor is y = 0 (or whatever groundAt(x, z) / groundObjects say, e.g. /world's
+    // floor). Each foot's ankle sits at its rest height above the ground; feet can step (updateFeet).
+    this.up = new THREE.Vector3(0, 1, 0);
+    this.ankleH = { left: this.feet.left.y, right: this.feet.right.y };
+    const mid = this.feet.left.clone().add(this.feet.right).multiplyScalar(0.5);
+    this.feetRest = { left: this.feet.left.clone().sub(mid), right: this.feet.right.clone().sub(mid) };
+    this.stepState = null; this.hipDrop = 0; this.nextIdleStep = performance.now() + 20000 + Math.random() * 25000;
     this.addFloor();
+  }
+
+  // the ground height under (x, z): a groundAt(x, z) hook, a raycast down onto groundObjects, else the floor (y = 0)
+  groundY(x, z) {
+    if (this.groundAt) { const y = this.groundAt(x, z); if (Number.isFinite(y)) return y; }
+    if (this.groundObjects?.length) {
+      this._ray ||= new THREE.Raycaster(); this._ray.set(_v[11].set(x, 3, z), _v[10].set(0, -1, 0)); this._ray.far = 6;
+      const hit = this._ray.intersectObjects(this.groundObjects, true)[0];
+      if (hit) return hit.point.y;
+    }
+    return this.floorY || 0;
+  }
+  // ask for a step (a big reaction, a turn): she re-plants a foot under her hips
+  requestStep(why = 'asked') { this.stepAsk = { why, at: performance.now() }; }
+  // FEET: planted feet stay exactly on the ground (no float, no sink, no skating); she steps when her hips drift too
+  // far from the base between her feet (> 9 cm), when her body turns away from her feet (> 20°), when a big reaction
+  // asks for it, and now and then on her own while idle. A step lifts the lighter foot, arcs it (4-8 cm high) and
+  // re-plants it under her hips at her rest stance, with a non-repeating variant (wider/narrower/forward/back/turn).
+  updateFeet(dt, now) {
+    if (!this.feet || !this.feetRest) return;
+    const H = this.vrm.humanoid, hips = H.getNormalizedBoneNode('hips');
+    const hp = hips.getWorldPosition(_v[9]);
+    const S = this.stepState;
+    if (S) {
+      const u = Math.min(1, (now - S.t0) / S.dur), e = u * u * (3 - 2 * u);
+      const f = this.feet[S.side];
+      f.lerpVectors(S.from, S.to, e);
+      f.y = S.from.y + (S.to.y - S.from.y) * e + Math.sin(Math.PI * u) * S.lift;
+      if (u >= 1) { f.copy(S.to); this.stepState = null; this.lastStep = now; this.steps = (this.steps || 0) + 1; }
+    } else {
+      const mid = _v[8].copy(this.feet.left).add(this.feet.right).multiplyScalar(0.5);
+      const drift = Math.hypot(hp.x - mid.x, hp.z - mid.z);
+      const fyaw = Math.atan2(this.feet.left.z - this.feet.right.z, this.feet.left.x - this.feet.right.x);   // 0 = squared up
+      const hq = hips.getWorldQuaternion(_q[3]), fwd = _v[7].set(0, 0, 1).applyQuaternion(hq);
+      const byaw = Math.atan2(fwd.x, fwd.z);
+      const turn = Math.abs(((byaw - (-fyaw)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+      const busy = this.motion?.moves?.busy;
+      let why = null;
+      if (drift > 0.09) why = 'balance';
+      else if (turn > 0.35) why = 'turn';
+      else if (this.stepAsk && now - this.stepAsk.at < 1500) why = this.stepAsk.why;
+      else if (!busy && now > this.nextIdleStep && now > (this.talk?.until || 0)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
+      if (why && now - (this.lastStep || 0) > 700) {
+        this.stepAsk = null;
+        // the lighter foot steps: the one farther from under her hips
+        const dl = Math.hypot(hp.x - this.feet.left.x, hp.z - this.feet.left.z), dr = Math.hypot(hp.x - this.feet.right.x, hp.z - this.feet.right.z);
+        const side = dl > dr ? 'left' : 'right';
+        this._stepNR ||= new NoRepeat({ minGap: 2, windowMs: 20000 });
+        const style = this._stepNR.pick(['rest', 'wide', 'narrow', 'fwd', 'back', 'toe_out'], { pool: 'step' });
+        const off = { rest: [0, 0], wide: [0.035, 0], narrow: [-0.025, 0], fwd: [0, 0.04], back: [0, -0.035], toe_out: [0.015, 0.015] }[style];
+        const sx = side === 'left' ? 1 : -1;
+        const rest = this.feetRest[side];
+        const to = new THREE.Vector3(hp.x + rest.x + off[0] * sx, 0, hp.z + rest.z + off[1]);
+        // keep the other foot as the pivot: never step closer than 12 cm or farther than 45 cm from it
+        const other = this.feet[side === 'left' ? 'right' : 'left'], dx = to.x - other.x, dz = to.z - other.z, dd = Math.hypot(dx, dz);
+        if (dd < 0.12 || dd > 0.45) { const k = THREE.MathUtils.clamp(dd, 0.12, 0.45) / (dd || 1); to.x = other.x + dx * k; to.z = other.z + dz * k; }
+        to.y = this.groundY(to.x, to.z) + this.ankleH[side];
+        const len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
+        if (len > 0.015) { try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'step', what: side + ':' + style, why }); if (L.length > 400) L.shift(); } catch {} }
+        if (len > 0.015) this.stepState = { side, from: this.feet[side].clone(), to, t0: now, dur: 300 + len * 900 + Math.random() * 120, lift: 0.04 + Math.min(0.04, len * 0.15) + Math.random() * 0.01, why, style };
+        else this.lastStep = now;
+      }
+    }
+    // planted feet: snapped onto the ground every frame (whatever a pose or tracked move wanted)
+    for (const s of ['left', 'right']) {
+      if (this.stepState?.side === s) continue;
+      const f = this.feet[s], gy = this.groundY(f.x, f.z) + this.ankleH[s];
+      f.y = gy;
+    }
+    // hips follow the lower foot: if a leg can't reach its planted foot, the hips sink so the knees bend (never hover)
+    let need = 0;
+    for (const s of ['left', 'right']) {
+      const U = H.getNormalizedBoneNode(s + 'UpperLeg'), K = H.getNormalizedBoneNode(s + 'LowerLeg'), F = H.getNormalizedBoneNode(s + 'Foot');
+      if (!U || !K || !F) continue;
+      const pu = U.getWorldPosition(_v[0]), len = (this.legLen ||= {})[s] ||= pu.distanceTo(K.getWorldPosition(_v[1])) + K.getWorldPosition(_v[1]).distanceTo(F.getWorldPosition(_v[2]));
+      const tgt = this.feet[s], d = pu.distanceTo(tgt);
+      if (d > len * 0.985) need = Math.max(need, Math.min(0.12, (d - len * 0.985) * (pu.y - tgt.y) / Math.max(d, 1e-3)));
+    }
+    this.hipDrop += (need - this.hipDrop) * Math.min(1, dt * 12);
+    if (this.hipDrop > 1e-4) { hips.position.y -= this.hipDrop; hips.updateMatrixWorld(true); }
+    if (this.footShadows) for (const s of ['left', 'right']) { const m = this.footShadows[s]; m.position.x = this.feet[s].x; m.position.z = this.feet[s].z + 0.03; m.position.y = this.groundY(this.feet[s].x, this.feet[s].z) + 0.0015; }
   }
 
   // a faint floor disc plus soft contact shadows, so she reads as standing ON something
@@ -281,19 +370,41 @@ export class Avatar {
     F.updateMatrixWorld(true);
   }
 
-  // GPU-bound (frames averaging slower than ~42 fps for 3 s): draw fewer pixels, a quarter step at a time
+  // ADAPTIVE QUALITY toward 60 fps. Frames averaging slower than ~54 fps for 2.5 s step quality down one notch:
+  // pixel ratio a quarter step at a time (floor 1x on a GPU, 0.6x on a software renderer like this box's
+  // SwiftShader), then the extra camera panels (self-view, face, body views) drop from 60 to 30 / 15 / 8 Hz.
+  // When frames run at the screen's rate again for 8 s, it tries one notch back up (and remembers a notch that failed).
+  // ?dpr=<n> pins the pixel ratio; ?quality=low|high pins the level.
   adaptPixels(raw) {
-    if (this.dprPinned || !(raw > 0) || raw > 0.25 || document.hidden) return;
-    const now = performance.now(), P = (this.perf ||= { ms: 16.7, cool: now + 4000 });
-    P.ms = P.ms * 0.96 + raw * 1000 * 0.04;
-    const pr = this.renderer.getPixelRatio();
-    if (now > P.cool && P.ms > 24 && pr > (this.minPixelRatio || 1)) {
-      this.renderer.setPixelRatio(Math.max(this.minPixelRatio || 1, Math.round((pr - 0.25) * 4) / 4));
-      this.resize();
-      P.cool = now + 3000; P.ms = 16.7;
-      this.pixelSteps = (this.pixelSteps || 0) + 1;
-    }
+    if (!(raw > 0) || raw > 0.25 || document.hidden) return;
+    const now = performance.now();
+    const Q = (this.quality ||= (() => {
+      let soft = false;
+      try { const gl = this.renderer.getContext?.(), e = gl?.getExtension('WEBGL_debug_renderer_info'); soft = /swiftshader|llvmpipe|software/i.test(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : ''); } catch {}
+      const pin = new URLSearchParams(location.search).get('quality');
+      return { soft, level: pin === 'low' ? 0 : 3, pinned: !!pin, ms: 16.7, cool: now + 4000, fastSince: 0, failed: {}, steps: 0, prMax: this.renderer.getPixelRatio?.() || 1 };
+    })());
+    Q.ms = Q.ms * 0.95 + raw * 1000 * 0.05;
+    Q.fps = +(1000 / Q.ms).toFixed(1);
+    if (Q.pinned || now < Q.cool) return;
+    const pr = this.renderer.getPixelRatio(), floor = Q.soft ? 0.6 : Math.min(this.minPixelRatio || 1, 1);
+    if (Q.ms > 18.5) {
+      Q.fastSince = 0;
+      if (!this.dprPinned && pr > floor + 0.01) { this.renderer.setPixelRatio(Math.max(floor, Math.round((pr - 0.25) * 4) / 4)); this.resize(); this.pixelSteps = (this.pixelSteps || 0) + 1; }
+      else if (Q.level > 0) { Q.failed[Q.level] = now; Q.level--; }
+      else return;
+      Q.steps++; Q.cool = now + 2500; Q.ms = 16.7;
+    } else if (Q.ms < 17.6) {
+      Q.fastSince ||= now;
+      if (now - Q.fastSince > 8000) {
+        Q.fastSince = 0; Q.cool = now + 3000;
+        if (Q.level < 3 && !(now - (Q.failed[Q.level + 1] || -1e9) < 60000)) Q.level++;
+        else if (!this.dprPinned && pr < Q.prMax - 0.01 && !(now - (Q.failed.pr || -1e9) < 60000)) { Q.failed.pr = now; this.renderer.setPixelRatio(Math.min(Q.prMax, pr + 0.25)); this.resize(); }
+      }
+    } else Q.fastSince = 0;
   }
+  // how often the extra camera panels may redraw (self-view, face panel, body views), from the quality level
+  panelHz() { return [8, 15, 30, 60][this.quality?.level ?? 3]; }
 
   resize() {
     const el = this.canvas.parentElement;
@@ -619,6 +730,9 @@ export class Avatar {
   }
 
   // ---------- per frame ----------
+  // ---- the loop: a FIXED-TIMESTEP simulation (60 Hz: pose, IK, face, springs) decoupled from rendering, with the
+  // rendered pose interpolated between the last two simulation states. Motion stays smooth and identical whatever the
+  // render fps does (a dip to 30 fps runs 2 steps per frame; a 120 Hz screen draws in-between poses). ?fixed=0 = old loop.
   frame() {
     this.clock.update();
     const raw = this.clock.getDelta(), dt = Math.min(raw, 0.1);
@@ -628,6 +742,32 @@ export class Avatar {
     const vrm = this.vrm;
     for (const f of this.preHooks || []) { try { f(dt, raw); } catch (e) { console.warn('pre hook', e); } }   // (dt, raw) before her pose + render, body or not (the /world room moves the camera here)
     if (vrm) {
+      if (this.fixedStep === undefined) this.fixedStep = new URLSearchParams(location.search).get('fixed') === '0' ? 0 : 1 / 60;
+      const STEP = this.fixedStep;
+      if (!STEP) this.simulate(vrm, dt, t, now);
+      else {
+        this.simAcc = (this.simAcc || 0) + dt;
+        let n = 0;
+        while (this.simAcc >= STEP && n < 5) {
+          this.simAcc -= STEP; n++;
+          this.snapBones(vrm, 'prev');
+          this.simulate(vrm, STEP, t - this.simAcc, now - this.simAcc * 1000);
+          this.snapBones(vrm, 'cur');
+        }
+        if (n >= 5) this.simAcc = 0;                       // a long stall: drop the backlog instead of spiralling
+        this.simSteps = (this.simSteps || 0) + n;
+        this.lerpBones(this.simAcc / STEP);                // draw between the last two sim states
+      }
+    }
+    this.frameHooksLight?.(t);
+    if (vrm && !this.cameraHeld) this.updateCamera(Math.min(raw, 0.5), now); // real time, so slow devices still settle
+    this.renderer.render(this.scene, this.camera);
+    if (vrm) for (const f of this.frameHooks) { try { f(vrm, dt); } catch (e) { console.warn('frame hook', e); } }
+    this.unlerpBones();   // the next simulation step continues from its own state, not the drawn in-between
+  }
+  // one simulation step of her body (everything that used to run per rendered frame)
+  simulate(vrm, dt, t, now) {
+    {
       const H = vrm.humanoid;
       // arms toward targets
       for (const [bone, tgt] of Object.entries(this.target)) {
@@ -696,6 +836,7 @@ export class Avatar {
       for (const s of ['left', 'right']) { set(s + 'UpperLeg', 0, 0, 0); set(s + 'LowerLeg', 0.03, 0, 0); set(s + 'Foot', 0, 0, 0); }
       for (const f of this.poseHooks) { try { f(vrm, dt); } catch (e) { console.warn('pose hook', e); } }
       H.normalizedHumanBonesRoot.updateMatrixWorld(true);
+      try { this.updateFeet(dt, now); } catch (e) { console.warn('feet', e); }
       // the free leg (weight on the other one) rests on the ball of its foot: heel up, knee bent
       this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));
       this.plantFoot('right', A.tap?.side === 'right' ? tap : 0, Math.max(0, L));
@@ -713,8 +854,12 @@ export class Avatar {
         // talking gestures: every 1-2.5 s each hand takes a shape (point, open palm, two up, soft fist, relaxed)
         const G = this.gesture[s];
         if (talking && relaxed && now > G.next) {
-          const shapes = [[0, 0, 0, 0, 0], [0.5, -0.25, 0.45, 0.5, 0.55], [0.3, -0.2, -0.2, 0.5, 0.55], [0.35, 0.35, 0.4, 0.45, 0.5], [0, -0.2, 0.05, 0.15, 0.25], [0.2, 0.15, -0.15, 0.1, 0.3]];
-          G.t = shapes[Math.floor(Math.random() * shapes.length)]; G.next = now + 1000 + Math.random() * 1500;
+          // no fixed shape list (Saidie: no loops): each finger takes a fresh random target, loosely coupled so the
+          // hand reads as one gesture (an "openness" level plus per-finger scatter), held a log-normal random time
+          const open = Math.random(), sc = () => (Math.random() - 0.5) * 0.5;
+          const prev = G.t || [0, 0, 0, 0, 0];
+          G.t = [open * 0.5 * Math.random(), ...[0, 1, 2, 3].map((j) => Math.max(-0.3, Math.min(0.6, prev[j + 1] * 0.25 + (open - 0.35) * 0.6 * (0.8 + j * 0.1) + sc())))];
+          G.next = now + Math.min(4200, 700 * Math.exp(0.55 * (Math.random() + Math.random() + Math.random() - 1.5) * 2) + 500);
         } else if (!talking && G.next && now > G.next) { G.t = [0, 0, 0, 0, 0]; G.next = 0; }
         for (let j = 0; j < 5; j++) G.v[j] = damp(G.v[j], G.t[j], 7, dt);
         const sg = s === 'left' ? -1 : 1; // her left fingers point +x in bone space, so they curl with -z
@@ -779,11 +924,32 @@ export class Avatar {
       for (const f of this.faceHooks || []) { try { f(vrm, dt); } catch (e) { console.warn('face hook', e); } }
       vrm.update(dt);
     }
-    this.frameHooksLight?.(t);
-    if (vrm && !this.cameraHeld) this.updateCamera(Math.min(raw, 0.5), now); // real time, so slow devices still settle
-    this.renderer.render(this.scene, this.camera);
-    if (vrm) for (const f of this.frameHooks) { try { f(vrm, dt); } catch (e) { console.warn('frame hook', e); } }
   }
+  // bone snapshots for the interpolated render: every bone of her skinned meshes (humanoid + hair/clothes springs)
+  snapBones(vrm, which) {
+    if (!this._bones || this._bonesVrm !== vrm) {
+      const set = new Set(); vrm.scene.traverse((o) => { if (o.isSkinnedMesh) for (const b of o.skeleton.bones) set.add(b); });
+      this._bones = [...set]; this._bonesVrm = vrm;
+      this._snap = { prev: this._bones.map(() => [new THREE.Quaternion(), new THREE.Vector3()]), cur: this._bones.map(() => [new THREE.Quaternion(), new THREE.Vector3()]) };
+      this._snapN = 0;
+    }
+    const S = this._snap[which];
+    for (let i = 0; i < this._bones.length; i++) { S[i][0].copy(this._bones[i].quaternion); S[i][1].copy(this._bones[i].position); }
+    if (which === 'cur') this._snapN++;
+  }
+  lerpBones(alpha) {
+    if (!this._bones || this._snapN < 2) return;
+    const P = this._snap.prev, C = this._snap.cur, a = Math.max(0, Math.min(1, alpha));
+    for (let i = 0; i < this._bones.length; i++) { const b = this._bones[i]; b.quaternion.slerpQuaternions(P[i][0], C[i][0], a); b.position.lerpVectors(P[i][1], C[i][1], a); }
+    this._lerped = true;
+  }
+  unlerpBones() {
+    if (!this._lerped) return; this._lerped = false;
+    const C = this._snap.cur;
+    for (let i = 0; i < this._bones.length; i++) { this._bones[i].quaternion.copy(C[i][0]); this._bones[i].position.copy(C[i][1]); }
+  }
+  simStats() { return { step: this.fixedStep, steps: this.simSteps || 0, bones: this._bones?.length || 0 }; }
+
 
   updateFace(dt, t, now) {
     const em = this.vrm.expressionManager;

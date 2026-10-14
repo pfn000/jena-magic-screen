@@ -3,6 +3,7 @@ import './mobile.css';
 import './stream.css';
 import { streamLayout, streamDirector, streamCaptions, streamHooks } from './stream.js';
 import { Soundboard } from './soundboard.js';
+import { Expressions } from './expressions.js';
 import './trust.js';   // mama's trusted device: one unlock, then no passcode prompts (only for step-ups)
 import { loadConfig } from './config.js';
 import { Avatar } from './avatar.js';
@@ -223,6 +224,10 @@ autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), re
 // her talk/react/direct-to-camera move set + smug face + motion styles (src/motion.js, ANIMATIONS/moveset.json)
 const motion = new Motion(avatar, { moves: autonomy.moves });
 autonomy.motion = motion;
+avatar.motion = motion;
+// her learned facial expressions (src/expressions.js, ANIMATIONS/expressions/): her own words + moods pick them, no repeats
+const expressions = new Expressions(avatar);
+motion.onLineReaction = (trigger, intensity) => expressions.react(trigger, intensity);
 const params = new URLSearchParams(location.search);
 // her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
 const selfSense = new SelfSense(avatar, {
@@ -247,12 +252,18 @@ if (params.get('selfview') !== '0' && !avatar.noGL) {
   bar.innerHTML = VIEWS.map((v) => `<button type="button" data-v="${v}" class="${v === 'front' ? 'on' : ''}">${v}</button>`).join('');
   bar.onclick = (e) => { const v = e.target.dataset?.v; if (v) bodyViews.set(v, 'mama'); };
   $('#self-view')?.after(bar);
-  setInterval(() => {
-    if (document.hidden || Math.random() > 0.25) return;
-    const v = bodyViews.view === 'front' ? VIEWS[1 + Math.floor(Math.random() * 4)] : 'front';
+  // irregular self-checks (log-normal 30-200 s apart, never the same side twice in a row): no fixed 20 s beat
+  let lastSide = '';
+  const selfLook = () => {
+    setTimeout(selfLook, Math.min(200000, Math.max(30000, 70000 * Math.exp((Math.random() + Math.random() + Math.random() - 1.5) * 1.0))));
+    if (document.hidden) return;
+    const sides = VIEWS.slice(1, 5).filter((x) => x !== lastSide);
+    const v = bodyViews.view === 'front' ? sides[Math.floor(Math.random() * sides.length)] : 'front';
+    if (v !== 'front') lastSide = v;
     bodyViews.set(v, 'jena');
     if (v !== 'front') chain.self('sense', `checking myself from the ${v}`);
-  }, 20000);
+  };
+  setTimeout(selfLook, 30000 + Math.random() * 60000);
   window.__jenaBodyViews = bodyViews;
   // collapse her POV panels so they don't clutter the page (she keeps seeing herself either way)
   const eye = $('#self-eye');
@@ -655,6 +666,9 @@ window.jena = {
   onReaction: (cb) => motion.onReaction(cb),
   react: (type, intensity) => motion.play(/^(react|direct|brag|talk|idle)_/.test(type) ? type : (['point', 'lean_in', 'wave', 'finger_guns', 'you'].includes(type) ? 'direct_' : ['smug', 'flex'].includes(type) ? 'brag_' : 'react_') + type, { intensity, trigger: 'api' }),
   motion,
+  // learned facial expressions: jena.expr.play('surprised'), .show('pout') (freeze at peak, null clears), .names, .state()
+  expr: expressions,
+  onExpression: (cb) => expressions.onExpression(cb),
   get springs() { return avatar.springSetup || null; },
   think: (message, user = 'guest') => thinkAbout({ message, source: 'stage', user }),
   bones: () => avatar.bones(),

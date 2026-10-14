@@ -87,7 +87,7 @@ export class SelfVision {
     const A = this.avatar, r = A?.renderer;
     if (this.reading || document.hidden || !this.src.width || !canReadAsync(r)) return;
     const now = performance.now();
-    if (now - (this.lastView || 0) < 1000 / this.viewHz) return;
+    if (now - (this.lastView || 0) < 1000 / Math.max(this.viewHz, A?.panelHz?.() || 0)) return;   // up to 60 Hz when the device keeps up
     // nobody sees the panel (collapsed on phones): only render when her eyes are due a look
     if (!shown(this.view) && !(this.pose && now - (this.lastCapture || 0) > this.lookEvery() * 0.8)) return;
     const box = this.bodyBox();

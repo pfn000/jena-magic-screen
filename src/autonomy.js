@@ -176,7 +176,7 @@ export class Autonomy {
     const now = Date.now();
     if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000 || this.moves?.busy) return;
     this.lastIdle = now;
-    this.nextIdleIn = 12000 + Math.random() * 18000;
+    this.nextIdleIn = Math.min(55000, Math.max(10000, 20000 * Math.exp((Math.random() + Math.random() + Math.random() - 1.5) * 1.0)));   // irregular, never a steady beat
     const quietFor = now - Math.max(...this.chatTimes, 0);
     // moves she learned herself from watching videos of real people (src/moves.js): often her first pick
     if (this.moves?.library.length && Math.random() < 0.55) {
@@ -202,6 +202,7 @@ export class Autonomy {
     // no repeats: an action comes back only after 4 others and never inside 45 s (src/nonrepeat.js)
     const i = IDLE.pick(options.map((_, k) => k), { pool: 'autonomy-idle' });
     this.prevIdlePick = this.lastIdlePick; this.lastIdlePick = i;
+    try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(performance.now()), kind: 'act', what: 'idle#' + i, why: 'autonomy' }); if (L.length > 400) L.shift(); } catch {}
     options[i]();
   }
 
