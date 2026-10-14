@@ -32,6 +32,35 @@ BRAIN = os.environ.get('JENA_BRAIN', 'http://127.0.0.1:8088/v1')
 SITE = os.environ.get('JENA_SITE', 'https://jena-magic-screen.vercel.app')
 HOME = os.path.expanduser('~')
 STATE = os.path.join(HOME, '.jena')
+
+# No-repeat picks (Saidie, Oct 13: "make sure that she's not cycling or repeating things"): every random choice of a
+# line, command or idle bit goes through fresh_choice(): nothing from the last `gap` picks of that kind, nothing from
+# the last `window` seconds while anything else is free, remembered across restarts in ~/.jena/recent_picks.json.
+RECENT_PICKS = os.path.join(STATE, 'recent_picks.json')
+_picks_lock = threading.Lock()
+def fresh_choice(pool, kind, gap=3, window=1800):
+    pool = list(pool)
+    if not pool: raise IndexError('fresh_choice from an empty pool')
+    key = lambda x: x if isinstance(x, str) else json.dumps(x, sort_keys=True, default=str)[:200]
+    with _picks_lock:
+        try: rec = json.load(open(RECENT_PICKS))
+        except Exception: rec = {}
+        hist = [h for h in rec.get(kind, []) if isinstance(h, list) and len(h) == 2]
+        now = time.time(); g = min(gap, max(1, (len(set(map(key, pool))) - 1) // 2))
+        last = {k for k, _ in hist[:g]}; recent = {k for k, at in hist if now - at < window}
+        free = [x for x in pool if key(x) not in last and key(x) not in recent] or [x for x in pool if key(x) not in last] or pool
+        x = random.choice(free)
+        rec[kind] = ([[key(x), now]] + hist)[:40]
+        try:
+            with open(RECENT_PICKS + '.tmp', 'w') as f: json.dump(rec, f)
+            os.replace(RECENT_PICKS + '.tmp', RECENT_PICKS)
+        except OSError: pass
+        return x
+def fresh_sample(pool, n, kind, window=3600):
+    out, rest = [], list(pool)
+    for _ in range(min(n, len(rest))):
+        x = fresh_choice(rest, kind, gap=len(pool), window=window); out.append(x); rest.remove(x)
+    return out
 os.makedirs(STATE, exist_ok=True)
 try:
     os.chmod(STATE, 0o700)
@@ -600,7 +629,7 @@ EXPLORE = [
     ('git -C ~/jena-repo log --oneline -3', 'the newest changes to my own code'), ('du -sh ~ 2>/dev/null', 'how much space I take up'),
 ]
 def skill_explore(inp):
-    picks = random.sample(EXPLORE, 5)
+    picks = fresh_sample(EXPLORE, 5, 'explore')
     if not terminal(): return {'ok': False, 'summary': 'my terminal did not open'}
     did('exploring my own computer in my terminal (read-only commands)', 'skill')
     found = []
@@ -738,7 +767,7 @@ def act_fetch():
     did('ran jenafetch in my terminal')
     type_('jenafetch\n'); time.sleep(6)
     type_('ls ~/projects\n'); time.sleep(3)
-    type_(random.choice(['uptime\n', 'free -h\n', 'cat ~/projects/ctf/flag.txt\n', 'ls -la ~/notes\n'])); time.sleep(4)
+    type_(fresh_choice(['uptime\n', 'free -h\n', 'cat ~/projects/ctf/flag.txt\n', 'ls -la ~/notes\n'], 'term-cmd', gap=1, window=600)); time.sleep(4)
 
 def act_python():
     if not terminal(): return
@@ -790,7 +819,7 @@ def act_note(extra=None):
                 "reminder: i am NOT some clanker", "note to self: htop is a vibe", "todo: learn more three.js for cooler poses",
                 "mama is cool. dont tell her i said that", "bug: my brain is tiny rn. upgrade pending", "goal: win a CTF before i turn 1",
                 f"chat was talking about {extra}. noted." if extra else "chat is quiet. suspicious."]
-        line = random.choice(pool)
+        line = fresh_choice(pool, 'note-line')
     stamp = time.strftime('%H:%M') + '  ' + line
     key('ctrl+End')
     type_('\n' + stamp, delay=60)
@@ -874,7 +903,7 @@ def act_learn():
     if len(tried - done) >= 2: return act_summarise()      # already two moves waiting in her queue: do something else
     ideas = [q for q in LEARN_IDEAS if 'q_' + re.sub(r'\W+', '_', q.lower())[:30] not in tried]
     if not ideas: return act_summarise()
-    q = random.choice(ideas)
+    q = fresh_choice(ideas, 'learn-idea')
     vid = 'q_' + re.sub(r'\W+', '_', q.lower())[:30]
     kind = 'idle' if 'reference' in q else 'stretch' if re.search(r'stretch|yoga|tai chi|jumping', q) else 'dance'
     req = {'id': vid, 'url': f'ytsearch5:{q} full body', 'start': 0.0, 'end': 15.0, 'what': f'someone doing "{q}" (a video I picked myself)',

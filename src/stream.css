@@ -6,7 +6,7 @@ body.stream { background: #000; }
 body.stream #bg, body.stream #thoughts, body.stream #body-views, body.stream #self-eye, body.stream .controls,
 body.stream #dm-toggle, body.stream #dm, body.stream #build-stamp, body.stream .drop-hint, body.stream #voice-btn,
 body.stream #talk, body.stream #mic-status, body.stream .mic-note, body.stream #skills-pub, body.stream .m-tabs,
-body.stream .m-top, body.stream #avatar-status { display: none !important; }
+body.stream .m-top, body.stream #avatar-status, body.stream .desk-private, body.obs .desk-private { display: none !important; }
 body.stream #stage { display: block !important; position: fixed; inset: 0; padding: 0 !important; gap: 0; }
 
 /* the desktop: full-frame background, no panel chrome */

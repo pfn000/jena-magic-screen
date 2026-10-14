@@ -805,7 +805,9 @@ export class Avatar {
       if (this.blink.t > d) {
         this.blink.t = -1;
         this.blink.double = !this.blink.double && Math.random() < 0.18;
-        this.blink.next = this.blink.double ? 0.12 : 1.8 + Math.random() * 4.2;
+        // human blink gaps are log-normal (median ~3 s, long tail), not uniform: no rhythm you can count along to
+        const g = Math.exp(Math.log(3.0) + 0.55 * Math.sqrt(-2 * Math.log(Math.max(1e-9, Math.random()))) * Math.cos(2 * Math.PI * Math.random()));
+        this.blink.next = this.blink.double ? 0.09 + Math.random() * 0.08 : Math.min(9, Math.max(0.8, g));
       }
     }
     // happy eyes already squint; keep blink from overshooting

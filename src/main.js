@@ -162,9 +162,14 @@ async function pollDesk() {
   // mama's private popups are covered for everyone but mama (and always on stream); show when mama drives / she updates
   const dk = $('#desktop'), sd = d?.data || {};
   const isMama = !!localStorage.getItem('jena.dmKey') && !cfg.obs;
-  dk.querySelector('.desk-private').hidden = !(sd.private && !isMama);
+  // PRIVACY: on the stream / OBS (viewer-facing) nothing about mama ever shows: no "private message from mama" card,
+  // no "mama is driving" flag. The desktop just holds its last clean frame until her private popup is gone.
+  const viewer = !!cfg.obs || document.body.classList.contains('stream') || document.body.classList.contains('obs');
+  const priv = !!(sd.private && !isMama);
+  dk.querySelector('.desk-private').hidden = !priv || viewer;
+  try { desktop.hold = priv && viewer; } catch {}   // (desktop is declared further down; the first poll may run before it)
   const flag = dk.querySelector('.desk-flag');
-  const fl = sd.mama_driving ? '🖐 mama is driving her desktop' : sd.updating?.phase ? `⟳ ${sd.updating.phase === 'installing' ? 'updating' : sd.updating.phase} ${sd.updating.what || ''}…` : '';
+  const fl = sd.mama_driving ? (viewer ? '' : '🖐 mama is driving her desktop') : sd.updating?.phase ? `⟳ ${sd.updating.phase === 'installing' ? 'updating' : sd.updating.phase} ${sd.updating.what || ''}…` : '';
   flag.hidden = !fl; flag.textContent = fl;
   if (!deskSeen) { deskSeen = acts.length ? acts[acts.length - 1].ts - 1 : 1; acts.splice(0, Math.max(0, acts.length - 2)); }
   for (const a of acts) {

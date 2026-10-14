@@ -3,7 +3,13 @@
 // idle time) and from what her brain (JenaXI) asks for via action tags. Nobody else drives her body:
 // there are no movement buttons or commands. Every move she makes is logged in the thought chain in
 // her own words ("I'm raising my left arm"). "Left" and "right" are always HER left and right.
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];   // only for left/right sides; actions + captions use NoRepeat
+import { NoRepeat } from './nonrepeat.js';
+// Saidie: no loops. Her idle actions and their captions never come back until several others have played, nothing
+// repeats inside 30 s, and her weight shifts don't tick left-right-left-right like a metronome.
+const IDLE = new NoRepeat({ minGap: 4, windowMs: 45000 });
+const SAY = new NoRepeat({ minGap: 2, windowMs: 120000 });
+const say = (pool, kind) => SAY.pick(pool, { pool: kind });
 const SIDE = { left: 'left', right: 'right', both: 'both arms' };
 
 export class Autonomy {
@@ -179,23 +185,22 @@ export class Autonomy {
       return;
     }
     const options = [
-      () => this.raise('both', 2200, 'stretching, been standing here a while'),
-      () => this.tilt(pick(['left', 'right']), 2800, 'thinking about something'),
-      () => this.shift(pick(['left', 'right']), 9000, 'my legs are tired'),
-      () => this.fist(pick(['left', 'right']), 1600, 'squeezing my hand, just fidgeting'),
-      () => this.stretchFingers('both', 1500, 'cracking my knuckles, kinda'),
-      () => this.tap(pick(['left', 'right']), 3200, quietFor > 60000 ? "it's quiet in here" : 'bopping to nothing'),
-      () => this.nod('agreeing with my own thoughts'),
-      () => this.raise('left', 2400, 'checking my own arm works'),
-      () => this.raise('right', 2400, 'just because I can'),
-      () => this.lookAround('just seeing what\'s up'),
-      () => this.hip(pick(['left', 'right']), 5000 + Math.random() * 4000, 'just standing here, being iconic'),
-      () => this.look('up', 2000, 'thinking'),
-      () => this.face(pick(['relaxed', 'happy']), 4000, 'vibing'),
-      () => this.wave(pick(['left', 'right']), 'saying hi to whoever is watching'),
+      () => this.raise('both', 1800 + Math.random() * 900, say(['stretching, been standing here a while', 'big stretch', 'ok stretching real quick', 'arms up, reset'], 'stretch')),
+      () => this.tilt(pick(['left', 'right']), 2200 + Math.random() * 1400, say(['thinking about something', 'hmm', 'wait what was I doing', 'pondering'], 'tilt')),
+      () => this.shift(pick(['left', 'right']), 7000 + Math.random() * 5000, say(['my legs are tired', 'shifting my weight', 'new stance who dis', 'standing is a sport honestly'], 'shift')),
+      () => this.fist(pick(['left', 'right']), 1200 + Math.random() * 900, say(['squeezing my hand, just fidgeting', 'fidgeting', 'little hand squeeze'], 'fist')),
+      () => this.stretchFingers('both', 1200 + Math.random() * 700, say(['cracking my knuckles, kinda', 'finger stretch', 'wiggling my fingers'], 'fingers')),
+      () => this.tap(pick(['left', 'right']), 2600 + Math.random() * 1600, quietFor > 60000 ? say(["it's quiet in here", 'so quiet rn', 'chat where are you'], 'quiet') : say(['bopping to nothing', 'tapping along to the song in my head', 'tap tap'], 'tap')),
+      () => this.nod(say(['agreeing with my own thoughts', 'yeah. yeah.', 'nodding at nothing'], 'nod')),
+      () => this.raise(pick(['left', 'right']), 2000 + Math.random() * 900, say(['checking my own arm works', 'just because I can', 'arm check', 'testing my shoulder'], 'raise1')),
+      () => this.lookAround(say(["just seeing what's up", 'looking around', 'what is going on over there'], 'look')),
+      () => this.hip(pick(['left', 'right']), 4500 + Math.random() * 4500, say(['just standing here, being iconic', 'hand on hip, very cool', 'posing a little'], 'hip')),
+      () => this.look(pick(['up', 'up', 'down']), 1600 + Math.random() * 1000, say(['thinking', 'daydreaming', 'lost in thought'], 'lookup')),
+      () => this.face(pick(['relaxed', 'happy']), 3000 + Math.random() * 2500, say(['vibing', 'chilling', 'good mood'], 'face')),
+      () => this.wave(pick(['left', 'right']), say(['saying hi to whoever is watching', 'hi!!', 'waving at chat'], 'wave')),
     ];
-    // never the same thing twice in a row
-    let i; do { i = Math.floor(Math.random() * options.length); } while (options.length > 2 && (i === this.lastIdlePick || i === this.prevIdlePick));
+    // no repeats: an action comes back only after 4 others and never inside 45 s (src/nonrepeat.js)
+    const i = IDLE.pick(options.map((_, k) => k), { pool: 'autonomy-idle' });
     this.prevIdlePick = this.lastIdlePick; this.lastIdlePick = i;
     options[i]();
   }
@@ -205,8 +210,9 @@ export class Autonomy {
   posture() {
     if (!this.ready || document.hidden) { clearTimeout(this.postureTimer); this.postureTimer = setTimeout(() => this.posture(), 1000); return; }
     // nobody stands evenly on both feet for long: she swaps which leg holds her weight
-    this.weightSide = this.weightSide === 'left' ? 'right' : this.weightSide === 'right' ? 'left' : pick(['left', 'right']);
-    const hold = 7000 + Math.random() * 11000;
+    // not a metronome: usually the other leg, sometimes the same one again, hold times log-normal (median ~10 s)
+    this.weightSide = !this.weightSide ? pick(['left', 'right']) : Math.random() < 0.7 ? (this.weightSide === 'left' ? 'right' : 'left') : this.weightSide;
+    const hold = Math.min(26000, Math.max(5000, Math.exp(Math.log(10000) + 0.45 * Math.sqrt(-2 * Math.log(Math.max(1e-9, Math.random()))) * Math.cos(2 * Math.PI * Math.random()))));
     this.avatar.shiftWeight(this.weightSide, hold + 3000);
     clearTimeout(this.postureTimer);
     this.postureTimer = setTimeout(() => this.posture(), hold);

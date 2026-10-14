@@ -66,7 +66,10 @@ const ARMS = ['leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'righ
 const WEIGHT = { hips: 0.75, spine: 0.85, chest: 0.85, upperChest: 0.85, neck: 0.55, head: 0.5,
   leftUpperArm: 0.92, leftLowerArm: 0.9, leftHand: 0.6, rightUpperArm: 0.92, rightLowerArm: 0.9, rightHand: 0.6 };
 const MIRROR = (b) => b.startsWith('left') ? 'right' + b.slice(4) : b.startsWith('right') ? 'left' + b.slice(5) : b;
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
+import { NoRepeat } from './nonrepeat.js';
+// no bare random picks (Saidie: no loops): the final clip choice and her source captions go through NoRepeat
+const CLIPS = new NoRepeat({ minGap: 4, windowMs: 120000 });
+const LINES = new NoRepeat({ minGap: 2, windowMs: 60000 });
 const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const [_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8] = Array.from({ length: 8 }, () => new THREE.Vector3());
@@ -180,7 +183,8 @@ export class Moves {
     // among the candidates, lean toward the ones done longest ago; whole-body ones (fingers + face) first on ties
     const whole = (c) => (c.has?.fingers ? 1 : 0) + (c.has?.face ? 1 : 0);
     pool = [...pool].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0) || whole(b) - whole(a)).slice(0, Math.max(1, Math.ceil(pool.length / 2)));
-    return pick(pool);
+    const id = CLIPS.pick(pool.map((c) => c.id), { pool: context, prefer: undefined });
+    return pool.find((c) => c.id === id) || pool[0];
   }
 
   // how varied her moves have been: plays in the window, distinct moves, back-to-back repeats, and how
@@ -224,7 +228,7 @@ export class Moves {
       `copying ${what} from a video I studied, my own version`,
       `doing the thing I learned from a video of ${what}`,
     ];
-    let line = pick(lines);
+    let line = LINES.pick(lines, { pool: 'move-caption' });
     if (mirror) line += ', mirrored so it starts on my other side';
     if (why) line += ` (${why})`;
     this.showSource(meta, line);

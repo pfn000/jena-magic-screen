@@ -65,6 +65,13 @@ def clapback(said, heard, snd):   # mirrors api/_lib/memes.js clapbackSound
     if re.search(r"\b(skill issue|too easy|built different|ez|cooked)\b", s, re.I): sid = "rizz"
     elif re.search(r"\b(ratio|L ?\+|who asked|nobody asked|no one asked)\b", s, re.I): sid = "emotional-damage"
     else: sid = "vine-boom" if len(s) % 2 else "emotional-damage"
+    # no-repeat: if that clip is one she just used, take its sibling instead of the same sound again
+    try:
+        last = [p["id"] for p in json.load(open(STATE)).get("played", []) if time.time() - p["at"] < 300][-3:]
+        if sid in last:
+            alt = [x for x in ("vine-boom", "emotional-damage", "rizz" if sid == "rizz" else "vine-boom") if x != sid and x not in last and x in snd]
+            if alt: sid = alt[0]
+    except Exception: pass
     return (sid if sid in snd else None), None
 
 def locked_state(fn):
@@ -90,6 +97,8 @@ def refuse(st, sid, rules, now):
     if recent and now - recent[-1]["at"] < rules.get("min_gap_s", 20): return "too soon after the last one (%ds gap)" % rules.get("min_gap_s", 20)
     if len(recent) >= rules.get("max_per_5min", 4): return "enough sounds for now (%d in 5 min)" % rules.get("max_per_5min", 4)
     if recent and recent[-1]["id"] == sid and now - recent[-1]["at"] < 60: return "same sound twice in a row"
+    # no-repeat (Saidie: no loops): not one of the last 3 sounds, and not again inside 3 minutes
+    if sid in [p["id"] for p in recent[-3:]] or any(p["id"] == sid and now - p["at"] < 180 for p in recent): return "played recently (no repeats)"
     return ""
 
 def log(rec):

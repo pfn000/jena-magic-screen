@@ -8,9 +8,12 @@
 import * as THREE from 'three';
 import MOVESET from '../ANIMATIONS/moveset.json';
 import STYLES from '../ANIMATIONS/styles.json';
+import { NoRepeat, Wander } from './nonrepeat.js';
+import { KIND_COOLDOWN } from './motion-cooldowns.mjs';
+export { KIND_COOLDOWN };
 
 const MOVES = MOVESET.moves;
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
+// (no bare random picks here: every choice goes through NoRepeat, see src/nonrepeat.js; Saidie: no loops)
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const _v = Array.from({ length: 12 }, () => new THREE.Vector3());
 const _q = Array.from({ length: 6 }, () => new THREE.Quaternion());
@@ -85,6 +88,13 @@ export class Motion {
     this.lastTalkT0 = 0; this.nextTalk = 0; this.nextIdle = performance.now() + 5000; this.lastReact = 0;
     this.log = [];
     this.smugW = 0;
+    // her no-repeat memory: no move repeats until 3 others have played (fewer for tiny pools), nothing from the
+    // last 30 s while anything else is free, per-move cooldowns (moveset `cooldown` s, else by kind)
+    const cooldowns = {}; for (const [id, mv] of Object.entries(MOVES)) cooldowns[id] = mv.cooldown ? mv.cooldown * 1000 : (KIND_COOLDOWN[mv.kind] || 10000);
+    this.nr = opts.noRepeat || new NoRepeat({ minGap: 3, windowMs: 30000, cooldowns });
+    // procedural micro-motion on top of everything (never cycles): head drift, torso sway, weight shifts
+    this.wander = { hx: new Wander(1, 1.3), hy: new Wander(1, 2.1), hz: new Wander(1, 1.7), sz: new Wander(1, 3.2), sx: new Wander(1, 2.6) };
+    this.nextShift = performance.now() + 6000 + Math.random() * 10000;
     avatar.poseHooks.push((vrm, dt) => this.body(vrm, dt));
     (avatar.handHooks ||= []).push((vrm, dt) => this.arms(vrm, dt));
     (avatar.faceHooks ||= []).push((vrm, dt) => this.face(vrm, dt));
@@ -106,18 +116,23 @@ export class Motion {
   // per-emotion lean toward a style (from ANIMATIONS/styles.json, learned from the clips)
   styleFor(m) { const by = STYLES?.by_emotion || {}; for (const e of m.emotions || []) if (by[e]) return by[e]; return null; }
 
-  play(id, { intensity, trigger = 'manual', emotion } = {}) {
+  // choose from a pool without repeating (null = everything fresh is used up: skip rather than repeat)
+  choose(ids, pool, opts = {}) { return this.nr.pick(ids.filter((id) => MOVES[id]), { pool, ...opts }); }
+  play(id, { intensity, trigger = 'manual', emotion, picked = false, variant } = {}) {
     const m = MOVES[id];
     if (!m) throw new Error('unknown move ' + id + ' (have: ' + Object.keys(MOVES).join(', ') + ')');
+    if (!picked) this.nr.note(id, 'manual');
     const now = performance.now();
     const k = this.knobs(this.styleFor(m));
-    const amp = clamp((intensity ?? m.intensity ?? 0.6) / (m.intensity ?? 0.6), 0.5, 1.4) * k.amp;
-    const dur = (m.dur * 1000) / k.tempo;
+    // a fresh variant every play: size, speed, mirrored L/R, onset jitter, time warp, head bias
+    const v = variant || this.nr.variant({ mirror: m.mirror !== false });
+    const amp = clamp((intensity ?? m.intensity ?? 0.6) / (m.intensity ?? 0.6), 0.5, 1.4) * k.amp * v.amp;
+    const dur = (m.dur * 1000) / k.tempo / v.speed;
     // one move per body part family: a new reaction replaces what was playing on the same parts
     const parts = (mm) => new Set([...(mm.arms ? Object.keys(mm.arms) : []), mm.head || mm.spine || mm.hips ? 'body' : '']);
     const mine = parts(m);
     this.active = this.active.filter((a) => ![...parts(a.m)].some((p) => p && mine.has(p)));
-    const a = { id, m, t0: now, dur, k, amp, intensity: +(intensity ?? m.intensity ?? 0.6).toFixed(2), trigger };
+    const a = { id, m, t0: now + v.delayMs, dur, k, amp, v, intensity: +(intensity ?? m.intensity ?? 0.6).toFixed(2), trigger };
     this.active.push(a);
     if (m.gaze === 'camera') { this.avatar.lookToward?.('center'); this.avatar.gazeAt?.('camera', dur); }
     if (['react', 'direct', 'brag'].includes(m.kind)) {
@@ -126,8 +141,8 @@ export class Motion {
         trigger, timestamp: Date.now(), t: now, durationMs: Math.round(dur), cam: m.cam || null };
       this.emit(ev);
     }
-    this.log.push({ id, at: Date.now(), trigger, intensity: a.intensity }); if (this.log.length > 60) this.log.shift();
-    return { id, durationMs: Math.round(dur), style: k };
+    this.log.push({ id, at: Date.now(), trigger, intensity: a.intensity, mirror: v.mirror, speed: v.speed, amp: v.amp }); if (this.log.length > 60) this.log.shift();
+    return { id, durationMs: Math.round(dur), style: k, variant: v };
   }
   emit(ev) {
     for (const cb of this.listeners) { try { cb(ev); } catch (e) { console.warn('onReaction listener', e); } }
@@ -148,24 +163,38 @@ export class Motion {
     const L = t.toLowerCase();
     const has = (re) => re.test(L);
     const user = [...this.users].find((u) => u && u.length > 1 && L.includes(u.toLowerCase())) || (t.match(/@(\w{2,})/) || [])[1];
-    let id = null, trigger = null;
-    if (/\bYOU\b|\byou!/.test(t)) { id = 'direct_you'; trigger = 'you!'; }
-    else if (has(/\b(lol|lmao|lmfao|haha+|hehe+|rofl)\b|😂|🤣/)) { id = 'react_laugh'; trigger = 'laugh'; }
-    else if (has(/\b(no way|omg|oh my (god|gosh)|wait what|what\?!|what!|holy)\b/)) { id = pick(['react_shock', 'react_hands_face', 'react_face_swing', 'react_recoil']); trigger = 'shock'; }
-    else if (has(/\b(ew+|gross|yikes|cringe)\b/)) { id = pick(['react_recoil', 'react_cringe']); trigger = 'gross'; }
-    else if (has(/\b(bruh|ugh|smh|seriously|why would)\b/)) { id = 'react_facepalm'; trigger = 'bruh'; }
-    else if (has(/\b(ez|too easy|skill issue|built different|cope|ratio|cooked|i'?m (just )?(that )?good)\b/)) { id = 'brag_smug'; trigger = 'roast'; }
-    else if (/\bW\b/.test(t) || has(/\b(clutch|let'?s go+|lets go+|gg|dub|we won|i won|nailed it)\b/)) { id = pick(['react_hype', 'brag_flex', 'brag_smug']); trigger = 'win'; }
-    else if (has(/\b(oh wait|wait|oh!|oh no)\b/)) { id = 'react_head_snap'; trigger = 'realize'; }
-    else if (has(/\b(hi|hey|hello|welcome|bye|good ?night)\b/) && (has(/\b(chat|guys|everyone|y'?all)\b/) || user)) { id = 'direct_wave'; trigger = 'greeting'; }
+    // each trigger has a best-fit move (preferred when it's free) and alternates; nothing repeats back to back,
+    // inside 30 s, or inside its cooldown. When all of a trigger's moves are used up she skips the gesture.
+    let pref = null, alts = null, trigger = null;
+    if (/\bYOU\b|\byou!/.test(t)) { pref = 'direct_you'; alts = ['direct_point', 'direct_finger_guns']; trigger = 'you!'; }
+    else if (has(/\b(lol|lmao|lmfao|haha+|hehe+|rofl)\b|😂|🤣/)) { pref = 'react_laugh'; alts = ['react_hands_face', 'react_hype']; trigger = 'laugh'; }
+    else if (has(/\b(no way|omg|oh my (god|gosh)|wait what|what\?!|what!|holy)\b/)) { alts = ['react_shock', 'react_hands_face', 'react_face_swing', 'react_recoil', 'react_head_snap']; trigger = 'shock'; }
+    else if (has(/\b(ew+|gross|yikes|cringe)\b/)) { alts = ['react_recoil', 'react_cringe', 'react_face_swing']; trigger = 'gross'; }
+    else if (has(/\b(bruh|ugh|smh|seriously|why would)\b/)) { pref = 'react_facepalm'; alts = ['talk_shake', 'react_cringe']; trigger = 'bruh'; }
+    else if (has(/\b(ez|too easy|skill issue|built different|cope|ratio|cooked|i'?m (just )?(that )?good)\b/)) { pref = 'brag_smug'; alts = ['brag_flex', 'direct_finger_guns']; trigger = 'roast'; }
+    else if (/\bW\b/.test(t) || has(/\b(clutch|let'?s go+|lets go+|gg|dub|we won|i won|nailed it)\b/)) { alts = ['react_hype', 'brag_flex', 'brag_smug']; trigger = 'win'; }
+    else if (has(/\b(oh wait|wait|oh!|oh no)\b/)) { pref = 'react_head_snap'; alts = ['react_shock', 'talk_tilt_q']; trigger = 'realize'; }
+    else if (has(/\b(hi|hey|hello|welcome|bye|good ?night)\b/) && (has(/\b(chat|guys|everyone|y'?all)\b/) || user)) { pref = 'direct_wave'; alts = ['direct_point']; trigger = 'greeting'; }
     else if (has(/\b(chat|you guys|y'?all|everyone|everybody)\b/) || user) {
       trigger = user ? 'username' : 'chat';
-      id = /\?/.test(t) ? 'direct_lean_in' : has(/\b(thanks|thank you|ty|gotcha|appreciate)\b/) ? 'direct_finger_guns' : pick(['direct_point', 'direct_point', 'direct_finger_guns', 'direct_lean_in']);
+      pref = /\?/.test(t) ? 'direct_lean_in' : has(/\b(thanks|thank you|ty|gotcha|appreciate)\b/) ? 'direct_finger_guns' : null;
+      alts = ['direct_point', 'direct_finger_guns', 'direct_lean_in', 'direct_you'];
     }
-    if (!id) return null;
+    // her face reacts too (src/expressions.js): learned expressions for the same triggers, plus a few face-only ones
+    if (!alts) {
+      const face = has(/\b(tired|sleepy|yawn+|exhausted|so late)\b/) ? 'tired' : has(/\b(oops|my bad|whoops|sorry)\b/) ? 'oops'
+        : has(/\b(we lost|i lost|so sad|that'?s sad|miss (you|them|it))\b/) ? 'sad' : has(/\b(focus|lock(ed)? in|let me cook|try hard)\b/) ? 'focus'
+        : has(/\b(hmm+|let me think|i wonder|maybe)\b/) ? 'think' : /\?\s*$/.test(t) ? 'question' : null;
+      if (face) { try { this.onLineReaction?.(face, I); } catch {} }
+      return null;
+    }
     // at most one big reaction every ~2.5 s, so a long line doesn't turn into a seizure
     if (performance.now() - this.lastReact < 2500) return null;
-    return this.play(id, { intensity: MOVES[id].kind === 'direct' ? Math.max(I, 0.6) : I, trigger });
+    const id = this.choose(pref ? [pref, ...alts] : alts, 'line-' + trigger, { prefer: pref, allowNull: true });
+    if (!id) return null;
+    this.lastLineTrigger = trigger;
+    try { this.onLineReaction?.(trigger, I); } catch {}
+    return this.play(id, { intensity: MOVES[id].kind === 'direct' ? Math.max(I, 0.6) : I, trigger, picked: true });
   }
   seenUser(name) { if (name) { this.users.add(String(name)); if (this.users.size > 200) this.users.delete(this.users.values().next().value); } }
 
@@ -179,11 +208,12 @@ export class Motion {
     const fits = (m) => (m.emotions || []).includes(mood) || (m.emotions || []).includes('neutral');
     if (talking) {
       const beat = A.voiceBeat;
-      if (beat && beat.at > (this._beatSeen || 0)) { this._beatSeen = beat.at; if (!busyBody && !learned && Math.random() < 0.35) this.play(pick(['talk_nod', 'talk_beat_r', 'talk_beat_l']), { trigger: 'beat', intensity: 0.5 + beat.level * 0.3 }); }
+      if (beat && beat.at > (this._beatSeen || 0)) { this._beatSeen = beat.at; if (!busyBody && !learned && Math.random() < 0.35) { const b = this.choose(['talk_nod', 'talk_beat_r', 'talk_beat_l', 'talk_me', 'talk_palms'], 'beat', { allowNull: true, cooldownMs: 3500 }); if (b) this.play(b, { trigger: 'beat', intensity: 0.5 + beat.level * 0.3, picked: true }); } }
       if (now > this.nextTalk && !busyBody && !learned) {
         const q = /\?\s*$/.test(A.talk.text || '');
         const pool = Object.entries(MOVES).filter(([id, m]) => m.kind === 'talk' && fits(m)).map(([id]) => id);
-        this.play(q && Math.random() < 0.5 ? 'talk_tilt_q' : pick(pool), { trigger: 'talk' });
+        const id = this.choose(pool, 'talk', { prefer: q && Math.random() < 0.5 ? 'talk_tilt_q' : null, allowNull: true });
+        if (id) this.play(id, { trigger: 'talk', picked: true });
         const k = this.knobs();
         // how often: learned from tracked talkers (ANIMATIONS/styles.json), x3 because 3D VTubers act bigger than people on camera
         const gpm = clamp((STYLES?.learned?.talk_gestures_per_min || 6) * 3, 8, 24);
@@ -193,8 +223,27 @@ export class Motion {
       this.nextIdle = now + 7000 + Math.random() * 7000;
       if (!busyBody && !learned) {
         const pool = Object.entries(MOVES).filter(([id, m]) => m.kind === 'idle' && fits(m)).map(([id]) => id);
-        if (pool.length) this.play(pick(pool), { trigger: 'idle' });
+        const id = pool.length ? this.choose(pool, 'idle', { allowNull: true }) : null;
+        if (id) this.play(id, { trigger: 'idle', picked: true });
       }
+    }
+  }
+
+  // progress 0..1 of a playing move with its variant's onset delay (t0 is already shifted) and time warp
+  uOf(a, now) { const u = clamp((now - a.t0) / a.dur, 0, 1); return a.v ? u ** a.v.warp : u; }
+  // procedural micro-motion, layered on everything: slow random head drift + torso sway (Ornstein-Uhlenbeck, so it
+  // never cycles) and a weight shift to a random side every 6-22 s. Breathing, blink timing and eye saccades live
+  // in avatar.js; together they keep idle from ever looking like a loop.
+  micro(vrm, dt) {
+    const H = vrm.humanoid, W = this.wander, d = Math.min(dt, 0.05), now = performance.now();
+    const quiet = this.moves?.busy ? 0.4 : 1;
+    const head = H.getNormalizedBoneNode('head'), spine = H.getNormalizedBoneNode('spine');
+    if (head) { head.rotation.x += W.hx.step(d) * 0.018 * quiet; head.rotation.y += W.hy.step(d) * 0.03 * quiet; head.rotation.z += W.hz.step(d) * 0.016 * quiet; }
+    if (spine) { spine.rotation.z += W.sz.step(d) * 0.012 * quiet; spine.rotation.x += W.sx.step(d) * 0.008 * quiet; }
+    const lean = this.avatar.act?.lean;
+    if (lean && now > this.nextShift) {
+      this.nextShift = now + 6000 + Math.random() * 16000;
+      if (!lean.until && Math.abs(lean.t) < 0.05) { lean.t = (Math.random() < 0.5 ? -1 : 1) * (0.2 + Math.random() * 0.5); lean.until = now + 2500 + Math.random() * 7000; }
     }
   }
 
@@ -203,12 +252,13 @@ export class Motion {
   body(vrm, dt) {
     const now = performance.now();
     this.picker(now);
+    try { this.micro(vrm, dt); } catch (e) { console.warn('motion micro', e); }
     this.active = this.active.filter((a) => now - a.t0 < a.dur);
     if (!this.active.length) { this.shoulders = 0; return; }
     const H = vrm.humanoid, damp = this.moves?.busy ? 0.6 : 1;
     let sh = 0;
     for (const a of this.active) {
-      const u = (now - a.t0) / a.dur, m = a.m, k = a.k, g = a.amp * damp;
+      const u = this.uOf(a, now), m = a.m, k = a.k, g = a.amp * damp, mir = a.v?.mirror ? -1 : 1, bias = a.v?.bias;
       const hz = m.loop_hz ? Math.sin((now - a.t0) / 1000 * Math.PI * 2 * m.loop_hz * k.tempo) : 0;
       const env = Math.sin(Math.PI * Math.min(1, u)); // osc envelope
       for (const [bone, key] of [['head', 'head'], ['neck', 'neck'], ['spine', 'spine'], ['chest', 'chest']]) {
@@ -216,12 +266,13 @@ export class Motion {
         if (!v && !o) continue;
         const n = H.getNormalizedBoneNode(bone); if (!n) continue;
         // her head yaw/pitch shares with the neck so a big turn bends the whole neck, not just the skull
-        const x = (v ? v[0] : 0) + (o ? o[0] * hz * env : 0), y = (v ? v[1] : 0) + (o ? o[1] * hz * env : 0), z = (v ? v[2] : 0) + (o ? o[2] * hz * env : 0);
+        let x = (v ? v[0] : 0) + (o ? o[0] * hz * env : 0), y = ((v ? v[1] : 0) + (o ? o[1] * hz * env : 0)) * mir, z = ((v ? v[2] : 0) + (o ? o[2] * hz * env : 0)) * mir;
+        if (bone === 'head' && bias) { x += bias[0] * env; y += bias[1] * env; z += bias[2] * env; }
         if (bone === 'head') { const nk = H.getNormalizedBoneNode('neck'); if (nk) { nk.rotation.x += x * 0.35 * g; nk.rotation.y += y * 0.35 * g; } n.rotation.x += x * 0.65 * g; n.rotation.y += y * 0.65 * g; n.rotation.z -= z * g; }
         else { n.rotation.x += x * g; n.rotation.y += y * g; n.rotation.z += z * g; }
       }
       const hp = track(m.hips, u, k, 3), ho = m.osc?.hips;
-      if (hp || ho) { const h = H.getNormalizedBoneNode('hips'); if (h) { h.position.x += ((hp ? hp[0] : 0) + (ho ? ho[0] * hz * env : 0)) * g; h.position.y += ((hp ? hp[1] : 0) + (ho ? ho[1] * Math.abs(hz) * env : 0)) * g; h.position.z += ((hp ? hp[2] : 0) + (ho ? ho[2] * hz * env : 0)) * g; } }
+      if (hp || ho) { const h = H.getNormalizedBoneNode('hips'); if (h) { h.position.x += ((hp ? hp[0] : 0) + (ho ? ho[0] * hz * env : 0)) * g * mir; h.position.y += ((hp ? hp[1] : 0) + (ho ? ho[1] * Math.abs(hz) * env : 0)) * g; h.position.z += ((hp ? hp[2] : 0) + (ho ? ho[2] * hz * env : 0)) * g; } }
       const s = track(m.shoulders, u, k, 1); if (s) sh = Math.max(sh, s[0] * g);
     }
     if (sh > 0) { const l = H.getNormalizedBoneNode('leftShoulder'), r = H.getNormalizedBoneNode('rightShoulder'); if (l) l.rotation.z += 0.16 * sh; if (r) r.rotation.z -= 0.16 * sh; }
@@ -263,8 +314,8 @@ export class Motion {
     for (const side of ['left', 'right']) {
       let best = null, bw = 0;
       for (const a of this.active) {
-        const arm = a.m.arms?.[side]; if (!arm) continue;
-        const u = (now - a.t0) / a.dur; const w = (track(arm.keys, u, { ...a.k, overshoot: 0 }, 1) || [0])[0];
+        const arm = a.m.arms?.[a.v?.mirror ? (side === 'left' ? 'right' : 'left') : side]; if (!arm) continue;
+        const u = this.uOf(a, now); const w = (track(arm.keys, u, { ...a.k, overshoot: 0 }, 1) || [0])[0];
         if (w > bw) { bw = w; best = { a, pose: POSES[arm.pose], name: arm.pose }; }
       }
       if (!best || bw < 0.01 || !best.pose) continue;
@@ -309,9 +360,10 @@ export class Motion {
     const em = vrm.expressionManager; if (!em) return;
     const now = performance.now();
     const want = {}; let smug = 0;
+    const SWAP = { lookLeft: 'lookRight', lookRight: 'lookLeft', blinkLeft: 'blinkRight', blinkRight: 'blinkLeft' };
     for (const a of this.active) {
-      const u = (now - a.t0) / a.dur;
-      for (const [name, keys] of Object.entries(a.m.face || {})) { const v = track(keys, u, { ...a.k, overshoot: 0 }, 1)[0] * Math.min(1, a.amp); want[name] = Math.max(want[name] || 0, v); }
+      const u = this.uOf(a, now);
+      for (const [name0, keys] of Object.entries(a.m.face || {})) { const name = a.v?.mirror ? (SWAP[name0] || name0) : name0; const v = track(keys, u, { ...a.k, overshoot: 0 }, 1)[0] * Math.min(1, a.amp); want[name] = Math.max(want[name] || 0, v); }
       if (a.m.smug) smug = Math.max(smug, track(a.m.smug, u, { ...a.k, overshoot: 0 }, 1)[0]);
     }
     if (this.forceSmug && now < this.forceSmug) smug = Math.max(smug, 1);

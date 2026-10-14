@@ -259,6 +259,8 @@ export class Desktop {
   }
 
   show(src) {
+    // viewer-facing layout while mama's private popup is up: keep the last clean frame (main.js sets hold)
+    if (this.hold) { try { URL.revokeObjectURL(src); } catch {} return Promise.resolve(true); }
     return new Promise((resolve) => {
       const back = this.imgs[1 - this.front];
       back.onload = () => {

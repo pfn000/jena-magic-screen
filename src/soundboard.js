@@ -1,6 +1,7 @@
 // Jena's soundboard: short kid-safe meme sounds from myinstants.com (public/sounds, tags in public/sounds/index.json).
 // She picks one with an [sfx:id] cue in her reply, or her brain's picker sends {type:'sfx'} when the moment fits.
-// Never spammy: at least 20 s between sounds, at most 4 in 5 minutes, never the same one twice in a row within a minute.
+// Never spammy: at least 20 s between sounds, at most 4 in 5 minutes, never one of her last 3 sounds or the same one
+// inside 3 minutes (no loops; a clapback takes its sibling clip instead).
 // Never for private (mama) runs. Audible where her voice is: always on the stream/OBS page, on the site only with 🔊 on.
 export class Soundboard {
   constructor({ obs = false, voice = null } = {}) {
@@ -30,12 +31,19 @@ export class Soundboard {
     if (recent.length && now - recent[recent.length - 1].at < this.rules.min_gap_s * 1000) return 'too soon after the last one';
     if (recent.length >= this.rules.max_per_5min) return 'enough sounds for now';
     if (this.last?.id === id && now - this.last.at < 60000) return 'same sound twice in a row';
+    // no-repeat (Saidie: no loops): not one of her last 3 sounds, and not again inside 3 minutes
+    if (recent.slice(-3).some((p) => p.id === id) || recent.some((p) => p.id === id && now - p.at < 180000)) return 'played recently (no repeats)';
     return '';
   }
   async play(id, why = '') {
     await this.ready;
     this.clapping = /^clapback/.test(why);   // a clapback sound (api/_lib/memes.js clapbackSound) keeps its own 90 s clock
-    const no = this.refuse(id);
+    let no = this.refuse(id);
+    // a clapback whose clip she just used takes its sibling instead of the same sound again
+    if (no && /no repeats/.test(no) && this.clapping) {
+      const alt = ['vine-boom', 'emotional-damage'].find((x) => x !== id && !this.refuse(x));
+      if (alt) { id = alt; no = ''; }
+    }
     this.clapping = false;
     if (no) { console.info(`[sfx] skipped ${id}: ${no}`); return { played: false, why: no }; }
     const s = this.sounds.get(id), a = new Audio(s.file);
