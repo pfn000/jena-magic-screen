@@ -183,11 +183,12 @@ export class Expressions {
     }
     // voice prosody (RESEARCH.md cheap win #4): brows lift on stressed high-pitched syllables
     out.BRW_Surprised = Math.max(out.BRW_Surprised || 0, this.pros.brow);
+    // fcl.* channels are hers alone and nothing else resets them, so each frame writes every one of them
+    // (0 when unused): a max() against last frame's value latched them on (eyes stuck shut, mouth stuck open)
+    for (const k of this.channels) { try { em.setValue('fcl.' + k, clamp(out[k] || 0, 0, 1)); } catch {} }
     for (const [k, v] of Object.entries(out)) {
-      if (v <= 0.002) continue;
-      const name = /^look/.test(k) ? k : 'fcl.' + k;
-      if (!/^look/.test(k) && !this.channels.has(k)) continue;
-      try { em.setValue(name, Math.max(em.getValue(name) || 0, v)); } catch {}
+      if (v <= 0.002 || !/^look/.test(k)) continue;
+      try { em.setValue(k, Math.max(em.getValue(k) || 0, v)); } catch {}
     }
     this.faceNow = out; this.weight = w;
   }
