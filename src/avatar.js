@@ -263,11 +263,13 @@ export class Avatar {
       else if (turn > 0.35 && !noop) why = 'turn';
       else if (this.stepAsk && now - this.stepAsk.at < 1500) why = this.stepAsk.why;
       else if (now > this.nextIdleStep && ((!busy && now > (this.talk?.until || 0)) || now > this.nextIdleStep + 15000)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
-      if (why && now - (this.lastStep || 0) > 700) {
+      if (why && now - (this.lastStep || 0) > ((why === 'balance' || why === 'turn') ? 1600 : 700) && now - (this.lastStep || 0) > 700) {
         this.stepAsk = null;
         // the lighter foot steps: the one farther from under her hips
         const dl = Math.hypot(hp.x - this.feet.left.x, hp.z - this.feet.left.z), dr = Math.hypot(hp.x - this.feet.right.x, hp.z - this.feet.right.z);
-        const side = dl > dr ? 'left' : 'right';
+        let side = dl > dr ? 'left' : 'right';
+        if (this._lastStepSide === side && now - (this.lastStep || 0) < 3500 && Math.abs(dl - dr) < 0.06) side = side === 'left' ? 'right' : 'left';   // feet take turns, like walking
+        this._lastStepSide = side;
         this._stepNR ||= new NoRepeat({ minGap: 2, windowMs: 20000 });
         const style = this._stepNR.pick(['rest', 'wide', 'narrow', 'fwd', 'back', 'toe_out'], { pool: 'step' });
         const off = { rest: [0, 0], wide: [0.035, 0], narrow: [-0.025, 0], fwd: [0, 0.04], back: [0, -0.035], toe_out: [0.015, 0.015] }[style];
