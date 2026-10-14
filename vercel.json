@@ -5,6 +5,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/world",
+      "destination": "/world.html"
+    },
+    {
       "source": "/tab-live",
       "destination": "/tab-live.html"
     },

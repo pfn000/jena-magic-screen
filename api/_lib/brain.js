@@ -17,7 +17,7 @@
 //   {type:"status", text}                     brain state, e.g. offline
 //   {type:"done"}
 import { PERSONA } from './persona.js';
-import { memeNote, takeSfx, pickSound, playCommand } from './memes.js';
+import { memeNote, takeSfx, pickSound, playCommand, clapbackSound, dirtyLine } from './memes.js';
 import { boxLink, boxAuth, ttsToken } from './boxlink.js';
 
 const env = (k) => (process.env[k] || '').trim();
@@ -300,7 +300,8 @@ export async function* thinkEvents(input) {
   if (invented) yield { type: 'step', kind: 'status', text: `removed ${invented} link${invented > 1 ? 's' : ''} she made up (not from her search or your message)` };
   const cue = takeSfx(cleaned);   // [sfx:id] she wrote herself
   let { text, events } = extractTags(cue.text);
-  const sfxPick = cue.id ? { id: cue.id, why: 'her pick' } : pickSound(input.message, text);   // or the picker, only on a clear match
+  // a clean clapback to chat gets its sound first (rate-limited on the page); a line with a slur or anything sexual gets none
+  const sfxPick = dirtyLine(text) ? null : cue.id ? { id: cue.id, why: 'her pick' } : (clapbackSound(input.message, text) || pickSound(input.message, text));   // or the picker, only on a clear match
   if (sfxPick) events.push({ type: 'sfx', id: sfxPick.id, why: sfxPick.why });
   // if her words skipped what her skill really found, the real top result rides along, labelled as the skill's
   const top = input.skill?.ok && input.skill.top;

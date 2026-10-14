@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Jena's World · NCOM</title>
+  <meta name="description" content="Jena's own 3D room in the browser. Walk around, say hi, or join with a VR headset.">
+  <meta property="og:title" content="Jena's World">
+  <meta property="og:description" content="Jena's own 3D room. Walk in with WASD, a phone, or a VR headset. Bring a friend with the room link.">
+  <meta name="theme-color" content="#1b1030">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥽</text></svg>">
+</head>
+<body class="world">
+  <div id="world-stage"><canvas id="world-canvas"></canvas></div>
+  <div id="world-loading">waking Jena up in her room…</div>
+  <div id="world-hud" hidden>
+    <div class="w-top">
+      <span class="w-title">Jena's World <b>NCOM</b></span>
+      <span id="w-net" class="w-pill">solo</span>
+      <button id="w-invite" type="button">invite a friend</button>
+      <label class="w-name">name <input id="w-name-in" maxlength="16" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <div id="w-osc" aria-label="NCOM Focals PRO pose readout"></div>
+    <div id="w-help">click the room to look around · WASD to walk · Q/E to turn · Esc to let go</div>
+    <div id="w-pad" aria-hidden="true"><i></i></div>
+    <div id="w-toast" hidden></div>
+  </div>
+  <script type="module" src="/src/world-entry.js"></script>
+</body>
+</html>

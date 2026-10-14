@@ -25,6 +25,7 @@ export class Soundboard {
       if (s.scream && now - (this.lastScream || 0) < (this.rules.scream_min_gap_s || 300) * 1000) return 'one scream per 5 minutes';
       return '';
     }
+    if (this.clapping && now - this.lastClapback < (this.rules.clapback_min_gap_s || 90) * 1000) return 'one clapback sound per 90 s';
     const recent = this.played.filter((p) => now - p.at < 300000);
     if (recent.length && now - recent[recent.length - 1].at < this.rules.min_gap_s * 1000) return 'too soon after the last one';
     if (recent.length >= this.rules.max_per_5min) return 'enough sounds for now';
@@ -33,12 +34,15 @@ export class Soundboard {
   }
   async play(id, why = '') {
     await this.ready;
+    this.clapping = /^clapback/.test(why);   // a clapback sound (api/_lib/memes.js clapbackSound) keeps its own 90 s clock
     const no = this.refuse(id);
+    this.clapping = false;
     if (no) { console.info(`[sfx] skipped ${id}: ${no}`); return { played: false, why: no }; }
     const s = this.sounds.get(id), a = new Audio(s.file);
     a.volume = s.volume ?? 0.55;   // the retention clips carry their own level (keys -23 dBFS, screams limited to -6 dBFS)
     const at = Date.now();
     if (s.scream) this.lastScream = at;
+    if (/^clapback/.test(why)) this.lastClapback = at;
     if (!s.hidden && !s.scream) { this.played.push({ id, at, why }); this.played = this.played.filter((p) => at - p.at < 300000); this.last = { id, at }; }
     try { await a.play(); } catch (e) { return { played: false, why: e.message }; }
     window.dispatchEvent(new CustomEvent('jena-sfx', { detail: { id, why, hidden: !!s.hidden, scream: !!s.scream } }));

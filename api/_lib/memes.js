@@ -71,6 +71,24 @@ export function pickSound(heard, said) {
   return m ? { id: m.s, why: m.n } : null;
 }
 
+// CLAPBACKS: chat came at her and she clapped back. A clean clapback gets one sound after the line (emotional
+// damage / vine boom; a brag-roast gets the smug rizz clip). She never uses a slur and nothing sexual: a line like that
+// gets NO sound (her brain out-roasts clean instead). Rate: the page allows one clapback sound per 90 s (src/soundboard.js),
+// the box the same (box/stream/jena-sfx.py clapback).
+const DIRTY = /\b(n[i1!*]gg\w*|f[a@*4]gg?\w*|retard\w*|tranny|k[i1]ke|sp[i1]c|ch[i1]nk|wetback|beaner|r[a@]pe\w*|sex\w*|porn\w*|nude\w*|naked|horny|boob\w*|tits?|dick|cock|pussy|cum|thot|slut\w*|whore\w*|onlyfans|daddy|kys|kill yo(?:ur)?self)\b/i;
+const BAIT = /\b(trash|garbage|mid|cringe|npc|bot|ratio|you suck|u suck|ur (?:so )?(?:bad|dumb|mid)|you'?re (?:so )?(?:bad|dumb|mid|boring)|stupid|dumb|loser|noob|washed|fell off|clown|L)\b/i;
+const COMEBACK = /\b(imagine|couldn'?t be me|who asked|says the (?:one|guy|person|kid)|ratio|cope|skill issue|sit (?:down|tf down)|cooked|L ?\+|try again|stay mad|keep crying|that'?s rich|bold of you|(?:you(?:'re| are)|ur) (?:just )?(?:jealous|mad|pressed)|mad cuz|caught in 4k|no one asked|nobody asked)\b/i;
+export const dirtyLine = (t) => DIRTY.test(String(t || '').normalize('NFKC'));
+export function clapbackSound(heard, said) {
+  const s = String(said || ''), h = String(heard || '');
+  if (!s.trim() || dirtyLine(s)) return null;   // never a sound on a slur or anything sexual (she shouldn't say it at all)
+  if (/\b(date|kiss|crush|cute|babe|marry|girlfriend|boyfriend|love you)\b/i.test(`${h} ${s}`)) return null;
+  const clap = COMEBACK.test(s) || (BAIT.test(h) && /\b(you|your|you'?re|ur|u)\b/i.test(s) && /[!?]|\b(lol|lmao|bro|bestie|chat)\b/i.test(s));
+  if (!clap) return null;
+  if (/\b(skill issue|too easy|built different|ez|cooked)\b/i.test(s)) return { id: 'rizz', why: 'clapback' };
+  return { id: /\b(ratio|L ?\+|who asked|nobody asked|no one asked)\b/i.test(s) ? 'emotional-damage' : (s.length % 2 ? 'vine-boom' : 'emotional-damage'), why: 'clapback' };
+}
+
 // "jena play the vine boom" / "play bruh sound" / "!sfx bruh"
 export function playCommand(text) {
   const m = String(text || '').match(/^\s*(?:jena[\s,]+)?(?:!sfx\s+|play\s+(?:the\s+|a\s+|that\s+)?)([a-z0-9 -]{2,40}?)(?:\s+(?:sound|sfx|sound effect|noise))?\s*[.!?]*\s*$/i);

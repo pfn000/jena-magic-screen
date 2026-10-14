@@ -5,11 +5,14 @@
   jena-sfx pick "chat said gg we won"               which clip fits a moment (prints it, plays nothing)
   jena-sfx list                                     the clips, their tags and when to use them
   jena-sfx status                                   is a stream sink up, what was played lately, limits left
+  jena-sfx clapback "<her line>" [--to "<what chat said>"]   a sound AFTER her clapback line (clean lines only)
 
 Same rules as the page soundboard (src/soundboard.js): at least 20 s between sounds, at most 4 in 5 minutes,
 never the same clip twice within a minute, never for a private (mama) run (--private refuses). Kid-safe clips only.
 Where it is heard: the stream compositor's own audio sink (box/stream/jena-stream.sh, /tmp/jena-stream/pulse),
 so it goes out with the stream. With no stream running nothing plays and it says so (exit 4).
+Clapbacks: one clapback sound per 90 s on top of the rules above; a line with a slur or anything sexual never gets a
+sound (she out-roasts clean instead); same detector as the site (api/_lib/memes.js clapbackSound).
 Output is one JSON line. Exit 0 played / 2 refused (rate limit, unknown, private) / 4 no stream audio to play into."""
 import fcntl, json, os, re, subprocess, sys, time
 
@@ -47,6 +50,22 @@ def pick(text, snd):   # mirrors api/_lib/memes.js pickSound: a clip only on a c
     for rx, sid in RULES:
         if re.search(rx, str(text or ""), re.I) and sid in snd: return sid
     return None
+
+DIRTY = re.compile(r"\b(n[i1!*]gg\w*|f[a@*4]gg?\w*|retard\w*|tranny|k[i1]ke|sp[i1]c|ch[i1]nk|wetback|beaner|r[a@]pe\w*|sex\w*|porn\w*|nude\w*|naked|horny|boob\w*|tits?|dick|cock|pussy|cum|thot|slut\w*|whore\w*|onlyfans|daddy|kys|kill yo(?:ur)?self)\b", re.I)
+BAIT = re.compile(r"\b(trash|garbage|mid|cringe|npc|bot|ratio|you suck|u suck|ur (?:so )?(?:bad|dumb|mid)|you'?re (?:so )?(?:bad|dumb|mid|boring)|stupid|dumb|loser|noob|washed|fell off|clown|L)\b", re.I)
+COMEBACK = re.compile(r"\b(imagine|couldn'?t be me|who asked|says the (?:one|guy|person|kid)|ratio|cope|skill issue|sit (?:down|tf down)|cooked|L ?\+|try again|stay mad|keep crying|that'?s rich|bold of you|(?:you(?:'re| are)|ur) (?:just )?(?:jealous|mad|pressed)|mad cuz|caught in 4k|no one asked|nobody asked)\b", re.I)
+CLAP_GAP = int(os.environ.get("JENA_CLAPBACK_GAP_S", "90"))
+
+def clapback(said, heard, snd):   # mirrors api/_lib/memes.js clapbackSound
+    s, h = str(said or ""), str(heard or "")
+    if not s.strip() or DIRTY.search(s): return None, "dirty" if s.strip() else "empty"
+    if re.search(r"\b(date|kiss|crush|cute|babe|marry|girlfriend|boyfriend|love you)\b", h + " " + s, re.I): return None, "romantic"
+    clap = COMEBACK.search(s) or (BAIT.search(h) and re.search(r"\b(you|your|you'?re|ur|u)\b", s, re.I) and re.search(r"[!?]|\b(lol|lmao|bro|bestie|chat)\b", s, re.I))
+    if not clap: return None, "not a clapback"
+    if re.search(r"\b(skill issue|too easy|built different|ez|cooked)\b", s, re.I): sid = "rizz"
+    elif re.search(r"\b(ratio|L ?\+|who asked|nobody asked|no one asked)\b", s, re.I): sid = "emotional-damage"
+    else: sid = "vine-boom" if len(s) % 2 else "emotional-damage"
+    return (sid if sid in snd else None), None
 
 def locked_state(fn):
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
@@ -96,6 +115,16 @@ def main(argv):
         except Exception: st = {"played": []}
         recent = [p for p in st["played"] if now - p["at"] < 300]
         out({"stream_audio": os.path.exists(SINK_SOCK), "played_5min": recent, "left_5min": max(0, rules.get("max_per_5min", 4) - len(recent))}, 0)
+    clap = False
+    if cmd == "clapback":
+        args = argv[1:]; heard = ""
+        if "--to" in args: i = args.index("--to"); heard = " ".join(args[i + 1:i + 2]); del args[i:i + 2]
+        said = " ".join(a for a in args if a != "--private")
+        sid, no = clapback(said, heard, snd)
+        if not sid:
+            rec = {"at": round(time.time(), 1), "clapback": said[:120], "played": False, "refused": {"dirty": "never a sound on a slur or anything sexual (she out-roasts clean instead)", "romantic": "never on anything romantic"}.get(no, no or "no clip")}
+            log(rec); out(rec, 2)
+        argv = ["play", sid, "--why", "clapback"] + (["--private"] if "--private" in args else []); cmd = "play"; clap = True
     if cmd != "play": out({"played": False, "why": "unknown command %s" % cmd}, 2)
     args = argv[1:]; why = ""; private = False
     if "--why" in args: i = args.index("--why"); why = " ".join(args[i + 1:i + 2]); del args[i:i + 2]
@@ -107,7 +136,11 @@ def main(argv):
     if not os.path.exists(SINK_SOCK): rec.update(played=False, refused="no stream running (nothing to play into)"); log(rec); out(rec, 4)
     now = time.time()
     def claim(st):
+        if clap:
+            last = max([p["at"] for p in st.get("clapbacks", []) if now - p["at"] < 3600] or [0])
+            if now - last < CLAP_GAP: return "one clapback sound per %d s" % CLAP_GAP
         no = refuse(st, sid, rules, now)
+        if not no and clap: st["clapbacks"] = [p for p in st.get("clapbacks", []) if now - p["at"] < 3600] + [{"at": now, "id": sid}]
         if not no: st["played"].append({"id": sid, "at": now, "why": why})
         return no
     no = locked_state(claim)

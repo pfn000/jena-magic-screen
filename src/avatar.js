@@ -379,6 +379,7 @@ export class Avatar {
     } catch { this.coverBottom = 0; }
   }
   frameCamera() {
+    if (this.cameraHeld) return;   // a page that drives the camera itself (the /world room: WASD, mouse look, a VR headset)
     if (this.cam && document.body.classList.contains('stream')) return;   // stream: panel resizes (dance <-> talk) ease through updateCamera, never snap
     const pin = new URLSearchParams(location.search).get('view');
     this.viewPin = pin === 'full' || pin === 'talk' ? pin : null;
@@ -625,6 +626,7 @@ export class Avatar {
     const t = this.clock.getElapsed() + (this.timeOffset || 0);
     const now = performance.now();
     const vrm = this.vrm;
+    for (const f of this.preHooks || []) { try { f(dt, raw); } catch (e) { console.warn('pre hook', e); } }   // (dt, raw) before her pose + render, body or not (the /world room moves the camera here)
     if (vrm) {
       const H = vrm.humanoid;
       // arms toward targets
