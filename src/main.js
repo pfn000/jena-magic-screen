@@ -667,6 +667,19 @@ window.jena = {
   react: (type, intensity) => motion.play(/^(react|direct|brag|talk|idle)_/.test(type) ? type : (['point', 'lean_in', 'wave', 'finger_guns', 'you'].includes(type) ? 'direct_' : ['smug', 'flex'].includes(type) ? 'brag_' : 'react_') + type, { intensity, trigger: 'api' }),
   motion,
   spin: (dir, ms, turns) => motion.avatar?.spin?.(dir, ms, turns),
+  // which way her body parts face, relative to the viewer camera: yaw in degrees (0 = straight at the camera,
+  // + = turned to HER left) and a word; forward comes from each part's own left-right bone line (left x up)
+  facing: () => {
+    const A = motion.avatar, H = A?.vrm?.humanoid; if (!H) return null;
+    const V = A.camera.position.constructor, P = (n) => H.getRawBoneNode(n)?.getWorldPosition(new V());
+    const yawOf = (l, r) => { if (!l || !r) return null; const lx = l.x - r.x, lz = l.z - r.z; return Math.atan2(-lz, lx); };   // forward = left x up = (-lz, 0, lx)
+    const hp = P('hips'), cy = Math.atan2(A.camera.position.x - hp.x, A.camera.position.z - hp.z);
+    const rel = (y) => y === null ? null : Math.round(((Math.atan2(Math.sin(y - cy), Math.cos(y - cy))) * 180 / Math.PI));
+    const word = (d) => d === null ? null : Math.abs(d) < 20 ? 'camera' : Math.abs(d) > 135 ? 'away' : d > 0 ? 'her left' : 'her right';
+    const out = { hips: rel(yawOf(P('leftUpperLeg'), P('rightUpperLeg'))), chest: rel(yawOf(P('leftUpperArm'), P('rightUpperArm'))), head: rel(yawOf(P('leftEye'), P('rightEye'))) };
+    const r = {}; for (const [k, v] of Object.entries(out)) r[k] = { yaw: v, facing: word(v) };
+    r.eyes = { target: A.gazeNow || 'camera' }; r.spinning = !!A.spinState; return r;
+  },
   // learned facial expressions: jena.expr.play('surprised'), .show('pout') (freeze at peak, null clears), .names, .state()
   expr: expressions,
   onExpression: (cb) => expressions.onExpression(cb),

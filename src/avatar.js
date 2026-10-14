@@ -22,6 +22,7 @@ const REST = {
   leftHand: [0, -0.15, -0.18], rightHand: [0, 0.15, 0.18],
 };
 // smooth 1D value noise: never-repeating, organic drift (each channel gets its own random table)
+const talking0 = (A, now) => now < (A.talk?.until || 0);
 function noise() {
   const p = Float32Array.from({ length: 256 }, () => Math.random() * 2 - 1);
   const n = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return p[i & 255] * (1 - u) + p[(i + 1) & 255] * u; };
@@ -228,6 +229,14 @@ export class Avatar {
     return this.floorY || 0;
   }
   // ask for a step (a big reaction, a turn): she re-plants a foot under her hips
+  // shoulders: shrug ('both' | 'L' | 'R'), drop (relaxed down) or roll (forward-up-back)
+  shrug(side = 'both', amt = 0.18 + Math.random() * 0.12, ms = 650 + Math.random() * 500, kind = 'shrug') {
+    if (!this.sh) return null;
+    const asym = side === 'both' ? Math.random() * 0.3 : 0;
+    this.sh.ev = { t0: performance.now(), ms, side, amt, kind, aL: 1 - (Math.random() < 0.5 ? asym : 0), aR: 1 - (Math.random() < 0.5 ? asym : 0) };
+    try { const Lg = (window.jenaLog ||= []); Lg.push({ t: Math.round(performance.now()), kind: 'shoulders', what: kind + ':' + side, why: 'shoulders' }); } catch {}
+    return this.sh.ev;
+  }
   // spin all the way around (or more): dir 1/-1, turns 1 = 360 degrees
   spin(dir = Math.random() < 0.5 ? 1 : -1, ms = 1500 + Math.random() * 700, turns = 1) { this.spinState = { t0: performance.now(), dur: ms, dir, turns }; try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(performance.now()), kind: 'spin', what: (dir > 0 ? 'ccw' : 'cw') + ' ' + turns, why: 'spin' }); } catch {} return this.spinState; }
   requestStep(why = 'asked') { this.stepAsk = { why, at: performance.now() }; }
@@ -244,7 +253,7 @@ export class Avatar {
     {
       const d = (this._spinY || 0) - (this._spinPrev || 0);
       this._spinPrev = this.spinState ? (this._spinY || 0) : 0;
-      if (Math.abs(d) > 1e-5) for (const s of ['left', 'right']) { const f = this.feet[s], dx = f.x - hp.x, dz = f.z - hp.z, c = Math.cos(d), sn = Math.sin(d); f.x = hp.x + dx * c + dz * sn; f.z = hp.z - dx * sn + dz * c; }
+      if (Math.abs(d) > 1e-5) for (const s of ['left', 'right']) { const FY = (this.footYaw ||= { left: 0, right: 0 }); FY[s] = Math.atan2(Math.sin(FY[s] + d), Math.cos(FY[s] + d)); const f = this.feet[s], dx = f.x - hp.x, dz = f.z - hp.z, c = Math.cos(d), sn = Math.sin(d); f.x = hp.x + dx * c + dz * sn; f.z = hp.z - dx * sn + dz * c; }
     }
     const S = this.stepState;
     if (this.spinState && !S) { /* no steps mid-spin */ }
@@ -253,6 +262,7 @@ export class Avatar {
       const f = this.feet[S.side];
       f.lerpVectors(S.from, S.to, e);
       f.y = S.from.y + (S.to.y - S.from.y) * e + Math.sin(Math.PI * u) * S.lift;
+      if (S.yawTo !== undefined) { const FY = (this.footYaw ||= { left: 0, right: 0 }); FY[S.side] = S.yawFrom + (S.yawTo - S.yawFrom) * e; }
       if (u >= 1) { f.copy(S.to); this.stepState = null; this.lastStep = now; this.steps = (this.steps || 0) + 1; }
     } else {
       const mid = _v[8].copy(this.feet.left).add(this.feet.right).multiplyScalar(0.5);
@@ -269,17 +279,31 @@ export class Avatar {
       const busy = this.motion?.moves?.busy;
       let why = null;
       const noop = now - (this._noopAt || 0) < 4000;   // the last balance/turn step had nowhere to go: don't spin on it
-      if (drift > 0.09 && !noop) why = 'balance';
+      // feet crossed too far (more than 6 cm past each other along her hips' side axis): step out of it
+      const latv = _v[5].set(1, 0, 0).applyQuaternion(hq); 
+      const sepRaw = (this.feet.left.x - this.feet.right.x) * latv.x + (this.feet.left.z - this.feet.right.z) * latv.z;
+      if (this._latSign === undefined && Math.abs(sepRaw) > 0.05) this._latSign = Math.sign(sepRaw);
+      const crossed = this._latSign !== undefined && sepRaw * this._latSign < -0.06;
+      this.feetDbg.cross = +(-(sepRaw * (this._latSign || 1))).toFixed(3);
+      if (crossed && !noop) why = 'uncross';
+      else if (drift > 0.09 && !noop) why = 'balance';
       else if (turn > 0.35 && !noop) why = 'turn';
       else if (this.stepAsk && now - this.stepAsk.at < 1500) why = this.stepAsk.why;
       else if (now > this.nextIdleStep && ((!busy && now > (this.talk?.until || 0)) || now > this.nextIdleStep + 15000)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
-      if (why && now - (this.lastStep || 0) > ((why === 'balance' || why === 'turn') ? (turn > 0.6 || this.spinState ? 280 : 1600) : 700) && now - (this.lastStep || 0) > 700) {
+      if (why && now - (this.lastStep || 0) > ((why === 'balance' || why === 'turn' || why === 'uncross') ? (turn > 0.6 || why === 'uncross' || this.spinState ? 280 : 1600) : 700) && now - (this.lastStep || 0) > 700) {
         this.stepAsk = null;
         // the lighter foot steps: the one farther from under her hips
         const dl = Math.hypot(hp.x - this.feet.left.x, hp.z - this.feet.left.z), dr = Math.hypot(hp.x - this.feet.right.x, hp.z - this.feet.right.z);
         let side = dl > dr ? 'left' : 'right';
         if (this._lastStepSide === side && now - (this.lastStep || 0) < 3500 && Math.abs(dl - dr) < 0.06) side = side === 'left' ? 'right' : 'left';   // feet take turns, like walking
         this._lastStepSide = side;
+        if (why === 'idle' && Math.random() < 0.35) {   // a fidget: the foot just pivots on its heel/ball, no step
+          const FY = (this.footYaw ||= { left: 0, right: 0 }), from = FY[side], to2 = from + (Math.random() - 0.5) * 0.5;
+          this.footPivot = { side, from, to: THREE.MathUtils.clamp(to2, -0.7, 0.7), t0: now, dur: 350 + Math.random() * 300 }; this.lastStep = now;
+          try { const Lg = (window.jenaLog ||= []); Lg.push({ t: Math.round(now), kind: 'pivot', what: side + ' ' + (to2 - from).toFixed(2), why }); } catch {}
+          why = null;
+        }
+        if (why) {
         this._stepNR ||= new NoRepeat({ minGap: 2, windowMs: 20000 });
         const style = this._stepNR.pick(['rest', 'wide', 'narrow', 'fwd', 'back', 'toe_out'], { pool: 'step' });
         const off = { rest: [0, 0], wide: [0.035, 0], narrow: [-0.025, 0], fwd: [0, 0.04], back: [0, -0.035], toe_out: [0.015, 0.015] }[style];
@@ -299,7 +323,7 @@ export class Avatar {
         const capCross = () => { const sep = ((to.x - other.x) * ax.x + (to.z - other.z) * ax.z) * want; if (sep < -0.06) { const k = (-0.06 - sep) * want; to.x += ax.x * k; to.z += ax.z * k; to.y = this.groundY(to.x, to.z) + this.ankleH[side]; } };
         capCross();
         let len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
-        if (len < 0.03 && why !== 'balance' && why !== 'turn') {   // an asked-for or idle step always visibly moves the foot
+        if (len < 0.03 && why !== 'balance' && why !== 'turn' && why !== 'uncross') {   // an asked-for or idle step always visibly moves the foot
           const a = Math.random() * Math.PI * 2, r = 0.035 + Math.random() * 0.03;
           to.x += Math.cos(a) * r * 0.8; to.z += Math.sin(a) * r;
           const ddx = to.x - other.x, ddz = to.z - other.z, d2 = Math.hypot(ddx, ddz);
@@ -308,11 +332,13 @@ export class Avatar {
           capCross();
           len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
         }
-        if (len > 0.015) { try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'step', what: side + ':' + style, why }); if (L.length > 400) L.shift(); } catch {} }
-        if (len > 0.015) this.stepState = { side, from: this.feet[side].clone(), to, t0: now, dur: 300 + len * 900 + Math.random() * 120, lift: 0.04 + Math.min(0.04, len * 0.15) + Math.random() * 0.01, why, style };
+        if (len > 0.015 && why) { try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'step', what: side + ':' + style, why }); if (L.length > 400) L.shift(); } catch {} }
+        if (len > 0.015) this.stepState = { yawFrom: (this.footYaw ||= { left: 0, right: 0 })[side], yawTo: (() => { const hy = H.getNormalizedBoneNode('hips').rotation.y; const b = Math.atan2(Math.sin(hy), Math.cos(hy)) + (side === 'left' ? 1 : -1) * (0.08 + Math.random() * 0.12); const cur = this.footYaw[side]; return cur + Math.atan2(Math.sin(b - cur), Math.cos(b - cur)); })(), side, from: this.feet[side].clone(), to, t0: now, dur: 300 + len * 900 + Math.random() * 120, lift: 0.04 + Math.min(0.04, len * 0.15) + Math.random() * 0.01, why, style };
         else { this.lastStep = now; if (why === 'balance' || why === 'turn') this._noopAt = now; if (why === 'turn') this._turnRef = rel; }
+        }
       }
     }
+    if (this.footPivot) { const P = this.footPivot, u = Math.min(1, (now - P.t0) / P.dur), e = u * u * (3 - 2 * u); (this.footYaw ||= { left: 0, right: 0 })[P.side] = P.from + (P.to - P.from) * e; if (u >= 1) this.footPivot = null; }
     // planted feet: snapped onto the ground every frame (whatever a pose or tracked move wanted)
     for (const s of ['left', 'right']) {
       if (this.stepState?.side === s) continue;
@@ -395,10 +421,15 @@ export class Avatar {
       const axis = _v[3].subVectors(target, pu).normalize();
       wq.premultiply(_q[0].setFromAxisAngle(axis, (side === 'left' ? 1 : -1) * 0.7 * free));
     }
+    // knee tracks the toes: the whole leg rolls about its hip-to-ankle line by the foot's own yaw
+    const fy = (this.footYaw ||= { left: 0, right: 0 })[side] || 0;
+    const hy0 = H.getNormalizedBoneNode('hips')?.rotation.y || 0, fr = Math.atan2(Math.sin(fy - hy0), Math.cos(fy - hy0));   // relative to her hips' facing (no flip at +-180)
+    if (Math.abs(fr) > 1e-4) wq.premultiply(_q[0].setFromAxisAngle(_v[3].subVectors(target, pu).normalize(), -THREE.MathUtils.clamp(fr, -0.9, 0.9) * 0.85));
     U.quaternion.copy(U.parent.getWorldQuaternion(_q[2]).invert().multiply(wq));
     U.updateMatrixWorld(true);
-    // flat foot: in the normalized rig every bone's rest world rotation equals the rig root's
+    // flat foot, turned by its own yaw (each foot points its own way: toe-out, pivots, following her turns)
     const root = H.normalizedHumanBonesRoot.getWorldQuaternion(_q[1]);
+    if (Math.abs(fy) > 1e-4) root.premultiply(_q[3].setFromAxisAngle(_v[5].set(0, 1, 0), fy));
     F.quaternion.copy(F.parent.getWorldQuaternion(_q[2]).invert().multiply(root));
     if (lift) F.rotateX(-lift); // toes up (heel stays down) for a foot tap
     if (free) F.rotateX(0.45 * free); // toes stay on the floor while the heel is up
@@ -846,17 +877,23 @@ export class Avatar {
       const hips = H.getNormalizedBoneNode('hips');
       const sway = N.sw(t * 0.16);
       if (hips && this.hipsRest) {
-        hips.position.set(this.hipsRest.x + L * 0.075 + sway * 0.022, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003, this.hipsRest.z + N.py(t * 0.11) * 0.012);
+        hips.position.set(this.hipsRest.x + L * 0.075 + sway * 0.03, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003, this.hipsRest.z + N.py(t * 0.11) * 0.012);
       }
       // contrapposto: the standing leg's hip rises (+z lifts her left side), the spine and shoulders answer it
       // a full free turn (spin): eased 360 degrees on the hips; her feet step around to follow (updateFeet)
       let spinY = 0;
       if (this.spinState) { const S2 = this.spinState, u = (now - S2.t0) / S2.dur; if (u >= 1) this.spinState = null; else { const e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u); spinY = e * Math.PI * 2 * S2.dir * S2.turns; } }
-      set('hips', 0, N.px(t * 0.1) * 0.07 + L * 0.06 + spinY, L * 0.11 + sway * 0.02);
+      set('hips', 0, N.px(t * 0.1) * 0.07 + L * 0.06 + spinY, L * 0.11 + sway * 0.03);
       this._spinY = spinY;
-      set('spine', 0.03 + breathe * 0.03 + N.sx(t * 0.13) * 0.04, N.sy(t * 0.12) * 0.06, -L * 0.13 + N.sz(t * 0.15) * 0.03);
-      set('chest', breathe * 0.05, N.cy(t * 0.14) * 0.05, -L * 0.04);
-      set('upperChest', breathe * 0.02, 0, 0);
+      // the torso curves like a real spine: one total bend/twist/roll, spread over every spine bone her rig has
+      // (spine -> chest -> upperChest) with falloff, instead of all on one joint; the roll counters the hips' sway
+      // so her head stays steady over her feet
+      const hasUC = !!H.getNormalizedBoneNode('upperChest');
+      const wS = hasUC ? 0.42 : 0.55, wC = hasUC ? 0.33 : 0.45, wU = hasUC ? 0.25 : 0;
+      const bx = N.sx(t * 0.13) * 0.07, by = N.sy(t * 0.12) * 0.09 + N.cy(t * 0.14) * 0.05, bz = -L * 0.17 - sway * 0.035 + N.sz(t * 0.15) * 0.035;
+      set('spine', 0.03 + breathe * 0.025 + bx * wS, by * wS, bz * wS);
+      set('chest', breathe * 0.04 + bx * wC, by * wC, bz * wC);
+      if (hasUC) set('upperChest', breathe * 0.025 + bx * wU, by * wU, bz * wU);
       set('neck', N.nx(t * 0.2) * 0.05, N.ny(t * 0.17) * 0.08, L * 0.04);
       if (this.look.until && now > this.look.until) { this.look.ty = 0; this.look.tx = 0; this.look.until = 0; }
       this.look.y = damp(this.look.y, this.look.ty, 4, dt);
@@ -864,7 +901,32 @@ export class Avatar {
       // +z on the head rolls it toward HER right, so her chosen tilt (+ = her left) goes in negated
       set('head', N.hx(t * 0.27) * 0.06 + this.look.x + nodX, N.hy(t * 0.21) * 0.14 + this.look.y + shakeY, N.hz(t * 0.24) * 0.05 - A.tilt.v - L * 0.06);
       // shoulders lift a touch on each breath in
-      set('leftShoulder', 0, 0, -0.05 + inhale * 0.045); set('rightShoulder', 0, 0, 0.05 - inhale * 0.045); // shoulders down, lifting on each breath
+      // shoulders (clavicles) move on their own: breath lifts them, each drifts up/down and forward/back on its own
+      // noise (asymmetric), plus shrugs (both or one), drops and rolls she chooses or her words/reactions trigger
+      {
+        const SH = (this.sh ||= { L: { u: 0, f: 0 }, R: { u: 0, f: 0 }, ev: null, nL: noise(), nR: noise(), nF: noise() });
+        let eu = { L: 0, R: 0 }, ef = { L: 0, R: 0 };
+        if (SH.ev) {
+          const E = SH.ev, u = (now - E.t0) / E.ms;
+          if (u >= 1) SH.ev = null;
+          else {
+            const env = u < 0.25 ? Math.sin(u / 0.25 * Math.PI / 2) : u > 0.7 ? Math.cos((u - 0.7) / 0.3 * Math.PI / 2) : 1;   // quick up, hold, ease down
+            const roll = E.kind === 'roll' ? Math.sin(u * Math.PI * 2) : 0;
+            for (const k of ['L', 'R']) if (E.side === 'both' || E.side === k) { eu[k] = (E.kind === 'drop' ? -0.1 : E.kind === 'roll' ? 0.12 * Math.max(0, Math.cos(u * Math.PI * 2 - Math.PI / 2)) : E.amt) * env * (k === 'L' ? E.aL : E.aR); ef[k] = roll * 0.16 * env; }
+          }
+        }
+        for (const k of ['L', 'R']) {
+          const nz = (k === 'L' ? SH.nL : SH.nR)(t * 0.09 + (k === 'L' ? 0 : 50));
+          const gu = THREE.MathUtils.clamp(inhale * 0.05 + nz * 0.03 + eu[k], -0.12, 0.35), gf = THREE.MathUtils.clamp(SH.nF(t * 0.07 + (k === 'L' ? 0 : 30)) * 0.05 + ef[k], -0.2, 0.2);
+          SH[k].u = damp(SH[k].u, gu, 10, dt); SH[k].f = damp(SH[k].f, gf, 8, dt);
+        }
+        set('leftShoulder', 0, SH.L.f, -0.05 + SH.L.u); set('rightShoulder', 0, -SH.R.f, 0.05 - SH.R.u);
+        // a new line she says: "idk"/a question gets a shrug now and then
+        if (this.talk?.t0 && this.talk.t0 !== SH.lastT0) {
+          SH.lastT0 = this.talk.t0; const tx = String(this.talk.text || '');
+          if (/\b(idk|i don'?t know|dunno|whatever|maybe|i guess)\b/i.test(tx) || (/\?\s*$/.test(tx) && Math.random() < 0.45)) this.shrug(Math.random() < 0.7 ? 'both' : Math.random() < 0.5 ? 'L' : 'R');
+        }
+      }
       // relaxed arms drift a little (only while they're down; a raised arm stays where she put it)
       const restL = this.target.leftUpperArm[2] < 0 ? 1 : 0, restR = this.target.rightUpperArm[2] > 0 ? 1 : 0;
       add('leftUpperArm', N.al(t * 0.19) * 0.09 * restL, 0, (N.al(t * 0.13 + 40) * 0.06 + inhale * 0.02) * restL);
@@ -884,6 +946,25 @@ export class Avatar {
         add('spine', 0, sp.y * 0.35, sp.z * 0.4); add('chest', 0, sp.y * 0.25, sp.z * 0.3); add('neck', 0, sp.y * 0.2, 0); add('head', 0, sp.y * 0.3, sp.z * 0.3);
         const fling = Math.min(0.5, Math.abs(sp.y) * 0.8);
         add('leftUpperArm', 0, 0, fling * restL); add('rightUpperArm', 0, 0, -fling * restR);
+      }
+      // NECK: free glances (yaw up to ~70 deg, pitch, roll), split 40/60 over neck and head, eased in, held, eased back,
+      // at irregular times; smaller while she talks (she mostly looks at chat then)
+      {
+        const G = (this.glance ||= { y: 0, p: 0, r: 0, ty: 0, tp: 0, tr: 0, next: now + 4000 + Math.random() * 8000, back: 0 });
+        if (now > G.next) {
+          const big = Math.random() < 0.3, sc = talking0(this, now) ? 0.3 : 1;
+          G.ty = (Math.random() - 0.5) * 2 * (big ? 1.2 : 0.5) * sc; G.tp = (Math.random() - 0.4) * (big ? 0.5 : 0.25) * sc; G.tr = (Math.random() - 0.5) * 0.35 * sc;
+          G.back = now + 700 + Math.random() * 2200; G.next = now + Math.min(30000, Math.max(3500, 9000 * Math.exp((Math.random() + Math.random() - 1) * 1.2)));
+          try { const Lg = (window.jenaLog ||= []); Lg.push({ t: Math.round(now), kind: 'glance', what: 'yaw ' + (G.ty * 57.3).toFixed(0) + ' pitch ' + (G.tp * 57.3).toFixed(0), why: 'idle' }); } catch {}
+        }
+        if (G.back && now > G.back) { G.ty = G.tp = G.tr = 0; G.back = 0; }
+        G.y = damp(G.y, G.ty, 3.2, dt); G.p = damp(G.p, G.tp, 3.2, dt); G.r = damp(G.r, G.tr, 2.5, dt);
+        add('neck', G.p * 0.4, G.y * 0.4, G.r * 0.4); add('head', G.p * 0.6, G.y * 0.6, G.r * 0.6);
+        // WRISTS: each hand drifts on 3 axes, droops a little when relaxed, more life while talking
+        this.WN ||= { lx: noise(), ly: noise(), lz: noise(), rx: noise(), ry: noise(), rz: noise() };
+        const W = this.WN, wa = talking0(this, now) ? 1.6 : 1;
+        add('leftHand', W.lx(t * 0.21) * 0.14 * wa, W.ly(t * 0.17) * 0.12 * wa, (W.lz(t * 0.19) * 0.16 * wa + 0.08) * restL);
+        add('rightHand', W.rx(t * 0.21 + 9) * 0.14 * wa, W.ry(t * 0.17 + 9) * 0.12 * wa, -(W.rz(t * 0.19 + 9) * 0.16 * wa + 0.08) * restR);
       }
       // legs: start straight-ish (knees a hair forward of locked), then IK plants each foot
       for (const s of ['left', 'right']) { set(s + 'UpperLeg', 0, 0, 0); set(s + 'LowerLeg', 0.03, 0, 0); set(s + 'Foot', 0, 0, 0); }
