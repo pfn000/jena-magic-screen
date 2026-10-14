@@ -105,6 +105,13 @@ export class FaceView {
       label = what === 'camera' ? 'you (the viewer camera)' : `${what} · ${onPage}`;
       Object.assign(this.cross.style, { display: '', left: Math.max(0, Math.min(innerWidth, x)) + 'px', top: Math.max(0, Math.min(innerHeight, y)) + 'px' });
     } else { label = what === 'camera' ? 'you (the viewer camera)' : what + ' (behind the camera)'; this.cross.style.display = 'none'; }
+    // a named target that lives on the page (her desktop, the chat): mark that element itself when the 3D point
+    // falls off the visible page
+    const SEL = { desktop: '#desktop', chat: '#chat, #chat-box, [id*="chat"]', notes: '#notes, [id*="note"]' };
+    if (what !== 'camera' && (sp.z >= 1 || /off-screen/.test(label)) && SEL[what]) {
+      const elx = [...document.querySelectorAll(SEL[what])].find((e) => { const r = e.getBoundingClientRect(); return r.width > 20 && r.height > 20 && getComputedStyle(e).visibility !== 'hidden'; });
+      if (elx) { const r = elx.getBoundingClientRect(), x = Math.max(4, Math.min(innerWidth - 4, r.left + r.width / 2)), y = Math.max(4, Math.min(innerHeight - 4, r.top + r.height / 2)); label = `${what} · ${this.nameAt(x, y)}`; Object.assign(this.cross.style, { display: '', left: x + 'px', top: y + 'px' }); }
+    }
     this.cross.firstChild.textContent = 'looking at: ' + label;
     this.el.querySelector('.fv-gz').textContent = 'looking at: ' + label;
     this.el.querySelector('.fv-eyes').textContent = `eyes yaw ${deg(eb?.rotation.y || 0)} pitch ${deg(eb?.rotation.x || 0)} · blink ${(blink * 100).toFixed(0)}% · gaze ${what}`;
