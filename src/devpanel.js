@@ -29,7 +29,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><a href="/tab-live" target="_blank" rel="noopener" style="margin-left:auto;margin-right:8px;font-size:12px;color:#3ddc84;text-decoration:none;border:1px solid #1f5f3a;border-radius:999px;padding:1px 8px">🖥 Tab Live</a><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['asks', 'live', 'self', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', self: '🪞 Her body (self-view)', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys' }[t]}</button>`).join('')}</nav>
+      <nav>${['asks', 'live', 'self', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security', 'face'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', self: '🪞 Her body (self-view)', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys', face: '👀 Face + gaze' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -131,6 +131,7 @@ export class DevPanel {
     if (!this.el.hidden && this.tab !== 'security' && this.tab !== 'self' && document.activeElement?.id !== 'dp-lib-q' && !['ask-site', 'ask-key'].includes(document.activeElement?.id)) this.render();
   }
   render() {
+    if (this.tab === 'face') { const fvw = window.__jenaFaceView; const body = this.el.querySelector('.dp-body'); body.innerHTML = `<p>Live close-up of her face with expression bars, eye angles and blink, and a gaze ray to what she's really looking at (a crosshair + label on the page).</p><button class="dp-fv" style="padding:6px 12px">${fvw?.on ? 'hide' : 'show'} face + gaze view</button>`; body.querySelector('.dp-fv').onclick = () => { fvw?.toggle(); this.render(); }; return; }
     const d = this.data, box = d.box?.data, live = box && d.box.online;
     const notOn = `<p class="dp-warn">her box is not answering right now${d.box?.error ? `: ${esc(d.box.error)}` : ''}. Nothing below is cached or invented, so this section is empty until it answers.</p>`;
     let h = '';

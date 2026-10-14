@@ -20,6 +20,7 @@ import { SelfVision } from './selfvision.js';
 import { SelfSense } from './selfstate.js';
 import { FacePanel } from './facepanel.js';
 import { DevPanel, deployBar } from './devpanel.js';
+import { FaceView } from './faceview.js';
 import { softRefresh } from './refresh.js';
 import { obsGuard, requestObsReload } from './obsguard.js';
 import { Voice } from './voice.js';
@@ -703,6 +704,7 @@ if (params.get('debug') === '1') window.__jenaDebug = { autonomy, avatar, selfSe
 // ---------------- secret developer panel (top-left corner x5) + deploy progress ----------------
 if (!cfg.obs) {
   window.__jenaDev = new DevPanel({ getRuns: () => runs, avatar, cfg });
+  window.__jenaFaceView = new FaceView(avatar, cfg);
   deployBar();
 }
 
