@@ -250,13 +250,19 @@ export class Avatar {
       const fyaw = Math.atan2(this.feet.left.z - this.feet.right.z, this.feet.left.x - this.feet.right.x);   // 0 = squared up
       const hq = hips.getWorldQuaternion(_q[3]), fwd = _v[7].set(0, 0, 1).applyQuaternion(hq);
       const byaw = Math.atan2(fwd.x, fwd.z);
-      const turn = Math.abs(((byaw - (-fyaw)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+      // turn is measured against her own rest relation of hips to feet (the model's forward axis differs by VRM
+      // version), so a squared-up stance reads 0 whichever way the rig faces
+      const rel = byaw + fyaw;
+      if (this._turnRef === undefined) this._turnRef = rel;
+      const turn = Math.abs(((rel - this._turnRef) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+      this.feetDbg = { drift: +drift.toFixed(3), turn: +turn.toFixed(2) };
       const busy = this.motion?.moves?.busy;
       let why = null;
-      if (drift > 0.09) why = 'balance';
-      else if (turn > 0.35) why = 'turn';
+      const noop = now - (this._noopAt || 0) < 4000;   // the last balance/turn step had nowhere to go: don't spin on it
+      if (drift > 0.09 && !noop) why = 'balance';
+      else if (turn > 0.35 && !noop) why = 'turn';
       else if (this.stepAsk && now - this.stepAsk.at < 1500) why = this.stepAsk.why;
-      else if (!busy && now > this.nextIdleStep && now > (this.talk?.until || 0)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
+      else if (now > this.nextIdleStep && ((!busy && now > (this.talk?.until || 0)) || now > this.nextIdleStep + 15000)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
       if (why && now - (this.lastStep || 0) > 700) {
         this.stepAsk = null;
         // the lighter foot steps: the one farther from under her hips
@@ -272,10 +278,18 @@ export class Avatar {
         const other = this.feet[side === 'left' ? 'right' : 'left'], dx = to.x - other.x, dz = to.z - other.z, dd = Math.hypot(dx, dz);
         if (dd < 0.12 || dd > 0.45) { const k = THREE.MathUtils.clamp(dd, 0.12, 0.45) / (dd || 1); to.x = other.x + dx * k; to.z = other.z + dz * k; }
         to.y = this.groundY(to.x, to.z) + this.ankleH[side];
-        const len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
+        let len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
+        if (len < 0.03 && why !== 'balance' && why !== 'turn') {   // an asked-for or idle step always visibly moves the foot
+          const a = Math.random() * Math.PI * 2, r = 0.035 + Math.random() * 0.03;
+          to.x += Math.cos(a) * r * 0.8; to.z += Math.sin(a) * r;
+          const ddx = to.x - other.x, ddz = to.z - other.z, d2 = Math.hypot(ddx, ddz);
+          if (d2 < 0.12 || d2 > 0.45) { const k2 = THREE.MathUtils.clamp(d2, 0.12, 0.45) / (d2 || 1); to.x = other.x + ddx * k2; to.z = other.z + ddz * k2; }
+          to.y = this.groundY(to.x, to.z) + this.ankleH[side];
+          len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
+        }
         if (len > 0.015) { try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'step', what: side + ':' + style, why }); if (L.length > 400) L.shift(); } catch {} }
         if (len > 0.015) this.stepState = { side, from: this.feet[side].clone(), to, t0: now, dur: 300 + len * 900 + Math.random() * 120, lift: 0.04 + Math.min(0.04, len * 0.15) + Math.random() * 0.01, why, style };
-        else this.lastStep = now;
+        else { this.lastStep = now; if (why === 'balance' || why === 'turn') this._noopAt = now; if (why === 'turn') this._turnRef = rel; }
       }
     }
     // planted feet: snapped onto the ground every frame (whatever a pose or tracked move wanted)
