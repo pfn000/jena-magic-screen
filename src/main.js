@@ -3,6 +3,7 @@ import './mobile.css';
 import './stream.css';
 import { streamLayout, streamDirector, streamCaptions, streamHooks } from './stream.js';
 import { Soundboard } from './soundboard.js';
+import { ArkitFace } from './arkitface.js';
 import { Expressions } from './expressions.js';
 import './trust.js';   // mama's trusted device: one unlock, then no passcode prompts (only for step-ups)
 import { loadConfig } from './config.js';
@@ -14,6 +15,8 @@ import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { Moves, rememberMove } from './moves.js';
 import { Motion, setupSprings } from './motion.js';
+import { Dance } from './dance.js';
+import { Seat } from './seat.js';
 import { bodyBrief } from './selfcheck.js';
 import { SelfTrack } from './selfview.js';
 import { SelfVision } from './selfvision.js';
@@ -225,9 +228,16 @@ autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), re
 // her talk/react/direct-to-camera move set + smug face + motion styles (src/motion.js, ANIMATIONS/moveset.json)
 const motion = new Motion(avatar, { moves: autonomy.moves });
 autonomy.motion = motion;
+// K-pop dance she learned from dance-practice videos (src/dance.js, ANIMATIONS/dance/kpop/) + her gaming chair (src/seat.js)
+const dance = new Dance(avatar, { log: (text) => chain.self('body', text) });
+autonomy.dance = dance;
+const seat = new Seat(avatar, { log: (text) => chain.self('body', text), dance });
+autonomy.seat = seat;
 avatar.motion = motion;
 // her learned facial expressions (src/expressions.js, ANIMATIONS/expressions/): her own words + moods pick them, no repeats
 const expressions = new Expressions(avatar);
+// per-channel face tracking (src/arkitface.js): every ARKit score on its own target; runs after the face hooks above
+const arkface = avatar.arkface = new ArkitFace(avatar);
 motion.onLineReaction = (trigger, intensity) => expressions.react(trigger, intensity);
 const params = new URLSearchParams(location.search);
 // her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
@@ -668,6 +678,14 @@ window.jena = {
   react: (type, intensity) => motion.play(/^(react|direct|brag|talk|idle)_/.test(type) ? type : (['point', 'lean_in', 'wave', 'finger_guns', 'you'].includes(type) ? 'direct_' : ['smug', 'flex'].includes(type) ? 'brag_' : 'react_') + type, { intensity, trigger: 'api' }),
   motion,
   spin: (dir, ms, turns) => motion.avatar?.spin?.(dir, ms, turns),
+  // K-pop: jena.dance() (or jena.dance('kpop_super_svt')), jena.stopDance(), jena.danceTrace() = [{t, clip, video, jena}] yaw degrees
+  dance: (id, slices) => dance.start({ id: id || null, slices: slices || undefined, why: 'api' }),
+  stopDance: () => dance.stop(),
+  danceTrace: () => dance.trace.slice(),
+  dances: () => dance.ids,
+  // her gaming chair: jena.sit(pose?), jena.stand(), jena.chairSpin(), jena.seat.state()
+  sit: (pose) => seat.sit('api', pose), stand: () => seat.stand('api'), chairSpin: (dir) => seat.spin(dir), seat,
+  command: (text) => { const c = autonomy.bodyWord(text); return c ? autonomy.command(c, 'api') && c : null; },
   // which way her body parts face, relative to the viewer camera: yaw in degrees (0 = straight at the camera,
   // + = turned to HER left) and a word; forward comes from each part's own left-right bone line (left x up)
   facing: () => {
@@ -683,6 +701,7 @@ window.jena = {
   },
   // learned facial expressions: jena.expr.play('surprised'), .show('pout') (freeze at peak, null clears), .names, .state()
   expr: expressions,
+  arkface,
   onExpression: (cb) => expressions.onExpression(cb),
   get springs() { return avatar.springSetup || null; },
   think: (message, user = 'guest') => thinkAbout({ message, source: 'stage', user }),

@@ -70,7 +70,7 @@ export class Autonomy {
     this.log(`I'm stretching my fingers out${why ? ` (${why})` : ''}`);
   }
   hip(side = 'left', ms = 6000, why = '') {
-    this.avatar.handOnHipPose(side, ms);
+    if (this.avatar.handOnHipPose(side, ms) === false) return;   // not mid-dance / seated
     this.lastMove = Date.now();
     this.log(`I'm putting my ${side} hand on my hip${why ? ` (${why})` : ''}`);
   }
@@ -120,9 +120,27 @@ export class Autonomy {
     this.face('happy', 4000, '', true);
     if (this.moves && !this.moves.busy && Math.random() < 0.35) setTimeout(() => this.moves.play('happy', 'happy', `${user} hyped me up`), 2600);
   }
+  // plain-word body commands from chat ("sit", "stand up", "dance", "spin", "stop dancing"): short imperative
+  // messages only, so "I can't stand this" never makes her stand up
+  bodyWord(text = '') {
+    const m = String(text).toLowerCase().replace(/[’']/g, '').match(/^\s*(?:(?:hey|yo|ok|okay|jena|please|pls|can you|could you|now|go)[\s,!]*)*(sit down|sit|take a seat|have a seat|stand up|stand|get up|do a dance|dance for us|dance|do a kpop dance|kpop dance|kpop|stop dancing|spin the chair|spin around|spin)(?:[\s,!.?]*(?:please|pls|jena|again|now|for me|for us))*[\s!.?]*$/);
+    if (!m) return null;
+    const w = m[1];
+    return /sit|seat/.test(w) ? 'sit' : /stand|get up/.test(w) ? 'stand' : /stop/.test(w) ? 'stopdance' : /dance|kpop/.test(w) ? 'dance' : 'spin';
+  }
+  command(cmd, why = 'asked') {
+    const A = this.avatar;
+    if (cmd === 'dance') { if (this.seat?.seated) this.seat.stand('getting up to dance'); setTimeout(() => this.dance?.start({ why }).then((r) => r && this.log(`dancing ${r.song} (${r.artist}) because ${why}`)), this.seat?.seated ? 1600 : 0); return true; }
+    if (cmd === 'stopdance') { this.dance?.stop(); return true; }
+    if (cmd === 'sit') { this.dance?.stop(); this.seat?.sit(why); return true; }
+    if (cmd === 'stand') { this.seat?.stand(why); return true; }
+    if (cmd === 'spin') { if (this.seat?.seated) this.seat.spin(); else if (!this.dance?.active) A.spin?.(); return true; }
+    return false;
+  }
   onMessage(user, text = '') {
     this.motion?.seenUser(user);   // a username in what she says next -> a direct-to-camera gesture at them
     if (!this.ready) return;
+    { const c = this.bodyWord(text); if (c) { this.command(c, `${user} asked`); this.lastIdle = Date.now(); this.lastMove = Date.now(); return; } }
     this.lastIdle = Date.now();
     if (Date.now() - this.lastMove > 3000) {
       this.avatar.lookToward('center');
@@ -167,6 +185,7 @@ export class Autonomy {
       if (e.name === 'shake') return this.shake('my brain decided');
       if (e.name === 'hip') return this.hip(e.args?.[0] || 'left', 5000, 'my brain decided');
       if (e.name === 'fist') return this.fist(e.args?.[0] || 'right', 1800, 'my brain decided');
+      if (['dance', 'sit', 'stand', 'spin'].includes(e.name)) return this.command(e.name, 'my brain decided');
     } catch (err) { this.log(`tried to move but couldn't (${err.message})`); }
   }
 
@@ -174,10 +193,17 @@ export class Autonomy {
   tick() {
     if (!this.ready || document.hidden) return;
     const now = Date.now();
-    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000 || this.moves?.busy) return;
+    if (now - this.lastIdle < this.nextIdleIn || now - this.lastMove < 6000 || this.moves?.busy || this.dance?.active || this.seat?.busy) return;
     this.lastIdle = now;
     this.nextIdleIn = Math.min(55000, Math.max(10000, 20000 * Math.exp((Math.random() + Math.random() + Math.random() - 1.5) * 1.0)));   // irregular, never a steady beat
     const quietFor = now - Math.max(...this.chatTimes, 0);
+    // long quiet stretches: now and then she sits down in her chair, or gets up and dances (irregular, never on a beat)
+    if (this.seat && this.seat.idleTick(now, quietFor)) return;
+    if (this.dance && !this.seat?.seated && quietFor > 90000 && now - (this.lastDance || 0) > 240000 + Math.random() * 360000 && Math.random() < 0.12) {
+      this.lastDance = now; this.lastMove = now;
+      this.dance.start({ why: 'bored, so I put on some k-pop' }).then((r) => r && this.log(`practising ${r.song} (${r.artist}), it's quiet in here`));
+      return;
+    }
     // moves she learned herself from watching videos of real people (src/moves.js): often her first pick
     if (this.moves?.library.length && Math.random() < 0.55) {
       this.lastMove = now;

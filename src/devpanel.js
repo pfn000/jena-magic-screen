@@ -270,7 +270,9 @@ export class DevPanel {
       if (this.editOut) h += `<pre class="dp-pre">${esc(this.editOut)}</pre>`;
     }
     if (this.tab === 'health') {
+      const ri = this.avatar?.renderInfo?.();
       h += `<h3>This page</h3><p>render loop: ${this.fps} fps · avatar ${this.avatar?.ready ? 'loaded' : 'loading'} · ${esc(navigator.userAgent.slice(0, 80))}</p>`;
+      if (ri) h += `<h3>Render quality</h3><p class="dp-render"><b>${ri.fps ?? '?'} fps</b> (screen ${ri.refreshHz ?? '?'} Hz, never capped) · <b>${ri.width}×${ri.height}</b> px (${ri.pixelRatio}x; this screen is ${ri.nativeRatio}x native) · panels ${ri.panelHz} Hz · automatic (native res, steps down only on real frame drops)${ri.software ? ' · software GPU (fps here is not meaningful)' : ''}</p>`;
       if (live) {
         const x = box.host, s = box.services, tn = box.tunnel;
         h += `<h3>Services on her box</h3><ul>${Object.entries(s).map(([k, v]) => `<li>${okDot(v.ok)} <b>${esc(k)}</b> ${esc(v.detail)} · ${v.ms} ms${v.model ? ` · ${esc(v.model)}` : ''}${v.meta ? ` · ${(v.meta.n_params / 1e6).toFixed(0)}M params · ctx ${v.meta.n_ctx}` : ''}</li>`).join('')}</ul>

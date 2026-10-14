@@ -2,7 +2,7 @@
 // runs the pose model on her rendered body). Rendered from her real scene with a second camera a few
 // times a second, with her real skeleton (from her bones) drawn over it. She picks angles herself too.
 import * as THREE from 'three';
-import { canReadAsync, shown, flipInto } from './snapshot.js';
+import { canReadAsync, shown, flipInto, panelPx } from './snapshot.js';
 const BONES = [['hips', 'spine'], ['spine', 'chest'], ['chest', 'neck'], ['neck', 'head'],
   ...['left', 'right'].flatMap((s) => [['chest', `${s}UpperArm`], [`${s}UpperArm`, `${s}LowerArm`], [`${s}LowerArm`, `${s}Hand`], [`${s}Hand`, `${s}MiddleProximal`], [`${s}Hand`, `${s}ThumbDistal`],
     ['hips', `${s}UpperLeg`], [`${s}UpperLeg`, `${s}LowerLeg`], [`${s}LowerLeg`, `${s}Foot`], [`${s}Foot`, `${s}Toes`]])];
@@ -11,15 +11,21 @@ export const VIEWS = ['front', 'back', 'side', 'top', 'below'];
 export class BodyViews {
   constructor(avatar, canvas, label, { hz = 24 } = {}) {
     this.avatar = avatar; this.canvas = canvas; this.label = label;
-    this.w = 120; this.h = 240;
-    this.cam = new THREE.PerspectiveCamera(30, this.w / this.h, 0.05, 20);
-    this.rt = new THREE.WebGLRenderTarget(this.w, this.h); this.rt.texture.colorSpace = THREE.SRGBColorSpace;
-    this.px = new Uint8Array(this.w * this.h * 4);
-    this.tmp = document.createElement('canvas'); this.tmp.width = this.w; this.tmp.height = this.h;
-    this.img = this.tmp.getContext('2d').createImageData(this.w, this.h);
+    this.cam = new THREE.PerspectiveCamera(30, 0.5, 0.05, 20);
+    this.setSize(120, 240);
     this.every = 1000 / hz; this.last = 0;
     this.view = 'front';
     avatar.frameHooks.push(() => this.frame());
+  }
+  // crisp at the panel's CSS size x the stage's current pixel ratio (the quality governor steps both together)
+  setSize(w, h) {
+    if (w === this.w && h === this.h && this.rt) return;
+    this.w = w; this.h = h;
+    this.rt?.dispose();
+    this.rt = new THREE.WebGLRenderTarget(w, h); this.rt.texture.colorSpace = THREE.SRGBColorSpace;
+    this.px = new Uint8Array(w * h * 4);
+    this.tmp = document.createElement('canvas'); this.tmp.width = w; this.tmp.height = h;
+    this.img = this.tmp.getContext('2d').createImageData(w, h);
   }
   set(view, who = 'mama') {
     if (!VIEWS.includes(view)) return;
@@ -33,6 +39,7 @@ export class BodyViews {
     const async = canReadAsync(this.avatar.renderer);
     if (now - this.last < (async ? Math.max(1000 / (this.avatar.panelHz?.() || 24), 16) : 166)) return;   // up to 60 Hz when the device keeps up
     this.last = now;
+    const px = panelPx(this.canvas, this.avatar, 2, { min: 120 }); if (px) this.setSize(px.w, px.h);
     const a = this.avatar, H = a.vrm.humanoid, hips = H.getNormalizedBoneNode('hips').getWorldPosition(new THREE.Vector3());
     const ht = a.height || 1.5, mid = new THREE.Vector3(hips.x, ht * 0.5, hips.z);
     const d = ht * 1.9;
@@ -65,10 +72,10 @@ export class BodyViews {
     flipInto(this.px, this.img, W, Hh); // GL is bottom-up
     const c = this.canvas; if (c.width !== W || c.height !== Hh) { c.width = W; c.height = Hh; }
     const g = c.getContext('2d'); this.tmp.getContext('2d').putImageData(this.img, 0, 0); g.drawImage(this.tmp, 0, 0);
-    g.lineWidth = 2;
+    const k = W / 120; g.lineWidth = 2 * k;
     for (const [p, q, col] of lines) { g.strokeStyle = col; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
     // her center of mass over her feet (balance), from her bones
-    if (dot) { g.fillStyle = dot[2] ? '#3ddc84' : '#ff5d6c'; g.beginPath(); g.arc(dot[0], dot[1], 3.5, 0, 7); g.fill(); }
+    if (dot) { g.fillStyle = dot[2] ? '#3ddc84' : '#ff5d6c'; g.beginPath(); g.arc(dot[0], dot[1], 3.5 * k, 0, 7); g.fill(); }
     if (this.label) this.label.textContent = `body · ${this.view}${this.by === 'jena' ? ' (her pick)' : ''}`;
   }
 }

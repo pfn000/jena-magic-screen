@@ -61,3 +61,8 @@ Patterns (timing, amplitude, style), not routines, learned from:
 - People clips in `public/moves` (see `public/moves/index.json` for each source and channel), incl. cg-people.com casual talk references.
 Tools: MediaPipe Holistic (Apache-2.0), three.js + @pixiv/three-vrm (MIT), One Euro filter (Casiez, Roussel & Vogel, CHI 2012).
 Excluded on purpose: https://www.tiktok.com/t/ZPLSf4w7t/ (suggestive; Jena is a minor).
+
+
+## K-pop dance
+
+`dance/kpop/` — 5 K-pop dance-practice clips (keypoints only, kid-safe, facing per frame). Credits: [dance/kpop/README.md](dance/kpop/README.md).

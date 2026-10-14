@@ -8,7 +8,7 @@ const q = new URLSearchParams(location.search);
 const VARIANT = q.get('vision') === 'full' ? 'full' : q.get('vision') === 'lite' || matchMedia('(pointer: coarse)').matches ? 'lite' : 'full';
 const MODELS = [`/mediapipe/pose_landmarker_${VARIANT}.task`, `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${VARIANT}/float16/1/pose_landmarker_${VARIANT}.task`];
 import { Vector3, Color, PerspectiveCamera, WebGLRenderTarget, SRGBColorSpace } from 'three';
-import { canReadAsync, shown, flipInto, OneEuro } from './snapshot.js';
+import { canReadAsync, shown, flipInto, OneEuro, panelPx } from './snapshot.js';
 // her real skeleton, drawn from her own bones (so it always lines up): [from, to] humanoid bone names
 const SKELETON = [
   ['hips', 'spine'], ['spine', 'chest'], ['chest', 'upperChest'], ['upperChest', 'neck'], ['chest', 'neck'], ['neck', 'head'],
@@ -93,10 +93,15 @@ export class SelfVision {
     const box = this.bodyBox();
     if (!box) return;
     this.lastView = now;
-    const w = 160, h = 320;
-    if (!this.rt) {
-      this.rt = new WebGLRenderTarget(w, h); this.rt.texture.colorSpace = SRGBColorSpace;
-      this.px = new Uint8Array(w * h * 4); this.img = new ImageData(w, h); this.cam = new PerspectiveCamera(); this.wall = new Color(0xece6f6);
+    // crisp: the panel's CSS size x the stage's current pixel ratio (native on a 3x phone, stepped down with the
+    // stage by the quality governor); her eyes (MediaPipe) still look at a small 160x320 copy of it
+    const px = shown(this.view) ? panelPx(this.view, A, 2, { min: 160 }) : null;
+    const w = px ? px.w : 160, h = px ? px.h : 320;
+    if (!this.rt || this.rtW !== w || this.rtH !== h) {
+      this.rt?.dispose();
+      this.rt = new WebGLRenderTarget(w, h); this.rt.texture.colorSpace = SRGBColorSpace; this.rtW = w; this.rtH = h;
+      this.px = new Uint8Array(w * h * 4); this.img = new ImageData(w, h);
+      this.cam ||= new PerspectiveCamera(); this.wall ||= new Color(0xece6f6);
     }
     // the same view as her stage camera, cropped to her body box (what the old canvas crop showed)
     const cam = this.cam;
@@ -117,7 +122,7 @@ export class SelfVision {
       this.work.getContext('2d', { willReadFrequently: true }).putImageData(this.img, 0, 0);
       this.crop = box; this.snap = snap; this.frameSeq++; this.lastCapture = now;
       const dt = this.lastPaint ? (now - this.lastPaint) / 1000 : 0; this.lastPaint = now;
-      this.draw(this.smoothLm(dt));
+      this.draw(null, { carry: true }); // a new frame: the last yellow read rides along with her body until the next read
     }).catch(() => {}).finally(() => { this.reading = false; });
   }
 
@@ -156,13 +161,25 @@ export class SelfVision {
       ctx.drawImage(this.src, x0, y0, cw, ch, 0, 0, w, h);
       if (!this.pose) return this.draw(null);
     }
+    // her eyes look at a small copy of this exact frame (detection cost doesn't grow with the panel's resolution)
+    const det = (this.det ||= document.createElement('canvas'));
+    if (det.width !== 160) { det.width = 160; det.height = 320; }
+    const dctx = det.getContext('2d', { willReadFrequently: true });
+    dctx.imageSmoothingEnabled = true; dctx.imageSmoothingQuality = 'high';
+    dctx.drawImage(this.work, 0, 0, 160, 320);
     const t0 = performance.now();
-    const res = this.pose.detect(this.work); // each look is fresh: no tracking carried over from the last one
+    const res = this.pose.detect(det); // each look is fresh: no tracking carried over from the last one
     const ms = performance.now() - t0;
     this.detectMs = this.detectMs == null ? ms : this.detectMs * 0.8 + ms * 0.2;
     const lm = res?.landmarks?.[0];
-    this.lm = lm;
-    this.draw(lm, { fresh: true, paint: !async }); // fresh look: measure rig vs video now; the view paints on its own clock
+    // the YELLOW skeleton is MediaPipe's read of the rendered video. It used to be drawn on LATER frames (one
+    // look behind, one-euro smoothed), so it trailed and detached from her legs while her rig lines (pink/teal,
+    // projected from the same frame's bones) stayed on. Now it belongs to exactly the frame it was read from
+    // (this.lmSeq) and is only drawn on that frame; a weak read (low landmark visibility) isn't drawn at all.
+    const vis = lm ? [11, 12, 23, 24, 25, 26, 27, 28].reduce((a, i) => a + (lm[i]?.visibility ?? 0), 0) / 8 : 0;
+    this.lm = lm && vis > 0.45 ? lm : null; this.lmSeq = this.frameSeq; this.lmVis = +vis.toFixed(2);
+    this.lmFrame = { snap: this.snap, crop: this.crop, at: performance.now() };
+    this.draw(this.lm, { fresh: true, paint: true }); // repaint this same frame with its own yellow read
     if (!lm) return this.lost();
     this.lostSince = 0;
     if (this.saidLost) { this.saidLost = false; this.log('see', 'I can see myself again'); }
@@ -238,7 +255,7 @@ export class SelfVision {
     return { x0: hips.x - cw / 2, y0: top, cw, ch };
   }
 
-  draw(lm, { fresh = false, paint = true } = {}) {
+  draw(lm, { fresh = false, paint = true, carry = false } = {}) {
     const v = this.view;
     if (!v || (window.__jenaBodyView && window.__jenaBodyView !== 'front')) return; // another angle is being shown
 
@@ -253,7 +270,8 @@ export class SelfVision {
     if (b) {
       const P = {};
       const at = (n) => (P[n] ??= (() => { const p = this.snap ? this.snap[n] : this.project(n); return p && { x: (p.x - b.x0) / b.cw * w, y: (p.y - b.y0) / b.ch * h }; })());
-      c.lineWidth = 1.5; c.lineCap = 'round';
+      const k = w / 160; // overlay keeps its proportions at any resolution
+      c.lineWidth = 1.5 * k; c.lineCap = 'round';
       for (const [a, z] of SKELETON) {
         const p = at(a), q = at(z);
         if (!p || !q) continue;
@@ -264,15 +282,32 @@ export class SelfVision {
       for (const n of JOINTS) {
         const p = at(n);
         if (!p) continue;
-        c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 2.2, 0, 7); c.fill();
-        c.fillStyle = /^left/.test(n) ? '#0f766e' : /^right/.test(n) ? '#be185d' : '#6d28d9'; c.beginPath(); c.arc(p.x, p.y, 1.3, 0, 7); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 2.2 * k, 0, 7); c.fill();
+        c.fillStyle = /^left/.test(n) ? '#0f766e' : /^right/.test(n) ? '#be185d' : '#6d28d9'; c.beginPath(); c.arc(p.x, p.y, 1.3 * k, 0, 7); c.fill();
       }
       // DUAL TRACKING: what MediaPipe sees in the video (yellow) on top of her real rig (colored), and how far apart
+      // between reads (her eyes look ~3x a second, the panel paints up to 60x), the last read is carried along
+      // by how far each of her joints moved since the frame it was read from, so it stays ON her body; a read
+      // older than 1.2 s is stale and hidden
+      let shift = null;
+      if (!lm && carry && this.lm && this.lmFrame?.snap && this.lmFrame.crop && performance.now() - this.lmFrame.at < 1200) {
+        const F = this.lmFrame, swapped = !!this.agree?.mediapipeSwappedSides;
+        const MAPc = { 11: 'leftUpperArm', 12: 'rightUpperArm', 13: 'leftLowerArm', 14: 'rightLowerArm', 15: 'leftHand', 16: 'rightHand', 23: 'leftUpperLeg', 24: 'rightUpperLeg', 25: 'leftLowerLeg', 26: 'rightLowerLeg', 27: 'leftFoot', 28: 'rightFoot' };
+        shift = {};
+        for (const [i, bone0] of Object.entries(MAPc)) {
+          const bone = swapped ? bone0.replace(/^left|^right/, (x) => (x === 'left' ? 'right' : 'left')) : bone0;
+          const then = F.snap[bone], now = at(bone);
+          if (!then || !now) continue;
+          shift[i] = { x: now.x - (then.x - F.crop.x0) / F.crop.cw * w, y: now.y - (then.y - F.crop.y0) / F.crop.ch * h };
+        }
+        lm = this.lm;
+      }
       if (lm) {
         const MAP = { 11: 'leftUpperArm', 12: 'rightUpperArm', 13: 'leftLowerArm', 14: 'rightLowerArm', 15: 'leftHand', 16: 'rightHand', 23: 'leftUpperLeg', 24: 'rightUpperLeg', 25: 'leftLowerLeg', 26: 'rightLowerLeg', 27: 'leftFoot', 28: 'rightFoot' };
         const MP_LINES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [23, 24], [11, 23], [12, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
-        c.strokeStyle = 'rgba(250, 204, 21, 0.9)'; c.lineWidth = 1.2;
-        for (const [a, z] of MP_LINES) { const p = lm[a], q = lm[z]; if (!p || !q || p.visibility < 0.3 || q.visibility < 0.3) continue; c.beginPath(); c.moveTo(p.x * w, p.y * h); c.lineTo(q.x * w, q.y * h); c.stroke(); }
+        c.strokeStyle = 'rgba(250, 204, 21, 0.9)'; c.lineWidth = 1.2 * k;
+        const Y = (i) => { const m = lm[i]; if (!m || m.visibility < 0.3) return null; const d = shift ? shift[i] : null; if (shift && !d) return null; return { x: m.x * w + (d ? d.x : 0), y: m.y * h + (d ? d.y : 0) }; };
+        for (const [a, z] of MP_LINES) { const p = Y(a), q = Y(z); if (!p || !q) continue; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(q.x, q.y); c.stroke(); }
         const sh = at('leftUpperArm'), hp = at('leftUpperLeg');
         const torso = sh && hp ? Math.hypot(sh.x - hp.x, sh.y - hp.y) : 0;
         if (fresh && torso > 4) {
@@ -292,10 +327,10 @@ export class SelfVision {
         }
       }
       // which side is which, from HER point of view
-      c.font = '700 10px system-ui, sans-serif';
+      c.font = `700 ${Math.round(10 * k)}px system-ui, sans-serif`;
       const lh = at('leftHand'), rh = at('rightHand');
-      if (lh) { c.fillStyle = '#0f766e'; c.fillText('L', Math.min(w - 9, lh.x + 5), lh.y + 4); }
-      if (rh) { c.fillStyle = '#be185d'; c.fillText('R', Math.max(2, rh.x - 12), rh.y + 4); }
+      if (lh) { c.fillStyle = '#0f766e'; c.fillText('L', Math.min(w - 9 * k, lh.x + 5 * k), lh.y + 4 * k); }
+      if (rh) { c.fillStyle = '#be185d'; c.fillText('R', Math.max(2 * k, rh.x - 12 * k), rh.y + 4 * k); }
     }
     if (this.label && this.last) {
       // a side her eyes get wrong (checked against what she feels) shows as '?' instead of a false claim

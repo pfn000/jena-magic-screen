@@ -20,7 +20,7 @@ export class FaceView {
     el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483000;width:min(300px,46vw);background:rgba(16,10,28,.92);color:#eee;font:11px/1.25 system-ui,sans-serif;border:1px solid #6b3fa0;border-radius:10px;padding:6px;box-shadow:0 4px 18px #0008;pointer-events:auto';
     el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><b>👀 face + gaze</b><span class="fv-gz" style="margin-left:auto;color:#ffd84d"></span><button class="fv-x" style="background:none;border:0;color:#ccc;cursor:pointer">✕</button></div>'
       + '<div style="position:relative"><canvas class="fv-c" width="256" height="256" style="width:100%;aspect-ratio:1;display:block;border-radius:6px;background:#000"></canvas></div>'
-      + '<div class="fv-eyes" style="margin:4px 0;color:#bdf"></div><div class="fv-bars" style="max-height:120px;overflow:auto"></div>';
+      + '<div class="fv-eyes" style="margin:4px 0;color:#bdf"></div><div class="fv-track" style="margin:4px 0"></div><div class="fv-bars" style="max-height:120px;overflow:auto"></div>';
     document.body.appendChild(el);
     el.querySelector('.fv-x').onclick = () => this.toggle(false);
     this.canvas = el.querySelector('.fv-c'); this.ctx = this.canvas.getContext('2d');
@@ -115,6 +115,15 @@ export class FaceView {
     this.cross.firstChild.textContent = 'looking at: ' + label;
     this.el.querySelector('.fv-gz').textContent = 'looking at: ' + label;
     this.el.querySelector('.fv-eyes').textContent = `eyes yaw ${deg(eb?.rotation.y || 0)} pitch ${deg(eb?.rotation.x || 0)} · blink ${(blink * 100).toFixed(0)}% · gaze ${what}`;
+    // per-channel face tracking (arkitface.js): each lid, cheek, brow part and the jaw, her LEFT and RIGHT apart
+    const AS = A.arkface?.state?.();
+    if (AS) {
+      const m = (lab, v) => `<div style="display:flex;gap:3px;align-items:center;font-size:10px"><span style="width:58px;white-space:nowrap">${lab}</span><span style="flex:1;height:6px;background:#2a2040;border-radius:3px"><span style="display:block;height:6px;width:${Math.round(v * 100)}%;background:#ffd84d;border-radius:3px"></span></span><span style="width:20px;text-align:right">${Math.round(v * 100)}</span></div>`;
+      const col = (t, S) => `<div style="flex:1;min-width:0"><b style="font-size:10px">${t}</b>${m('upper lid', S.upperLid)}${m('lower lid', S.lowerLid)}${m('blink', S.blink)}${m('cheek', S.cheek)}${m('brow down', S.browDown)}${m('brow up', S.browOuter)}${m('smile', S.smile)}</div>`;
+      this.el.querySelector('.fv-track').innerHTML = `<div style="font-size:10px;color:#bbb">tracking → ${AS.targets}${AS.sources.length ? ' · from ' + AS.sources.join(', ') : ' · idle'}</div>`
+        + `<div style="display:flex;gap:8px">${col('her RIGHT', AS.right)}${col('her LEFT', AS.left)}</div>`
+        + `<div style="display:flex;gap:8px"><div style="flex:1">${m('jaw open', AS.jawOpen)}${m('cheek puff', AS.cheekPuff)}</div><div style="flex:1">${m('brow inner', AS.browInnerUp)}${m('pucker', AS.pucker)}</div></div>`;
+    }
     // bars: every expression channel above zero, biggest first
     const vals = [];
     if (em) for (const ex of em.expressions || []) { const v = em.getValue(ex.expressionName) || 0; if (v > 0.01) vals.push([ex.expressionName.replace(/^fcl\./, ''), v]); }

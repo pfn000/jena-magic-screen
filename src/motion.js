@@ -6,6 +6,7 @@
 // Public: window.jena.react(type, intensity) · window.jena.onReaction(cb) · window.jena.motion (state, play, setStyle)
 // She is a kid: nothing here is ever flirty (no winks, kisses, blush, body emphasis).
 import * as THREE from 'three';
+import { VRMSpringBoneCollider, VRMSpringBoneColliderShapeSphere } from '@pixiv/three-vrm';
 import MOVESET from '../ANIMATIONS/moveset.json';
 import STYLES from '../ANIMATIONS/styles.json';
 import { NoRepeat, Wander } from './nonrepeat.js';
@@ -39,10 +40,16 @@ export function classifyStyle({ speed = 0, accel = 0, overshoot = 0, amp = 0 }) 
 }
 
 const easeBack = (u, s) => { const c = 1.70158 * s; const x = u - 1; return 1 + (c + 1) * x * x * x + c * x * x; };
+// K-pop hit-then-ease (learned from the 5 dance-practice clips in ANIMATIONS/dance/kpop, Oct 14): the dancers' arms hit a
+// position in ~0.27 s (median attack, 20%->peak speed) and settle over ~0.27 s; so every gesture segment gets there
+// early (92% by 30% of the segment) and spends the rest easing in, instead of a symmetric smoothstep.
+export const HIT = { amount: 0.35, at: 0.3, reach: 0.92 };
+const hitCurve = (u) => (u < HIT.at ? HIT.reach * (1 - (1 - u / HIT.at) ** 3) : HIT.reach + (1 - HIT.reach) * (((u - HIT.at) / (1 - HIT.at)) ** 2 * (3 - 2 * (u - HIT.at) / (1 - HIT.at))));
 function ease(u, k) {
   const smooth = u * u * (3 - 2 * u);
   const fast = 1 - (1 - u) ** 3;
-  const base = smooth + (fast - smooth) * clamp(k.attack, 0, 1);
+  let base = smooth + (fast - smooth) * clamp(k.attack, 0, 1);
+  base += (hitCurve(clamp(u, 0, 1)) - base) * HIT.amount;
   return k.overshoot > 0.01 ? base + (easeBack(u, k.overshoot * 4) - u) * 0.5 : base;
 }
 // value of a keyframe track [[t, ...vals]] at u (0..1), eased per segment with the style knobs
@@ -396,6 +403,15 @@ export function setupSprings(vrm) {
   const groups = M.colliderGroups || [];
   const byName = (re) => groups.filter((g) => re.test(g.name || ''));
   const out = { removed: [], hair: 0, clothes: 0, other: 0, fixedColliders: 0 };
+  // her T-shirt sleeves are much puffier than the arm capsules the export gave her hair (4.8 cm), so strands slid INTO
+  // the sleeve at the shoulder: one soft sphere per shoulder, the size of the sleeve, for her hair only
+  const sleeves = { name: 'HairSleeves', colliders: [] };
+  for (const s of ['left', 'right']) {
+    const bone = vrm.humanoid?.getRawBoneNode?.(s + 'UpperArm'); if (!bone) continue;
+    const c = new VRMSpringBoneCollider(new VRMSpringBoneColliderShapeSphere({ offset: new THREE.Vector3(s === 'left' ? 0.045 : -0.045, 0.012, 0), radius: 0.066 }));
+    c.name = 'hair-sleeve-' + s; bone.add(c); sleeves.colliders.push(c);
+  }
+  const hairJoints = [];
   const BODY = /bust|breast|chest|boob|oppai|butt|hip(?!s)|belly|thigh(?!.*(tops|skirt|cloth))|body/i;
   for (const j of [...M.joints]) {
     const n = j.bone?.name || '';
@@ -404,7 +420,16 @@ export function setupSprings(vrm) {
       out.hair++;
       // head, neck, upper chest and shoulders/arms keep her hair outside her face and body
       if (!j.colliderGroups?.length) j.colliderGroups = byName(/head|neck|chest|spine|arm/i);
-      j.settings.dragForce = Math.max(j.settings.dragForce ?? 0.4, 0.35);
+      if (sleeves.colliders.length) j.colliderGroups = [...j.colliderGroups, sleeves];
+      hairJoints.push(j);
+      j.settings.dragForce = Math.max(j.settings.dragForce ?? 0.4, 0.55);   // damped: no flicking or spiking out
+      // (Saidie, Oct 14 3:15 PM: strands spiked out sideways over her shoulders.) Her long strands had a 3.2 cm collision
+      // radius against 4.8 cm arm capsules, so the shoulders shoved them 8 cm out to the side, and almost no gravity, so
+      // they stayed there. Thinner collision (they rest on the sleeve, not 3 cm off it) + real gravity so they fall onto
+      // and behind her shoulders.
+      if ((j.settings.hitRadius ?? 0) > 0.014) j.settings.hitRadius = 0.014;
+      j.settings.gravityPower = Math.max(j.settings.gravityPower ?? 0, 0.35);
+      if (!j.settings.gravityDir) j.settings.gravityDir = new THREE.Vector3(0, -1, 0);
     } else if (/tops|skirt|cloth|coat|sleeve/i.test(n)) {
       out.clothes++;
       // her export pointed the skirt at RightHand + LeftUpperLeg only, and the sleeves at nothing: legs + hips for
@@ -416,5 +441,13 @@ export function setupSprings(vrm) {
   }
   try { M.setInitState(); } catch {}
   out.joints = M.joints.size; out.colliders = M.colliders?.length ?? 0;
+  // hair falls down and a little BEHIND her (relative to the way her body faces, so it holds when she turns or spins),
+  // resting on/behind her shoulders instead of sliding forward through her sleeves. Avatar calls tick() each sim step.
+  const H = vrm.humanoid, _f = new THREE.Vector3(), _q = new THREE.Quaternion(), vrm0 = vrm.meta?.metaVersion === '0';
+  out.tick = () => {
+    const hips = H?.getNormalizedBoneNode?.('hips'); if (!hips || !hairJoints.length) return;
+    _f.set(0, 0, vrm0 ? -1 : 1).applyQuaternion(hips.getWorldQuaternion(_q)); _f.y = 0; if (_f.lengthSq() < 1e-6) return; _f.normalize();
+    for (const j of hairJoints) { const g = j.settings.gravityDir || (j.settings.gravityDir = new THREE.Vector3()); g.set(-_f.x * 0.35, -1, -_f.z * 0.35).normalize(); }
+  };
   return out;
 }

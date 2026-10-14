@@ -27,3 +27,16 @@ export class OneEuro {
     return this.x;
   }
 }
+
+// a panel's backing-store size in device pixels: its CSS size times the stage's CURRENT pixel ratio (the adaptive
+// quality governor in avatar.adaptPixels steps that ratio down when frames drop and back up with headroom), so
+// the panels are as crisp as the main stage and get cheaper together with it. Capped at maxPx on the long side.
+export function panelPx(el, avatar, aspect = 1, { min = 96, maxPx = 1080 } = {}) {
+  const pr = avatar?.renderer?.getPixelRatio?.() || window.devicePixelRatio || 1;
+  const cssW = el?.clientWidth || 0;
+  if (!cssW) return null;
+  let w = Math.round(cssW * pr), h = Math.round(w * aspect);
+  const long = Math.max(w, h); if (long > maxPx) { const k = maxPx / long; w = Math.round(w * k); h = Math.round(h * k); }
+  if (w < min) { h = Math.round(h * min / w); w = min; }
+  return { w, h, pr };
+}

@@ -5,6 +5,7 @@
 // Nobody picks these for her: she chooses a clip from her mood and what's going on, plays a different
 // slice of it each time (start, length, speed, sometimes mirrored), and blends it over her procedural
 // idle so her breathing and drift never stop. Left/right always mean HER left/right.
+import { mirrorScores } from './arkitface.js';
 import * as THREE from 'three';
 import { WatchVideo } from './watchvideo.js';
 import { SelfCheck } from './selfcheck.js';
@@ -72,6 +73,8 @@ const CLIPS = new NoRepeat({ minGap: 4, windowMs: 120000 });
 const LINES = new NoRepeat({ minGap: 2, windowMs: 60000 });
 const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+// keep-clear tuning (metres / radians): a hand's thickness off her hips and chest, and how far the relaxed fix may swing
+const HIP_CLEAR = 0.085, CHEST_CLEAR = 0.12, FIX_OUT = 0.6, FIX_BACK = 0.5;
 const [_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8] = Array.from({ length: 8 }, () => new THREE.Vector3());
 
 export class Moves {
@@ -205,7 +208,7 @@ export class Moves {
   // play a slice of a learned clip; never the same sequence twice (random window, speed, mirror)
   async play(context = 'idle', mood = 'neutral', why = '') {
     await this.ready;
-    if (this.playing || !this.library.length) return false;
+    if (this.playing || !this.library.length || this.avatar?.dancing) return false;   // a K-pop dance (src/dance.js) owns her body
     const meta = this.choose(context, mood);
     if (!meta) return false;
     let c;
@@ -264,8 +267,58 @@ export class Moves {
   }
 
 
+  // Where each hand is relative to her hips, in her own hips frame (metres): x = toward her own side (+ = out),
+  // y = up from the hips bone, z = toward her front (+ = in front). frontCenter is true when the hand is on or in
+  // front of her hips / crotch / lower belly instead of at her side or behind (Saidie, Oct 14: Jena is a minor
+  // character; a hand never rests on the front of her hips, crotch or chest, in a dance or anywhere).
+  handZone(H) {
+    const hips = H.getNormalizedBoneNode('hips'), lu = H.getNormalizedBoneNode('leftUpperLeg'), ru = H.getNormalizedBoneNode('rightUpperLeg');
+    if (!hips || !lu || !ru) return null;
+    H.normalizedHumanBonesRoot.updateMatrixWorld(true);
+    const inv = (this._zoneInv ||= new THREE.Matrix4()).copy(hips.matrixWorld).invert();
+    const lp = lu.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv), rp = ru.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+    // her front in the hips frame: the way her toes point from her ankle (VRM1 faces +z, a VRM0 rig may face -z)
+    if (this._front == null) {
+      const ft = H.getNormalizedBoneNode('leftFoot'), tt = H.getNormalizedBoneNode('leftToes');
+      if (ft && tt) { const a = ft.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv), b = tt.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv); this._front = b.z - a.z >= 0 ? 1 : -1; } else this._front = 1;
+    }
+    const fz = this._front, hw = Math.abs(lp.x - rp.x) / 2;   // half the hip-joint spacing
+    const out = {};
+    for (const side of ['left', 'right']) {
+      const hand = H.getNormalizedBoneNode(side + 'Hand'), lo = H.getNormalizedBoneNode(side + 'LowerArm');
+      if (!hand || !lo) continue;
+      const w = hand.getWorldPosition(new THREE.Vector3()), e = lo.getWorldPosition(new THREE.Vector3());
+      // the palm centre sits ~40% of a forearm's length past the wrist along the forearm
+      const palm = w.clone().sub(e).multiplyScalar(0.4).add(w);
+      const pts = [w, palm].map((v) => v.applyMatrix4(inv));
+      const sx = side === 'left' ? 1 : -1;   // her left is +x in the normalized frame
+      const zone = (q) => {
+        const x = q.x * sx, y = q.y, z = q.z * fz;
+        // front of hips / crotch / lower belly (Saidie, Oct 14: Jena is a minor). The zone is the body itself plus a
+        // hand's thickness, no more (the 14:xx version kept palms ~0.27 m out and read as stiff "cowboy" arms):
+        //  * below her waist: inside her hip/thigh width (+CLEAR) and anywhere on the front half, up to 0.4 m out
+        //  * just in front of her thighs' outer front (a 3/4 camera reads that as on her shorts): a thin (6 cm) side band
+        //  * at her waist line: only touching distance (a hand swinging out in front at waist height is fine)
+        const xin = hw + HIP_CLEAR;
+        // boxes (her hips frame): [xmax, ylo, yhi, zlo, zhi]; x has no lower bound (a hand across her midline counts too)
+        const boxes = [[xin, -0.32, 0.06, -0.02, 0.4], [xin + 0.06, -0.32, 0.06, 0.07, 0.3], [xin, 0.06, 0.16, -0.02, 0.17]];
+        // signed distance to the zone (metres, box metric): > 0 = that far clear of it, < 0 = inside
+        const clear = Math.min(...boxes.map(([xm, y0, y1, z0, z1]) => Math.max(x - xm, y0 - y, y - y1, z0 - z, z - z1)));
+        const front = clear < 0;
+        // resting on her seat (behind, below the waist, between her hip sides): kept off too; hands clasped behind her
+        // lower back (above the hips bone) are fine
+        const seat = y > -0.3 && y < 0.0 && x < hw + 0.04 && z <= -0.02 && z > -0.2;
+        return { x, y, z, front, seat, clear };
+      };
+      const [zw, zp] = pts.map(zone);
+      out[side] = { wrist: zw, palm: zp, frontCenter: zw.front || zp.front, seat: zw.seat || zp.seat, hipHalf: hw, hipClear: Math.min(zw.clear, zp.clear) };
+    }
+    return out;
+  }
+
   // Her hands and forearms never go through her own body, and they stay away from her chest and the
-  // front of her hips (a learned move that would put them there is eased back toward her own idle arm).
+  // front of her hips (a learned move that would put them there is eased back toward her own idle arm, then swung
+  // out to her side until clear; handZone() is the final word on the hips).
   keepClear(H, w, armBusy) {
     const hips = H.getNormalizedBoneNode('hips'), chest = H.getNormalizedBoneNode('upperChest') || H.getNormalizedBoneNode('chest');
     const lu = H.getNormalizedBoneNode('leftUpperArm'), ru = H.getNormalizedBoneNode('rightUpperArm'), neck = H.getNormalizedBoneNode('neck');
@@ -277,19 +330,24 @@ export class Moves {
     const hipY = P(hips, _v1).y, neckY = P(neck, _v2).y;
     this._hipInv.copy(hips.matrixWorld).invert();
     this._chestInv.copy(chest.matrixWorld).invert();
+    const fz = this._front ?? 1;
     const bad = (p) => {
-      const c = _v3.copy(p).applyMatrix4(this._chestInv), h = _v4.copy(p).applyMatrix4(this._hipInv);
+      const c = _v3.copy(p).applyMatrix4(this._chestInv);
       const y = p.y;
       // inside the torso (an elliptic column from below the hips up to the neck)
       if (y > hipY - 0.1 && y < neckY && (c.x / a) ** 2 + (c.z / b) ** 2 < 1) return true;
-      // in front of her chest
-      if (y > hipY + 0.55 * (neckY - hipY) && y < neckY - 0.03 && Math.abs(c.x) < a * 0.85 && c.z > b * 0.4 && c.z < b + 0.16) return true;
-      // in front of her hips / lower belly
-      if (h.y > -0.2 && h.y < 0.08 && Math.abs(h.x) < a * 1.2 && h.z > 0.015 && h.z < 0.24) return true;
+      // on / just in front of her chest (touching distance, not a whole arm's length)
+      if (y > hipY + 0.5 * (neckY - hipY) && y < neckY - 0.03 && Math.abs(c.x) < a * 0.95 && c.z * fz > b * 0.2 && c.z * fz < b + CHEST_CLEAR) return true;
       return false;
     };
+    // body axes (world) from her chest: forward (+z) for swinging an arm out, side (+x) for swinging it back
+    const cq = chest.getWorldQuaternion(_qa);
+    const axF = _v4.set(0, 0, 1).applyQuaternion(cq), axS = _v1.set(1, 0, 0).applyQuaternion(cq);
+    const now = performance.now();
+    this.fix ||= { left: 0, right: 0 }; this._fixT ||= { left: 0, right: 0 };
     for (const side of ['left', 'right']) {
-      if (armBusy[side]) { this.guard[side] = 1; continue; }
+      this.guard[side] = 1;   // the dance keeps its full arm motion; the fix below is the only correction
+      if (armBusy[side]) { this.fix[side] = 0; continue; }
       const nodes = ['UpperArm', 'LowerArm', 'Hand'].map((s) => H.getNormalizedBoneNode(side + s));
       const [up, lo, hand] = nodes;
       if (!up || !lo || !hand) continue;
@@ -298,27 +356,40 @@ export class Moves {
         const hp = P(hand, _v5), lp = P(lo, _v6);
         const mid = _v7.copy(hp).lerp(lp, 0.5);
         const tip = _v8.copy(hp).sub(lp).multiplyScalar(0.45).add(hp);
-        return bad(hp) || bad(mid) || bad(tip);
+        if (bad(hp) || bad(mid) || bad(tip)) return true;
+        const z = this.handZone(H); return !!(z?.[side]?.frontCenter || z?.[side]?.seat);
       };
-      let k = this.guard[side];
-      if (test()) {
-        // back off toward her own arm until it's clear
-        for (const f of [0.6, 0.3, 0]) {
-          k = Math.min(k, f);
-          ['UpperArm', 'LowerArm', 'Hand'].forEach((s, i) => {
-            const bn = side + s, n = nodes[i];
-            if (this._proc?.[bn] && this._clip?.[bn]) n.quaternion.copy(this._proc[bn]).slerp(this._clip[bn], w * (WEIGHT[bn] ?? 0.8) * k);
-          });
-          up.updateMatrixWorld(true);
-          if (!test()) break;
+      // Relaxed fix (Saidie, Oct 14 "cowboy" / "lotion drying"): the smallest swing of the upper arm, a little out and a
+      // little back, that takes the hand off the forbidden zone. The elbow keeps its bend (only the very last part of
+      // the range straightens it a bit), and a fix eases off over ~0.7 s instead of snapping back.
+      const base = nodes.map((n) => n.quaternion.clone());
+      const sg = side === 'left' ? 1 : -1;
+      const apply = (s) => {
+        nodes.forEach((n, i) => n.quaternion.copy(base[i]));
+        if (s > 0) {
+          const pq = up.parent.getWorldQuaternion(_qb).invert();
+          const rot = (ax, ang) => { _qc.setFromAxisAngle(ax, ang); const pw = up.parent.getWorldQuaternion(new THREE.Quaternion()); up.quaternion.premultiply(_qc.premultiply(pq).multiply(pw)); };
+          rot(axF, sg * FIX_OUT * s);
+          rot(axS, fz * FIX_BACK * s);
+          if (s > 0.7) lo.quaternion.slerp(_qc.identity(), (s - 0.7) / 0.3 * 0.6);
         }
-        // still in the way (her own idle arm sits close too): swing the arm out from her side until clear
-        for (let s = 0; s < 4 && test(); s++) { up.rotateZ(side === 'left' ? 0.09 : -0.09); up.updateMatrixWorld(true); }
-        this.guard[side] = k;
+        up.updateMatrixWorld(true);
+      };
+      const dt = Math.min(0.1, (now - (this._fixT[side] || now)) / 1000);
+      const sameFrame = now - (this._fixT[side] || 0) < 4;   // a second call this frame: no carry-over (no double fix)
+      this._fixT[side] = now;
+      let s = sameFrame ? 0 : Math.max(0, (this.fix[side] || 0) - dt * 1.4);
+      apply(s);
+      if (test()) {
+        while (s < 1 && test()) { s = Math.min(1, s + 0.05); apply(s); }
+        // last resort (rare): more swing out from her side until clear
+        for (let k = 0; k < 8 && test(); k++) { up.rotateZ(side === 'left' ? 0.06 : -0.06); up.updateMatrixWorld(true); }
+        // very last resort (a hand right across her midline): soften the elbow open and keep swinging out until clear
+        if (test()) { lo.quaternion.slerp(_qc.identity(), 0.7); hand.quaternion.identity(); for (let k = 0; k < 12 && test(); k++) { up.rotateZ(side === 'left' ? 0.07 : -0.07); up.updateMatrixWorld(true); } }
         this.guardHits = (this.guardHits || 0) + 1;
-      } else {
-        this.guard[side] = Math.min(1, k + 0.02); // ease back in once clear
+        (this.guardBySide ||= { left: 0, right: 0 })[side]++;
       }
+      if (!sameFrame) this.fix[side] = s;
     }
   }
 
@@ -377,16 +448,27 @@ export class Moves {
     const w = Math.min(1, p.w * conf);
     if (w < 0.02) return;
     const talking = this.avatar.talk && performance.now() < this.avatar.talk.until;
+    // the raw ARKit scores of this frame, every channel on its own (arkitface.js): each eyelid, cheek, brow part
+    const AF = this.avatar.arkface;
+    if (AF && F.arkit && F.arkit_names) {
+      const sc = {};
+      F.arkit_names.forEach((n, j) => { if (n[0] === '_') return; const ch = F.arkit[j]; if (!ch) return; let v = ch[i] * (1 - a) + (ch[i + 1] ?? ch[i]) * a; if (talking && /^(mouth|jaw)/.test(n)) v *= 0.35; if (v > 0.01) sc[n] = v; });
+      AF.feed('move', p.mirror ? mirrorScores(sc) : sc, w);
+    }
+    const perfect = !!(AF?.perfect && F.arkit);   // a perfect-sync model takes the ARKit channels instead of the mapped presets
     const have = this._exprNames ||= new Set(em.expressions.map((e) => e.expressionName));
-    F.names.forEach((name, j) => {
+    const SWAPN = { blinkLeft: 'blinkRight', blinkRight: 'blinkLeft', lookLeft: 'lookRight', lookRight: 'lookLeft' };
+    F.names.forEach((name0, j) => {
+      const name = p.mirror ? (SWAPN[name0] || name0) : name0;   // a mirrored playback: her left eye takes the performer's right
       if (!have.has(name)) { (this._unmapped ||= new Set()).has(name) || (this._unmapped.add(name), console.warn('jena face: her model has no expression', name)); return; }
       if (talking && ['aa', 'ih', 'ou', 'ee', 'oh'].includes(name)) return; // her own voice drives her mouth while she talks
+      if (perfect && !/^look/.test(name)) return;
       const at = (jj) => F.w[jj][i] * (1 - a) + (F.w[jj][i + 1] ?? F.w[jj][i]) * a;
       let raw = at(j);
       // per-eye blinks: both eyes close together; only a little of one-eye-only stays (a tracked squint or camera
       // angle otherwise reads as a wink, and she doesn't wink)
       if (name === 'blinkLeft' || name === 'blinkRight') {
-        const o = F.names.indexOf(name === 'blinkLeft' ? 'blinkRight' : 'blinkLeft');
+        const o = F.names.indexOf(name0 === 'blinkLeft' ? 'blinkRight' : 'blinkLeft');
         const both = o >= 0 ? Math.min(raw, at(o)) : raw;
         raw = both + (raw - both) * 0.25;
       }

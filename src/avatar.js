@@ -30,7 +30,7 @@ function noise() {
 }
 const _v = Array.from({ length: 12 }, () => new THREE.Vector3());
 const _q = Array.from({ length: 6 }, () => new THREE.Quaternion());
-const _tgt = new THREE.Vector3(), _hip = new THREE.Vector3();
+const _tgt = new THREE.Vector3(), _hip = new THREE.Vector3(), _m4 = new THREE.Matrix4();
 // Raised ("hand up, like in class"): upper arm lifted out to the side and up, forearm turned so the
 // palm faces forward (x twist), elbow softly bent so the hand leans in toward her head (y flex).
 // Right side mirrors the left: x stays, y and z flip.
@@ -56,13 +56,16 @@ export class Avatar {
       this.renderer = { noGL: true, domElement: canvas, setClearColor: nop, setPixelRatio: nop, getPixelRatio: () => 1, setSize: nop, setAnimationLoop: nop, render: nop, getRenderTarget: () => null, setRenderTarget: nop, readRenderTargetPixels: nop, dispose: nop, capabilities: { isWebGL2: false } };
     }
     this.renderer.setClearColor(0x000000, 0);
-    // sharpness vs speed: up to 2x pixels on phones and computers (a 3x iPhone at 1.5x looked soft and jaggy);
-    // ?dpr=<n> pins it. If frames run slow, frame() steps it down, never below 1.5x on a hi-dpi screen.
+    // sharpness: FULL native device resolution (no clamp: a 3x iPhone renders at 3x), automatically, no toggle.
+    // The adaptive governor (adaptPixels) only steps resolution down on real frame drops against the screen's own refresh
+    // rate (60 / 120 Hz), and back up with headroom. ?dpr=<n> pins it.
     const q = new URLSearchParams(location.search), pin = parseFloat(q.get('dpr'));
     const phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
     this.dprPinned = pin > 0;
-    this.renderer.setPixelRatio(pin > 0 ? pin : Math.min(window.devicePixelRatio || 1, 2));
-    this.minPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    const native = window.devicePixelRatio || 1;
+    this.nativeRatio = native;
+    this.renderer.setPixelRatio(pin > 0 ? pin : native);
+    this.minPixelRatio = Math.min(native, 1.5);
     this.phone = phone;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(22, 1, 0.1, 50);
@@ -251,10 +254,13 @@ export class Avatar {
     // spinning: she pivots on her feet (both feet turn around her hips with her, staying on the floor) instead of
     // stepping or twisting her legs around each other
     {
-      const d = (this._spinY || 0) - (this._spinPrev || 0);
-      this._spinPrev = this.spinState ? (this._spinY || 0) : 0;
+      // the same pivot carries a dance turn (src/dance.js sets danceYaw: the dancer's turn, relative to her start facing)
+      const turn = (this._spinY || 0) + (this.danceYaw || 0);
+      const d = turn - (this._spinPrev || 0);
+      this._spinPrev = (this.spinState || this.dancing) ? turn : 0;
       if (Math.abs(d) > 1e-5) for (const s of ['left', 'right']) { const FY = (this.footYaw ||= { left: 0, right: 0 }); FY[s] = Math.atan2(Math.sin(FY[s] + d), Math.cos(FY[s] + d)); const f = this.feet[s], dx = f.x - hp.x, dz = f.z - hp.z, c = Math.cos(d), sn = Math.sin(d); f.x = hp.x + dx * c + dz * sn; f.z = hp.z - dx * sn + dz * c; }
     }
+    if (this.seatW > 0.02) return;   // sitting in her chair: feet stay where they are, no steps
     const S = this.stepState;
     if (this.spinState && !S) { /* no steps mid-spin */ }
     else if (S) {
@@ -283,7 +289,7 @@ export class Avatar {
       const latv = _v[5].set(1, 0, 0).applyQuaternion(hq); 
       const sepRaw = (this.feet.left.x - this.feet.right.x) * latv.x + (this.feet.left.z - this.feet.right.z) * latv.z;
       if (this._latSign === undefined && Math.abs(sepRaw) > 0.05) this._latSign = Math.sign(sepRaw);
-      const crossed = this._latSign !== undefined && sepRaw * this._latSign < -0.06;
+      const crossed = this._latSign !== undefined && sepRaw * this._latSign < 0.06;   // standing: feet never cross (sitting poses are the only crossed legs)
       this.feetDbg.cross = +(-(sepRaw * (this._latSign || 1))).toFixed(3);
       if (crossed && !noop) why = 'uncross';
       else if (drift > 0.09 && !noop) why = 'balance';
@@ -317,10 +323,10 @@ export class Avatar {
         const other = this.feet[side === 'left' ? 'right' : 'left'], dx = to.x - other.x, dz = to.z - other.z, dd = Math.hypot(dx, dz);
         if (dd < 0.12 || dd > 0.45) { const k = THREE.MathUtils.clamp(dd, 0.12, 0.45) / (dd || 1); to.x = other.x + dx * k; to.z = other.z + dz * k; }
         to.y = this.groundY(to.x, to.z) + this.ankleH[side];
-        // crossing is fine (a cross-step, a pivot), but never more than ~6 cm past the other foot along her hips' side axis
+        // standing feet never cross: each ankle stays on its own side, at least 8 cm from the other along her hips' side axis
         const ax = new THREE.Vector3(1, 0, 0).applyAxisAngle(_v[6].set(0, 1, 0), turn > 0.2 ? yd : 0);
         const sgn = Math.sign(this.feetRest.left.x - this.feetRest.right.x) || 1, want = side === 'left' ? sgn : -sgn;
-        const capCross = () => { const sep = ((to.x - other.x) * ax.x + (to.z - other.z) * ax.z) * want; if (sep < -0.06) { const k = (-0.06 - sep) * want; to.x += ax.x * k; to.z += ax.z * k; to.y = this.groundY(to.x, to.z) + this.ankleH[side]; } };
+        const capCross = () => { const sep = ((to.x - other.x) * ax.x + (to.z - other.z) * ax.z) * want; if (sep < 0.08) { const k = (0.08 - sep) * want; to.x += ax.x * k; to.z += ax.z * k; to.y = this.groundY(to.x, to.z) + this.ankleH[side]; } };
         capCross();
         let len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
         if (len < 0.03 && why !== 'balance' && why !== 'turn' && why !== 'uncross') {   // an asked-for or idle step always visibly moves the foot
@@ -339,10 +345,14 @@ export class Avatar {
       }
     }
     if (this.footPivot) { const P = this.footPivot, u = Math.min(1, (now - P.t0) / P.dur), e = u * u * (3 - 2 * u); (this.footYaw ||= { left: 0, right: 0 })[P.side] = P.from + (P.to - P.from) * e; if (u >= 1) this.footPivot = null; }
-    // planted feet: snapped onto the ground every frame (whatever a pose or tracked move wanted)
+    // planted feet: snapped onto the ground every frame (whatever a pose or tracked move wanted), and (standing)
+    // each ankle kept on its OWN side of her hips' midline, at least 3.5 cm out: no X-legs, no crossed feet
+    const mid = this.legMidline();
     for (const s of ['left', 'right']) {
       if (this.stepState?.side === s) continue;
-      const f = this.feet[s], gy = this.groundY(f.x, f.z) + this.ankleH[s];
+      const f = this.feet[s];
+      if (mid) { const sg = s === 'left' ? 1 : -1, off = ((f.x - mid.c.x) * mid.lat.x + (f.z - mid.c.z) * mid.lat.z) * sg; if (off < 0.035) { const k = (0.035 - off) * sg; f.x += mid.lat.x * k; f.z += mid.lat.z * k; } }
+      const gy = this.groundY(f.x, f.z) + this.ankleH[s];
       f.y = gy;
     }
     // hips follow the lower foot: if a leg can't reach its planted foot, the hips sink so the knees bend (never hover)
@@ -427,6 +437,7 @@ export class Avatar {
     if (Math.abs(fr) > 1e-4) wq.premultiply(_q[0].setFromAxisAngle(_v[3].subVectors(target, pu).normalize(), -THREE.MathUtils.clamp(fr, -0.9, 0.9) * 0.85));
     U.quaternion.copy(U.parent.getWorldQuaternion(_q[2]).invert().multiply(wq));
     U.updateMatrixWorld(true);
+    this.keepKneeOut(side, U, K, F, target);
     // flat foot, turned by its own yaw (each foot points its own way: toe-out, pivots, following her turns)
     const root = H.normalizedHumanBonesRoot.getWorldQuaternion(_q[1]);
     if (Math.abs(fy) > 1e-4) root.premultiply(_q[3].setFromAxisAngle(_v[5].set(0, 1, 0), fy));
@@ -436,11 +447,52 @@ export class Avatar {
     F.updateMatrixWorld(true);
   }
 
-  // ADAPTIVE QUALITY toward 60 fps. Frames averaging slower than ~54 fps for 2.5 s step quality down one notch:
+  // her hips' midline for the legs: the point between her hip joints and the horizontal axis toward HER left.
+  // Null while she sits (crossed legs are an approved sitting pose) or without leg bones.
+  legMidline() {
+    if (this.seatW > 0.02 || !this.vrm) return null;
+    const H = this.vrm.humanoid, L = H.getNormalizedBoneNode('leftUpperLeg'), R = H.getNormalizedBoneNode('rightUpperLeg');
+    if (!L || !R) return null;
+    const lp = L.getWorldPosition(new THREE.Vector3()), rp = R.getWorldPosition(new THREE.Vector3());
+    const lat = new THREE.Vector3(lp.x - rp.x, 0, lp.z - rp.z); if (lat.lengthSq() < 1e-6) return null; lat.normalize();
+    return { c: lp.add(rp).multiplyScalar(0.5), lat };
+  }
+  // standing knees stay on their own side of the midline with a small gap (a slight inward knee is fine,
+  // crossing is not): if the knee is closer than 3 cm to the midline, the leg rolls outward about its
+  // hip-to-ankle line (the foot stays planted). Per-frame knee/ankle offsets go to legDbg for the proof.
+  keepKneeOut(side, U, K, F, target) {
+    const m = this.legMidline(); if (!m) { this.legDbg = null; return; }
+    const sg = side === 'left' ? 1 : -1, MIN = 0.03, kp = new THREE.Vector3();
+    const off = (p) => ((p.x - m.c.x) * m.lat.x + (p.z - m.c.z) * m.lat.z) * sg;
+    const knee = () => off(K.getWorldPosition(kp));
+    let k0 = knee(), rolled = 0;
+    if (k0 < MIN) {
+      const pu = U.getWorldPosition(new THREE.Vector3()), axis = new THREE.Vector3().subVectors(target, pu).normalize();
+      const base = U.quaternion.clone(), parentQ = U.parent.getWorldQuaternion(new THREE.Quaternion()), w0 = parentQ.clone().multiply(base);
+      const tryA = (a) => { U.quaternion.copy(parentQ.clone().invert().multiply(new THREE.Quaternion().setFromAxisAngle(axis, a).multiply(w0))); U.updateMatrixWorld(true); return knee(); };
+      const dir = tryA(0.05) > k0 ? 1 : -1;
+      let best = k0;
+      for (let a = 0.05; a <= 1.2 + 1e-6; a += 0.05) { best = tryA(a * dir); rolled = a * dir; if (best >= MIN) break; }
+      k0 = best;
+    }
+    const ank = off(F.getWorldPosition(kp));
+    (this.legDbg ||= {})[side] = { knee: +k0.toFixed(3), ankle: +ank.toFixed(3), rolled: +rolled.toFixed(2) };
+  }
+
+  // ADAPTIVE QUALITY toward the screen's own refresh rate (60 Hz, or 120 Hz on ProMotion; the render loop is
+  // never capped, it runs at whatever the display gives). The refresh period is measured from the fastest
+  // frames seen. Frames averaging >12% slower than that for 2.5 s are a real drop: step down one notch -
   // pixel ratio a quarter step at a time (floor 1x on a GPU, 0.6x on a software renderer like this box's
-  // SwiftShader), then the extra camera panels (self-view, face, body views) drop from 60 to 30 / 15 / 8 Hz.
-  // When frames run at the screen's rate again for 8 s, it tries one notch back up (and remembers a notch that failed).
+  // SwiftShader), then the extra camera panels drop 60 -> 30 / 15 / 8 Hz. Back at the refresh rate for 8 s:
+  // one notch back up, never above native resolution. Silent: no toggle.
   // ?dpr=<n> pins the pixel ratio; ?quality=low|high pins the level.
+  prCeiling() { return this.nativeRatio || window.devicePixelRatio || 1; } // native device resolution, never above
+
+  renderInfo() {
+    const c = this.renderer?.domElement, Q = this.quality || {};
+    return { fps: Q.fps || null, refreshHz: Q.vsync ? Math.round(1000 / Q.vsync) : null, width: c?.width || 0, height: c?.height || 0,
+      pixelRatio: +(this.renderer?.getPixelRatio?.() || 1).toFixed(2), nativeRatio: this.nativeRatio || 1, level: Q.level ?? 3, panelHz: this.panelHz(), software: !!Q.soft };
+  }
   adaptPixels(raw) {
     if (!(raw > 0) || raw > 0.25 || document.hidden) return;
     const now = performance.now();
@@ -448,24 +500,32 @@ export class Avatar {
       let soft = false;
       try { const gl = this.renderer.getContext?.(), e = gl?.getExtension('WEBGL_debug_renderer_info'); soft = /swiftshader|llvmpipe|software/i.test(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : ''); } catch {}
       const pin = new URLSearchParams(location.search).get('quality');
-      return { soft, level: pin === 'low' ? 0 : 3, pinned: !!pin, ms: 16.7, cool: now + 4000, fastSince: 0, failed: {}, steps: 0, prMax: this.renderer.getPixelRatio?.() || 1 };
+      return { soft, level: pin === 'low' ? 0 : 3, pinned: !!pin, ms: 16.7, cool: now + 4000, fastSince: 0, failed: {}, steps: 0, prMax: this.prCeiling(), vsync: 16.7, hist: [] };
     })());
-    Q.ms = Q.ms * 0.95 + raw * 1000 * 0.05;
+    const ms1 = raw * 1000;
+    // the display's refresh period: the 10th-percentile frame time over the last ~2 s, snapped to 60/90/120/144 Hz
+    Q.hist.push(ms1); if (Q.hist.length > 240) Q.hist.shift();
+    if (Q.hist.length >= 30 && (Q.hist.length % 15 === 0)) {
+      const p10 = [...Q.hist].sort((a, b) => a - b)[Math.floor(Q.hist.length * 0.1)];
+      const hz = [60, 90, 120, 144].reduce((b, h) => (Math.abs(1000 / h - p10) < Math.abs(1000 / b - p10) ? h : b), 60);
+      Q.vsync = 1000 / hz;
+    }
+    Q.ms = Q.ms * 0.95 + ms1 * 0.05;
     Q.fps = +(1000 / Q.ms).toFixed(1);
     if (Q.pinned || now < Q.cool) return;
     const pr = this.renderer.getPixelRatio(), floor = Q.soft ? 0.6 : Math.min(this.minPixelRatio || 1, 1);
-    if (Q.ms > 18.5) {
+    if (Q.ms > Q.vsync * 1.12 && Q.ms > 8.6) {
       Q.fastSince = 0;
-      if (!this.dprPinned && pr > floor + 0.01) { this.renderer.setPixelRatio(Math.max(floor, Math.round((pr - 0.25) * 4) / 4)); this.resize(); this.pixelSteps = (this.pixelSteps || 0) + 1; }
+      if (!this.dprPinned && pr > floor + 0.01) { this.renderer.setPixelRatio(Math.max(floor, Math.round((pr - 0.25) * 4) / 4)); this.resize(); this.pixelSteps = (this.pixelSteps || 0) + 1; Q.failed.pr = now; }
       else if (Q.level > 0) { Q.failed[Q.level] = now; Q.level--; }
       else return;
-      Q.steps++; Q.cool = now + 2500; Q.ms = 16.7;
-    } else if (Q.ms < 17.6) {
+      Q.steps++; Q.cool = now + 2500; Q.ms = Q.vsync;
+    } else if (Q.ms < Q.vsync * 1.05) {
       Q.fastSince ||= now;
       if (now - Q.fastSince > 8000) {
         Q.fastSince = 0; Q.cool = now + 3000;
         if (Q.level < 3 && !(now - (Q.failed[Q.level + 1] || -1e9) < 60000)) Q.level++;
-        else if (!this.dprPinned && pr < Q.prMax - 0.01 && !(now - (Q.failed.pr || -1e9) < 60000)) { Q.failed.pr = now; this.renderer.setPixelRatio(Math.min(Q.prMax, pr + 0.25)); this.resize(); }
+        else if (!this.dprPinned && pr < Q.prMax - 0.01 && !(now - (Q.failed.pr || -1e9) < 60000)) { this.renderer.setPixelRatio(Math.min(Q.prMax, pr + 0.25)); this.resize(); }
       }
     } else Q.fastSince = 0;
   }
@@ -740,6 +800,8 @@ export class Avatar {
   // Hand on her hip (HER left/right), for ms: the arm is solved onto her hip with the elbow out.
   handOnHipPose(side = 'left', ms = 5000) {
     if (side !== 'left' && side !== 'right') throw new Error(`handOnHip: side must be 'left' or 'right' (got ${side})`);
+    // never mid-dance or in her chair: those own her arms, and the hand must not end up on the front of her hips
+    if (this.dancing || this.seatW > 0.05) return false;
     clearTimeout(this.armTimers[side]);
     if (this.handOnHip && this.handOnHip.side !== side) this.lowerArm(this.handOnHip.side);
     const sg = side === 'left' ? 1 : -1;
@@ -757,9 +819,12 @@ export class Avatar {
     if (!U || !K || !W || !hips) return;
     hips.updateMatrixWorld(true);
     const sg = h.side === 'left' ? 1 : -1;
-    // her hip: a bit out to her side, just above the hip joint, slightly behind the front
-    const surf = this.collision?.hipSurface(h.side, 0.028);
-    if (surf) _hip.copy(surf); else _hip.set(sg * 0.15, 0.06, -0.01).applyMatrix4(hips.matrixWorld);
+    if (this.dancing || this.seatW > 0.05) h.release = true;
+    // her hip: on the SIDE of her hip, out past her hip line and a little behind it (Saidie, Oct 14: never on the
+    // front of her hips; Jena is a minor character)
+    const surf = this.collision?.hipSurface(h.side, 0.05);
+    if (surf) { _hip.copy(surf).applyMatrix4(_m4.copy(hips.matrixWorld).invert()); _hip.z -= 0.035 * (window.jenaMoves?._front ?? 1); _hip.applyMatrix4(hips.matrixWorld); }
+    else _hip.set(sg * 0.17, 0.06, -0.04).applyMatrix4(hips.matrixWorld);
     U.updateMatrixWorld(true);
     const pu = U.getWorldPosition(_v[0]), pk = K.getWorldPosition(_v[1]), pw = W.getWorldPosition(_v[2]);
     const a = pk.distanceTo(pu), b = pw.distanceTo(pk);
@@ -773,6 +838,12 @@ export class Avatar {
     _q[1].identity().slerp(swing, h.w);
     const wq = U.getWorldQuaternion(_q[2]).premultiply(_q[1]);
     U.quaternion.copy(U.parent.getWorldQuaternion(_q[1]).invert().multiply(wq));
+    // check: if the solve still left her hand on the front of her hips, swing the arm out and let the pose go
+    const z = window.jenaMoves?.handZone?.(H);
+    if (z?.[h.side]?.frontCenter || z?.[h.side]?.seat) {
+      for (let s = 0; s < 8 && (q => q?.frontCenter || q?.seat)(window.jenaMoves.handZone(H)?.[h.side]); s++) { U.rotateZ(sg * 0.08); U.updateMatrixWorld(true); }
+      h.release = true;
+    }
   }
   nod(ms = 1200) { this.act.nod = { until: performance.now() + ms, start: performance.now() }; }
   shakeHead(ms = 1200) { this.act.shake = { until: performance.now() + ms, start: performance.now() }; }
@@ -974,6 +1045,8 @@ export class Avatar {
       // the free leg (weight on the other one) rests on the ball of its foot: heel up, knee bent
       this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));
       this.plantFoot('right', A.tap?.side === 'right' ? tap : 0, Math.max(0, L));
+      // after the leg IK: her chair (src/seat.js) blends her into a seated pose
+      for (const f of (this.postIKHooks || [])) { try { f(vrm, dt); } catch (e) { console.warn('post-ik hook', e); } }
       if (this.handOnHip) this.placeHandOnHip(this.handOnHip, now);
       // fingers: every finger has its own slow drift and the hand its own spread, so they never move as one
       // block; they gesture while she talks; fist / open when she chooses. Thumb opposes as the hand closes.
@@ -1025,6 +1098,17 @@ export class Avatar {
       // her room (floor, wall behind her, stage edges) as colliders too
       if (!this.roomCol && this.feet) { try { this.roomCol = new RoomCollision(this); } catch (e) { console.warn('room', e); } }
       if (this.roomCol) { try { this.roomCol.apply(); } catch (e) { console.warn('room collision', e); } }
+      // last check of the frame: no hand on the front of her hips / crotch (Saidie, Oct 14; Jena is a minor). The dance and
+      // learned moves already keep clear; this catches anything layered on after them (talk gestures, collisions).
+      try {
+        const MVz = window.jenaMoves, Hz = vrm.humanoid, z = MVz?.handZone?.(Hz);
+        for (const s of ['left', 'right']) {
+          if (!z?.[s]?.frontCenter && !z?.[s]?.seat) continue;
+          const U = Hz.getNormalizedBoneNode(s + 'UpperArm'); if (!U) continue;
+          for (let k = 0; k < 8 && (q => q?.frontCenter || q?.seat)(MVz.handZone(Hz)?.[s]); k++) { U.rotateZ(s === 'left' ? 0.08 : -0.08); U.updateMatrixWorld(true); }
+          this.hipGuardHits = (this.hipGuardHits || 0) + 1;
+        }
+      } catch {}
       // eyes: she looks at things (you, her desktop panel, chat, her own hand when it's doing something,
       // sometimes the floor), with little saccades on top and the head following big eye turns a bit
       if (this.gazeGoal && now > this.gazeGoal.until) this.gazeGoal = null;
@@ -1056,6 +1140,8 @@ export class Avatar {
       add('head', this._hp, this._hy, 0);
       this.updateFace(dt, t, now);
       for (const f of this.faceHooks || []) { try { f(vrm, dt); } catch (e) { console.warn('face hook', e); } }
+      this.driveJaw(vrm, dt);
+      try { this.springSetup?.tick?.(); } catch {}   // hair gravity follows the way her body faces (motion.js setupSprings)
       vrm.update(dt);
     }
   }
@@ -1150,6 +1236,37 @@ export class Avatar {
     this._aa = this._vis.aa; this._oh = this._vis.oh;
   }
 
+  // her jaw bone follows her mouth: however the mouth got opened this frame (speech visemes, her voice level,
+  // a tracked face's jawOpen/aa/oh from a learned move or expression clip), a model with a humanoid 'jaw' bone
+  // also swings the jaw down. Runs after every face hook, so it reads the final mouth values. Models without a
+  // jaw bone (or with a mis-mapped one that isn't under the head, a common VRoid/converter bug) keep the
+  // blendshape-only mouth. The jaw is a child of the head, so her head nods/tilts carry it along untouched.
+  jawBone(vrm) {
+    if (this._jawVrm === vrm) return this._jaw;
+    this._jawVrm = vrm; this._jaw = null;
+    const H = vrm.humanoid, jaw = H?.getNormalizedBoneNode('jaw'), head = H?.getNormalizedBoneNode('head');
+    if (jaw && head) {
+      let o = jaw.parent, under = false; while (o) { if (o === head) { under = true; break; } o = o.parent; }
+      const raw = H.getRawBoneNode?.('jaw'), rh = H.getRawBoneNode?.('head');
+      let below = true;
+      if (raw && rh) { vrm.scene.updateMatrixWorld(true); below = raw.getWorldPosition(new THREE.Vector3()).y <= rh.getWorldPosition(new THREE.Vector3()).y + 0.02; }
+      if (under && below) this._jaw = jaw; else console.warn('jena jaw: the jaw bone on this model is not under her head; mouth stays blendshape-only');
+    }
+    this.jawInfo = { bone: !!this._jaw, mapped: !!jaw };
+    return this._jaw;
+  }
+  driveJaw(vrm, dt) {
+    const jaw = this.jawBone(vrm), em = vrm.expressionManager;
+    if (!jaw || !em) return;
+    const g = (n) => em.getValue(n) || 0;
+    // how far open the mouth reads: aa opens most, oh/ou round with a mid jaw, ih/ee are mostly lips
+    const open = Math.min(1, Math.max(g('aa'), g('oh') * 0.85, g('ou') * 0.55, g('ih') * 0.45, g('ee') * 0.35, g('surprised') * 0.4, this.arkJaw || 0)); // + a tracked face's jawOpen (arkitface.js)
+    this._jawOpen = damp(this._jawOpen || 0, open, 26, dt);
+    const MAX = 0.24; // ~14 degrees: a natural talking jaw; the mouth blendshapes still shape the lips on top
+    jaw.rotation.set(this._jawOpen * MAX, 0, 0);
+    this.jawInfo.open = +this._jawOpen.toFixed(3); this.jawInfo.deg = +(this._jawOpen * MAX * 57.2958).toFixed(1);
+  }
+
   // what her face and fingers are doing right now (dev panel, proof, tests)
   faceState() {
     const em = this.vrm?.expressionManager, H = this.vrm?.humanoid;
@@ -1161,7 +1278,7 @@ export class Avatar {
       const n = H.getNormalizedBoneNode(s + f + (f === 'Thumb' ? 'Proximal' : 'Intermediate'));
       if (n) fing[s + f] = +((f === 'Thumb' ? n.rotation.y : n.rotation.z) * (s === 'left' ? -1 : 1)).toFixed(3);
     }
-    return { expressions: ex, fingers: fing, talking: performance.now() < this.talk.until, viseme: this.viseme(performance.now()), micro: this.micro.name, rig: this.rigCheck || null };
+    return { expressions: ex, fingers: fing, talking: performance.now() < this.talk.until, viseme: this.viseme(performance.now()), micro: this.micro.name, rig: this.rigCheck || null, jaw: this.jawInfo || null };
   }
 
   // does her model have every bone and expression her face/finger code drives? logged once per model

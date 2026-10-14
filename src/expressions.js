@@ -11,6 +11,7 @@
 import { VRMExpression, VRMExpressionMorphTargetBind } from '@pixiv/three-vrm';
 import EXPR from '../ANIMATIONS/expressions/expressions.json';
 import { NoRepeat, Wander } from './nonrepeat.js';
+import { mirrorScores } from './arkitface.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 // what each face is for: the emotions/moods it fits and the line triggers (src/motion.js readLine) that call it
@@ -177,6 +178,13 @@ export class Expressions {
         let val = x * a.amp * w * (1 + hold);
         if (talking && /^MTH_/.test(k)) val *= 0.35;                                      // her lips keep talking
         out[k] = clamp(val, 0, 1);
+      }
+      // the same face as raw ARKit scores, per channel (each lid, cheek, brow part on its own): arkitface.js puts
+      // them on a perfect-sync model's own shape keys, or on the nearest per-side shapes otherwise
+      if (a.v.arkit && A.arkface) {
+        const sc = a.mirror ? mirrorScores(a.v.arkit) : { ...a.v.arkit };
+        if (talking) for (const k of Object.keys(sc)) if (/^(mouth|jaw)/.test(k)) sc[k] *= 0.35;   // her lips keep talking
+        A.arkface.feed('expression', sc, Math.min(1, a.amp * w));
       }
       // the face takes over from her plain mood presets while it plays
       for (const m of PRESET_MOODS) { try { em.setValue(m, (em.getValue(m) || 0) * (1 - w * 0.85)); } catch {} }
