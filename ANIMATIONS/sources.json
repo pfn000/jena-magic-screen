@@ -145,6 +145,171 @@
    },
    "duration": 7,
    "use": "lip-sync timing (mouth open/close vs audio) and hand-beat timing ONLY; its expressions/poses are not used for Jena (kid-appropriate rule)"
+  },
+  {
+   "id": "kpop_super_svt",
+   "from": "tab",
+   "dim": "2d",
+   "why": "dance",
+   "asked": "Saidie 10:34 PM Oct 13 (K-pop dance)",
+   "dance": {
+    "style": "kpop",
+    "artist": "SEVENTEEN",
+    "song": "Super (손오공)",
+    "kid_safe": "vetted: solo dancer, clean choreography; slice chosen to skip floor work and scene cuts"
+   },
+   "mirrored": true,
+   "slice": [
+    40,
+    58
+   ],
+   "crop": [
+    0.3,
+    0.7,
+    0.05,
+    1.0
+   ],
+   "source": {
+    "url": "https://www.youtube.com/watch?v=Wp6cE4rrG-o",
+    "title": "[ SEVENTEEN - SUPER 안무 거울모드 MIRRORED | 커버댄스 | 1인안무 ] (mirrored)",
+    "channel": "초영 CHOYOUNG",
+    "duration": 18,
+    "start": null,
+    "end": null
+   },
+   "duration": 18
+  },
+  {
+   "id": "kpop_sclass_skz",
+   "from": "tab",
+   "dim": "2d",
+   "why": "dance",
+   "asked": "Saidie 10:34 PM Oct 13 (K-pop dance)",
+   "dance": {
+    "style": "kpop",
+    "artist": "Stray Kids",
+    "song": "S-Class (특)",
+    "kid_safe": "vetted: solo dancer, clean choreography; slice chosen to skip floor work and scene cuts"
+   },
+   "mirrored": false,
+   "slice": [
+    37.5,
+    54
+   ],
+   "crop": [
+    0.15,
+    0.85,
+    0,
+    1
+   ],
+   "source": {
+    "url": "https://www.youtube.com/watch?v=BEYGiD5M4Jc",
+    "title": "Stray Kids - S-Class Full Dance Cover by fuji",
+    "channel": "FUJI",
+    "duration": 16.5,
+    "start": null,
+    "end": null
+   },
+   "duration": 16.5
+  },
+  {
+   "id": "kpop_supershy_nj",
+   "from": "tab",
+   "dim": "2d",
+   "why": "dance",
+   "asked": "Saidie 10:34 PM Oct 13 (K-pop dance)",
+   "dance": {
+    "style": "kpop",
+    "artist": "NewJeans",
+    "song": "Super Shy",
+    "kid_safe": "vetted: solo dancer, clean choreography; slice chosen to skip floor work and scene cuts"
+   },
+   "mirrored": true,
+   "slice": [
+    30,
+    48
+   ],
+   "crop": [
+    0.2,
+    0.8,
+    0.05,
+    1.0
+   ],
+   "source": {
+    "url": "https://www.youtube.com/watch?v=1eLA1V65OTc",
+    "title": "[MIRRORED] NewJeans - Super Shy dance cover | 안무 거울모드 (mirrored)",
+    "channel": "나윤 NaYoon",
+    "duration": 18,
+    "start": null,
+    "end": null
+   },
+   "duration": 18
+  },
+  {
+   "id": "kpop_dynamite_bts",
+   "from": "tab",
+   "dim": "2d",
+   "why": "dance",
+   "asked": "Saidie 10:34 PM Oct 13 (K-pop dance)",
+   "dance": {
+    "style": "kpop",
+    "artist": "BTS",
+    "song": "Dynamite",
+    "kid_safe": "vetted: solo dancer, clean choreography; slice chosen to skip floor work and scene cuts"
+   },
+   "mirrored": true,
+   "slice": [
+    47,
+    58
+   ],
+   "crop": [
+    0.2,
+    0.8,
+    0,
+    1
+   ],
+   "source": {
+    "url": "https://www.youtube.com/watch?v=8ONP2mdCovs",
+    "title": "BTS \"Dynamite\" dance mirror (Lisa Rhee) (mirrored)",
+    "channel": "KPOP-GO GO (MIRROR)",
+    "duration": 11,
+    "start": null,
+    "end": null
+   },
+   "duration": 11
+  },
+  {
+   "id": "kpop_iam_ive",
+   "from": "tab",
+   "dim": "2d",
+   "why": "dance",
+   "asked": "Saidie 10:34 PM Oct 13 (K-pop dance)",
+   "dance": {
+    "style": "kpop",
+    "artist": "IVE",
+    "song": "I AM",
+    "kid_safe": "vetted: solo dancer, clean choreography; slice chosen to skip floor work and scene cuts"
+   },
+   "mirrored": true,
+   "slice": [
+    49,
+    65
+   ],
+   "crop": [
+    0.28,
+    0.72,
+    0.1,
+    1.0
+   ],
+   "source": {
+    "url": "https://www.youtube.com/watch?v=DNhoCqA2rnM",
+    "title": "[MIRRORED] IVE - I AM Dance Cover 커버댄스 거울모드 안무 (mirrored)",
+    "channel": "현츄 HYEONCHU",
+    "duration": 16,
+    "start": null,
+    "end": null
+   },
+   "duration": 16
   }
  ]
 }

@@ -23,6 +23,8 @@ if not os.path.exists(vid) or os.path.getsize(vid) < 1000:
     if a is None and b is None: a, b = 0.0, float(c.get('duration') or 15) + 1.0
     subprocess.run(['yt-dlp', '-q', '--no-warnings', '-f', 'bv*[height<=480][ext=mp4]/bv*[height<=480]/b[height<=480]/b', '--merge-output-format', 'mp4',
                     '-o', vid, '--no-playlist', '--download-sections', f'*{a}-{b}', '--force-keyframes-at-cuts', src['url']], check=True, timeout=600)
+if c.get('dance'):   # pre-cut slice: give holistic.py the title so a "mirrored" practice video is un-mirrored first
+    json.dump({'id': cid, 'title': src.get('title'), 'channel': src.get('channel'), 'webpage_url': src.get('url')}, open(vid[:-4] + '.info.json', 'w'))
 M = os.path.join(W, 'models'); os.makedirs(M, exist_ok=True)
 G = 'https://storage.googleapis.com/mediapipe-models'
 for name, url in [('pose_full.task', f'{G}/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task'),
@@ -40,8 +42,15 @@ sys.path.insert(0, os.path.join(ROOT, 'moves-pipeline'))
 import numpy as np, retarget_full
 npz = f'{W}/raw/{cid}.npz'
 n = len(np.load(npz)['t'])
+facing = None
+if c.get('dance'):   # dance: read the performer's facing per frame, de-rotate, keep the turn as its own track
+    import dance_facing
+    facing = dance_facing.derotate(npz, f'{W}/raw/{cid}.derot.npz'); npz = f'{W}/raw/{cid}.derot.npz'
 clip, q, info, meta = retarget_full.build(npz, 0.4, max(1.0, n / 15.0 - 0.4))
-clip['learned_from'] = {'url': src.get('url'), 'title': src.get('title'), 'channel': src.get('channel'), 'start': src.get('start'), 'end': src.get('end')}
+if facing is not None:
+    a0 = int(0.4 * 15); facing = {**facing, 'yaw': facing['yaw'][a0:a0 + clip['frames']], 'chest': facing['chest'][a0:a0 + clip['frames']]}
+    clip['facing'] = facing; clip['dance'] = c.get('dance')
+clip['learned_from'] = {'url': src.get('url'), 'title': src.get('title'), 'channel': src.get('channel'), 'start': src.get('start') if src.get('start') is not None else (c.get('slice') or [None])[0], 'end': src.get('end') if src.get('end') is not None else (c.get('slice') or [None, None])[1], 'mirrored_practice': c.get('mirrored')}
 clip['tracked_on'] = {'where': 'GitHub Actions (jena-track.yml)', 'run': f"{os.environ.get('GITHUB_SERVER_URL')}/{os.environ.get('GITHUB_REPOSITORY')}/actions/runs/{os.environ.get('GITHUB_RUN_ID')}",
                       'secs': round(time.time() - t0, 1), 'detected': res.get('detected'), 'lighting': res.get('lighting'), 'mirrored': res.get('mirrored')}
 json.dump(clip, open(os.path.join(ROOT, 'out', cid + '.json'), 'w'), separators=(',', ':'))
