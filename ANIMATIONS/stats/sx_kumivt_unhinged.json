@@ -1,0 +1,94 @@
+{
+ "id": "sx_kumivt_unhinged",
+ "source": "https://www.tiktok.com/@kumivt/video/7675201090635189534",
+ "channel": "kumivt",
+ "seconds": 35.5,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": false
+ },
+ "speed_rad_s": 1.773,
+ "accel_rad_s2": 9.15,
+ "overshoot": 0.058,
+ "gesture_amp_rad": 1.754,
+ "gestures_per_min": 5.1,
+ "head_amp_deg": 14.8,
+ "sway_period_s": 2.73,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 4.814,
+   "vel_p95": 13.47,
+   "acc_mean": 25.66
+  },
+  "leftLowerArm": {
+   "vel_mean": 2.453,
+   "vel_p95": 6.161,
+   "acc_mean": 13.52
+  },
+  "leftHand": {
+   "vel_mean": 0.991,
+   "vel_p95": 2.504,
+   "acc_mean": 4.94
+  },
+  "rightUpperArm": {
+   "vel_mean": 3.925,
+   "vel_p95": 10.553,
+   "acc_mean": 19.04
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.857,
+   "vel_p95": 4.557,
+   "acc_mean": 10.18
+  },
+  "rightHand": {
+   "vel_mean": 0.916,
+   "vel_p95": 2.103,
+   "acc_mean": 4.15
+  },
+  "spine": {
+   "vel_mean": 0.851,
+   "vel_p95": 2.988,
+   "acc_mean": 4.94
+  },
+  "chest": {
+   "vel_mean": 0.627,
+   "vel_p95": 2.186,
+   "acc_mean": 3.55
+  },
+  "neck": {
+   "vel_mean": 0.511,
+   "vel_p95": 1.215,
+   "acc_mean": 2.15
+  },
+  "head": {
+   "vel_mean": 0.781,
+   "vel_p95": 1.837,
+   "acc_mean": 3.37
+  }
+ },
+ "lipsync": null,
+ "onsets": [
+  {
+   "t": 2.67,
+   "side": "right",
+   "peak": 14.22
+  },
+  {
+   "t": 30.53,
+   "side": "left",
+   "peak": 4.53
+  },
+  {
+   "t": 31.4,
+   "side": "right",
+   "peak": 12.12
+  }
+ ],
+ "style": {
+  "smooth": 0.242,
+  "bouncy": 0.26,
+  "snappy": 0.305,
+  "chibi": 0.192
+ }
+}

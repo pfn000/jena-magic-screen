@@ -1,0 +1,92 @@
+{
+ "id": "clp3Ysai6w0",
+ "source": "https://www.youtube.com/watch?v=clp3Ysai6w0",
+ "channel": "cg-people.com",
+ "seconds": 15.7,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 0.126,
+ "accel_rad_s2": 0.45,
+ "overshoot": 0.0,
+ "gesture_amp_rad": 0.972,
+ "gestures_per_min": 3.8,
+ "head_amp_deg": 2.2,
+ "sway_period_s": 5.22,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 0.313,
+   "vel_p95": 1.525,
+   "acc_mean": 1.01
+  },
+  "leftLowerArm": {
+   "vel_mean": 0.241,
+   "vel_p95": 1.039,
+   "acc_mean": 0.93
+  },
+  "leftHand": {
+   "vel_mean": 0.068,
+   "vel_p95": 0.271,
+   "acc_mean": 0.28
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.278,
+   "vel_p95": 1.54,
+   "acc_mean": 0.82
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.181,
+   "vel_p95": 1.057,
+   "acc_mean": 0.72
+  },
+  "rightHand": {
+   "vel_mean": 0.03,
+   "vel_p95": 0.135,
+   "acc_mean": 0.15
+  },
+  "spine": {
+   "vel_mean": 0.03,
+   "vel_p95": 0.08,
+   "acc_mean": 0.11
+  },
+  "chest": {
+   "vel_mean": 0.023,
+   "vel_p95": 0.06,
+   "acc_mean": 0.09
+  },
+  "neck": {
+   "vel_mean": 0.04,
+   "vel_p95": 0.114,
+   "acc_mean": 0.16
+  },
+  "head": {
+   "vel_mean": 0.06,
+   "vel_p95": 0.173,
+   "acc_mean": 0.22
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.19,
+  "open_mean": 0.086,
+  "open_speed_per_s": 1.95,
+  "close_speed_per_s": 1.69
+ },
+ "onsets": [
+  {
+   "t": 2.73,
+   "side": "left",
+   "peak": 1.95
+  }
+ ],
+ "style": {
+  "smooth": 0.988,
+  "bouncy": 0.0,
+  "snappy": 0.012,
+  "chibi": 0.0
+ }
+}

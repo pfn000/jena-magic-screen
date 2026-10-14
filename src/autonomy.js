@@ -115,6 +115,7 @@ export class Autonomy {
     if (this.moves && !this.moves.busy && Math.random() < 0.35) setTimeout(() => this.moves.play('happy', 'happy', `${user} hyped me up`), 2600);
   }
   onMessage(user, text = '') {
+    this.motion?.seenUser(user);   // a username in what she says next -> a direct-to-camera gesture at them
     if (!this.ready) return;
     this.lastIdle = Date.now();
     if (Date.now() - this.lastMove > 3000) {

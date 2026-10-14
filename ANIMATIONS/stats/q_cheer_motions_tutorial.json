@@ -1,0 +1,86 @@
+{
+ "id": "q_cheer_motions_tutorial",
+ "source": "https://www.youtube.com/watch?v=pZ81oIlinEI",
+ "channel": "SportVideos",
+ "seconds": 14.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 0.051,
+ "accel_rad_s2": 0.21,
+ "overshoot": 0.0,
+ "gesture_amp_rad": 0.0,
+ "gestures_per_min": 0.0,
+ "head_amp_deg": 4.8,
+ "sway_period_s": 2.37,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 0.092,
+   "vel_p95": 0.254,
+   "acc_mean": 0.31
+  },
+  "leftLowerArm": {
+   "vel_mean": 0.046,
+   "vel_p95": 0.119,
+   "acc_mean": 0.18
+  },
+  "leftHand": {
+   "vel_mean": 0.017,
+   "vel_p95": 0.051,
+   "acc_mean": 0.09
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.102,
+   "vel_p95": 0.327,
+   "acc_mean": 0.38
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.044,
+   "vel_p95": 0.109,
+   "acc_mean": 0.18
+  },
+  "rightHand": {
+   "vel_mean": 0.015,
+   "vel_p95": 0.043,
+   "acc_mean": 0.08
+  },
+  "spine": {
+   "vel_mean": 0.03,
+   "vel_p95": 0.118,
+   "acc_mean": 0.12
+  },
+  "chest": {
+   "vel_mean": 0.023,
+   "vel_p95": 0.09,
+   "acc_mean": 0.1
+  },
+  "neck": {
+   "vel_mean": 0.057,
+   "vel_p95": 0.276,
+   "acc_mean": 0.26
+  },
+  "head": {
+   "vel_mean": 0.086,
+   "vel_p95": 0.415,
+   "acc_mean": 0.38
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.28,
+  "open_mean": 0.212,
+  "open_speed_per_s": 2.09,
+  "close_speed_per_s": 1.78
+ },
+ "onsets": [],
+ "style": {
+  "smooth": 0.995,
+  "bouncy": 0.0,
+  "snappy": 0.005,
+  "chibi": 0.0
+ }
+}

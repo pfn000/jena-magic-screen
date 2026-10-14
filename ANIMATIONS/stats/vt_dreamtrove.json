@@ -1,0 +1,78 @@
+{
+ "id": "vt_dreamtrove",
+ "source": "https://www.youtube.com/watch?v=8FoJY56h2y0",
+ "channel": "DreamTrove",
+ "seconds": 14.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": false
+ },
+ "speed_rad_s": 1.093,
+ "accel_rad_s2": 5.33,
+ "overshoot": 0.0,
+ "gesture_amp_rad": 0.0,
+ "gestures_per_min": 0.0,
+ "head_amp_deg": 11.0,
+ "sway_period_s": 2.84,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 3.145,
+   "vel_p95": 11.875,
+   "acc_mean": 14.57
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.442,
+   "vel_p95": 5.161,
+   "acc_mean": 8.29
+  },
+  "leftHand": {
+   "vel_mean": 0.634,
+   "vel_p95": 2.54,
+   "acc_mean": 3.2
+  },
+  "rightUpperArm": {
+   "vel_mean": 2.537,
+   "vel_p95": 9.198,
+   "acc_mean": 12.17
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.23,
+   "vel_p95": 4.413,
+   "acc_mean": 6.68
+  },
+  "rightHand": {
+   "vel_mean": 0.457,
+   "vel_p95": 1.548,
+   "acc_mean": 2.1
+  },
+  "spine": {
+   "vel_mean": 0.409,
+   "vel_p95": 1.362,
+   "acc_mean": 2.02
+  },
+  "chest": {
+   "vel_mean": 0.303,
+   "vel_p95": 0.995,
+   "acc_mean": 1.47
+  },
+  "neck": {
+   "vel_mean": 0.304,
+   "vel_p95": 0.952,
+   "acc_mean": 1.08
+  },
+  "head": {
+   "vel_mean": 0.465,
+   "vel_p95": 1.459,
+   "acc_mean": 1.69
+  }
+ },
+ "lipsync": null,
+ "onsets": [],
+ "style": {
+  "smooth": 0.791,
+  "bouncy": 0.0,
+  "snappy": 0.209,
+  "chibi": 0.0
+ }
+}

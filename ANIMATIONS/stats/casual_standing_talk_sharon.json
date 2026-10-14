@@ -1,0 +1,94 @@
+{
+ "id": "casual_standing_talk_sharon",
+ "source": null,
+ "channel": null,
+ "seconds": 16.5,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 0.137,
+ "accel_rad_s2": 0.5,
+ "overshoot": 0.028,
+ "gesture_amp_rad": 1.143,
+ "gestures_per_min": 7.3,
+ "head_amp_deg": 1.4,
+ "sway_period_s": 8.23,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 0.334,
+   "vel_p95": 1.651,
+   "acc_mean": 1.11
+  },
+  "leftLowerArm": {
+   "vel_mean": 0.266,
+   "vel_p95": 1.414,
+   "acc_mean": 0.9
+  },
+  "leftHand": {
+   "vel_mean": 0.061,
+   "vel_p95": 0.217,
+   "acc_mean": 0.27
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.298,
+   "vel_p95": 1.62,
+   "acc_mean": 1.05
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.183,
+   "vel_p95": 1.138,
+   "acc_mean": 0.69
+  },
+  "rightHand": {
+   "vel_mean": 0.044,
+   "vel_p95": 0.204,
+   "acc_mean": 0.23
+  },
+  "spine": {
+   "vel_mean": 0.039,
+   "vel_p95": 0.099,
+   "acc_mean": 0.14
+  },
+  "chest": {
+   "vel_mean": 0.03,
+   "vel_p95": 0.069,
+   "acc_mean": 0.12
+  },
+  "neck": {
+   "vel_mean": 0.047,
+   "vel_p95": 0.154,
+   "acc_mean": 0.2
+  },
+  "head": {
+   "vel_mean": 0.071,
+   "vel_p95": 0.233,
+   "acc_mean": 0.28
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.24,
+  "open_mean": 0.068,
+  "open_speed_per_s": 2.19,
+  "close_speed_per_s": 0.82
+ },
+ "onsets": [
+  {
+   "t": 0.4,
+   "side": "left",
+   "peak": 2.2
+  },
+  {
+   "t": 3.13,
+   "side": "right",
+   "peak": 2.97
+  }
+ ],
+ "style": {
+  "smooth": 0.973,
+  "bouncy": 0.008,
+  "snappy": 0.013,
+  "chibi": 0.005
+ }
+}

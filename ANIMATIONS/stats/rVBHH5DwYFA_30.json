@@ -1,0 +1,92 @@
+{
+ "id": "rVBHH5DwYFA_30",
+ "source": "https://www.youtube.com/watch?v=rVBHH5DwYFA",
+ "channel": "DJ Raphi",
+ "seconds": 19.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 1.271,
+ "accel_rad_s2": 6.45,
+ "overshoot": 0.64,
+ "gesture_amp_rad": 1.188,
+ "gestures_per_min": 3.1,
+ "head_amp_deg": 11.1,
+ "sway_period_s": 9.6,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 3.016,
+   "vel_p95": 7.154,
+   "acc_mean": 14.89
+  },
+  "leftLowerArm": {
+   "vel_mean": 2.031,
+   "vel_p95": 5.222,
+   "acc_mean": 11.72
+  },
+  "leftHand": {
+   "vel_mean": 0.823,
+   "vel_p95": 2.298,
+   "acc_mean": 4.32
+  },
+  "rightUpperArm": {
+   "vel_mean": 2.973,
+   "vel_p95": 6.653,
+   "acc_mean": 14.39
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.735,
+   "vel_p95": 4.303,
+   "acc_mean": 9.44
+  },
+  "rightHand": {
+   "vel_mean": 0.576,
+   "vel_p95": 1.366,
+   "acc_mean": 3.14
+  },
+  "spine": {
+   "vel_mean": 0.356,
+   "vel_p95": 0.779,
+   "acc_mean": 1.41
+  },
+  "chest": {
+   "vel_mean": 0.264,
+   "vel_p95": 0.572,
+   "acc_mean": 1.04
+  },
+  "neck": {
+   "vel_mean": 0.37,
+   "vel_p95": 0.778,
+   "acc_mean": 1.61
+  },
+  "head": {
+   "vel_mean": 0.563,
+   "vel_p95": 1.204,
+   "acc_mean": 2.5
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.05,
+  "open_mean": 0.236,
+  "open_speed_per_s": 0.61,
+  "close_speed_per_s": 0.65
+ },
+ "onsets": [
+  {
+   "t": 13.07,
+   "side": "right",
+   "peak": 5.21
+  }
+ ],
+ "style": {
+  "smooth": 0.0,
+  "bouncy": 0.556,
+  "snappy": 0.0,
+  "chibi": 0.444
+ }
+}

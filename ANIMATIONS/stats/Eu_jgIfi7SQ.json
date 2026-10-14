@@ -1,0 +1,94 @@
+{
+ "id": "Eu_jgIfi7SQ",
+ "source": "https://www.youtube.com/watch?v=Eu_jgIfi7SQ",
+ "channel": "Tricia McIntosh",
+ "seconds": 22.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 0.101,
+ "accel_rad_s2": 0.43,
+ "overshoot": 0.025,
+ "gesture_amp_rad": 0.961,
+ "gestures_per_min": 5.4,
+ "head_amp_deg": 2.1,
+ "sway_period_s": 5.55,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 0.248,
+   "vel_p95": 0.934,
+   "acc_mean": 1.09
+  },
+  "leftLowerArm": {
+   "vel_mean": 0.17,
+   "vel_p95": 0.55,
+   "acc_mean": 0.66
+  },
+  "leftHand": {
+   "vel_mean": 0.04,
+   "vel_p95": 0.123,
+   "acc_mean": 0.18
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.233,
+   "vel_p95": 0.861,
+   "acc_mean": 1.05
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.116,
+   "vel_p95": 0.344,
+   "acc_mean": 0.56
+  },
+  "rightHand": {
+   "vel_mean": 0.03,
+   "vel_p95": 0.085,
+   "acc_mean": 0.14
+  },
+  "spine": {
+   "vel_mean": 0.032,
+   "vel_p95": 0.079,
+   "acc_mean": 0.11
+  },
+  "chest": {
+   "vel_mean": 0.024,
+   "vel_p95": 0.061,
+   "acc_mean": 0.09
+  },
+  "neck": {
+   "vel_mean": 0.047,
+   "vel_p95": 0.11,
+   "acc_mean": 0.17
+  },
+  "head": {
+   "vel_mean": 0.069,
+   "vel_p95": 0.168,
+   "acc_mean": 0.24
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.09,
+  "open_mean": 0.074,
+  "open_speed_per_s": 0.91,
+  "close_speed_per_s": 0.63
+ },
+ "onsets": [
+  {
+   "t": 9.67,
+   "side": "left",
+   "peak": 3.64
+  },
+  {
+   "t": 12.13,
+   "side": "left",
+   "peak": 3.42
+  }
+ ],
+ "style": {
+  "smooth": 0.98,
+  "bouncy": 0.005,
+  "snappy": 0.011,
+  "chibi": 0.003
+ }
+}

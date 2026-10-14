@@ -12,6 +12,7 @@ import { ThoughtChain } from './thoughts.js';
 import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { Moves, rememberMove } from './moves.js';
+import { Motion, setupSprings } from './motion.js';
 import { bodyBrief } from './selfcheck.js';
 import { SelfTrack } from './selfview.js';
 import { SelfVision } from './selfvision.js';
@@ -65,6 +66,8 @@ const avatarTimer = setTimeout(() => avatarStill('her 3D body is taking long to 
     catch (e2) { clearTimeout(avatarTimer); avatarStill(`couldn't load her body (${e2.message})`); return; }
   }
   clearTimeout(avatarTimer);
+  // spring bones: hair / clothes / accessories only, with colliders (src/motion.js setupSprings); never chest/body jiggle
+  try { avatar.springSetup = setupSprings(avatar.vrm); } catch (e) { console.warn('springs', e); }
   $('#avatar-still')?.remove(); document.body.classList.remove('avatar-still');
   document.body.classList.add('avatar-ready');
 })();
@@ -212,6 +215,9 @@ if (skillsPub) {
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
 // moves she learned by watching videos of real people move (pose-tracked into her own clips, /moves/)
 autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), remember: rememberMove, card: (trigger) => chain.start(trigger), boxBase: cfg.apiInfo?.box?.url ? cfg.apiInfo.box.url + '/box/moves/' : null });
+// her talk/react/direct-to-camera move set + smug face + motion styles (src/motion.js, ANIMATIONS/moveset.json)
+const motion = new Motion(avatar, { moves: autonomy.moves });
+autonomy.motion = motion;
 const params = new URLSearchParams(location.search);
 // her self-sense: every bone + every expression read off the live model each frame (window.jena.selfState)
 const selfSense = new SelfSense(avatar, {
@@ -640,6 +646,11 @@ if (cfg.api && !new URLSearchParams(location.search).get('desktop')) {
 const selfTrack = new SelfTrack();   // src/selfview.js: her live self-tracking checks (dev panel 🪞 + every brain request)
 // ---------------- public JS API (read-only on her body: she moves herself) ----------------
 window.jena = {
+  // reactions she plays (react_* / direct_* / brag_*): cb({type, move, kind, intensity 0-1, emotion, trigger, timestamp ms, t, durationMs, cam})
+  onReaction: (cb) => motion.onReaction(cb),
+  react: (type, intensity) => motion.play(/^(react|direct|brag|talk|idle)_/.test(type) ? type : (['point', 'lean_in', 'wave', 'finger_guns', 'you'].includes(type) ? 'direct_' : ['smug', 'flex'].includes(type) ? 'brag_' : 'react_') + type, { intensity, trigger: 'api' }),
+  motion,
+  get springs() { return avatar.springSetup || null; },
   think: (message, user = 'guest') => thinkAbout({ message, source: 'stage', user }),
   bones: () => avatar.bones(),
   expressions: () => avatar.expressions(),

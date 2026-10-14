@@ -127,7 +127,8 @@
     "start": null,
     "end": null
    },
-   "duration": 28
+   "duration": 28,
+   "use": "skit structure, cuts and reaction timing (3D VTuber compilation)"
   },
   {
    "id": "sx_reallife_lipsync",
@@ -136,13 +137,14 @@
    "why": "real-life face tracking, expressions, hands, lip sync to audio",
    "asked": "Saidie 6:56 PM",
    "source": {
-    "url": "https://www.tiktok.com/t/ZPLSf6xRL/",
-    "title": "real-life face/hand tracking example",
-    "channel": null,
+    "url": "https://www.tiktok.com/@valvalvalerii/video/7672068854159281430",
+    "title": "real-life face tracking / lip sync example",
+    "channel": "valvalvalerii",
     "start": null,
     "end": null
    },
-   "duration": 40
+   "duration": 7,
+   "use": "lip-sync timing (mouth open/close vs audio) and hand-beat timing ONLY; its expressions/poses are not used for Jena (kid-appropriate rule)"
   }
  ]
 }

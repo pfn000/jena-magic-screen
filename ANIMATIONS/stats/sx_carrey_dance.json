@@ -1,0 +1,137 @@
+{
+ "id": "sx_carrey_dance",
+ "source": "https://www.tiktok.com/@carrey_play/video/7682618730848832786",
+ "channel": "carrey_play",
+ "seconds": 29.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 0.685,
+ "accel_rad_s2": 3.44,
+ "overshoot": 0.153,
+ "gesture_amp_rad": 0.739,
+ "gestures_per_min": 20.5,
+ "head_amp_deg": 9.1,
+ "sway_period_s": 4.17,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 1.808,
+   "vel_p95": 4.582,
+   "acc_mean": 9.31
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.311,
+   "vel_p95": 3.698,
+   "acc_mean": 6.6
+  },
+  "leftHand": {
+   "vel_mean": 0.256,
+   "vel_p95": 0.667,
+   "acc_mean": 1.34
+  },
+  "rightUpperArm": {
+   "vel_mean": 1.313,
+   "vel_p95": 3.191,
+   "acc_mean": 6.44
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.864,
+   "vel_p95": 2.538,
+   "acc_mean": 5.03
+  },
+  "rightHand": {
+   "vel_mean": 0.287,
+   "vel_p95": 0.825,
+   "acc_mean": 1.39
+  },
+  "spine": {
+   "vel_mean": 0.186,
+   "vel_p95": 0.398,
+   "acc_mean": 0.81
+  },
+  "chest": {
+   "vel_mean": 0.139,
+   "vel_p95": 0.296,
+   "acc_mean": 0.6
+  },
+  "neck": {
+   "vel_mean": 0.272,
+   "vel_p95": 0.579,
+   "acc_mean": 1.15
+  },
+  "head": {
+   "vel_mean": 0.412,
+   "vel_p95": 0.882,
+   "acc_mean": 1.76
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.1,
+  "open_mean": 0.059,
+  "open_speed_per_s": 0.79,
+  "close_speed_per_s": 0.62
+ },
+ "onsets": [
+  {
+   "t": 1.6,
+   "side": "right",
+   "peak": 1.54
+  },
+  {
+   "t": 3.27,
+   "side": "left",
+   "peak": 2.93
+  },
+  {
+   "t": 5.8,
+   "side": "right",
+   "peak": 3.2
+  },
+  {
+   "t": 8.27,
+   "side": "left",
+   "peak": 3.29
+  },
+  {
+   "t": 10.73,
+   "side": "right",
+   "peak": 3.87
+  },
+  {
+   "t": 13.73,
+   "side": "right",
+   "peak": 3.19
+  },
+  {
+   "t": 18.2,
+   "side": "right",
+   "peak": 3.7
+  },
+  {
+   "t": 26.27,
+   "side": "right",
+   "peak": 2.16
+  },
+  {
+   "t": 26.93,
+   "side": "left",
+   "peak": 5.9
+  },
+  {
+   "t": 28.47,
+   "side": "right",
+   "peak": 1.24
+  }
+ ],
+ "style": {
+  "smooth": 0.506,
+  "bouncy": 0.267,
+  "snappy": 0.081,
+  "chibi": 0.146
+ }
+}

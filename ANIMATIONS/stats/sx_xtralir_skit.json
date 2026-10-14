@@ -1,0 +1,114 @@
+{
+ "id": "sx_xtralir_skit",
+ "source": "https://www.tiktok.com/@xtralir/video/7685967188376997150",
+ "channel": "xtralir",
+ "seconds": 27.5,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 0.842,
+ "accel_rad_s2": 4.22,
+ "overshoot": 0.283,
+ "gesture_amp_rad": 0.604,
+ "gestures_per_min": 13.1,
+ "head_amp_deg": 10.1,
+ "sway_period_s": 1.83,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 1.986,
+   "vel_p95": 5.609,
+   "acc_mean": 9.33
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.258,
+   "vel_p95": 3.76,
+   "acc_mean": 6.96
+  },
+  "leftHand": {
+   "vel_mean": 0.538,
+   "vel_p95": 1.653,
+   "acc_mean": 2.59
+  },
+  "rightUpperArm": {
+   "vel_mean": 1.761,
+   "vel_p95": 5.853,
+   "acc_mean": 8.97
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.234,
+   "vel_p95": 4.249,
+   "acc_mean": 6.75
+  },
+  "rightHand": {
+   "vel_mean": 0.426,
+   "vel_p95": 1.177,
+   "acc_mean": 2.17
+  },
+  "spine": {
+   "vel_mean": 0.292,
+   "vel_p95": 0.887,
+   "acc_mean": 1.17
+  },
+  "chest": {
+   "vel_mean": 0.218,
+   "vel_p95": 0.656,
+   "acc_mean": 0.86
+  },
+  "neck": {
+   "vel_mean": 0.279,
+   "vel_p95": 0.739,
+   "acc_mean": 1.33
+  },
+  "head": {
+   "vel_mean": 0.426,
+   "vel_p95": 1.14,
+   "acc_mean": 2.06
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.04,
+  "open_mean": 0.068,
+  "open_speed_per_s": 0.3,
+  "close_speed_per_s": 0.66
+ },
+ "onsets": [
+  {
+   "t": 1.2,
+   "side": "right",
+   "peak": 1.62
+  },
+  {
+   "t": 2.67,
+   "side": "left",
+   "peak": 3.16
+  },
+  {
+   "t": 3.8,
+   "side": "left",
+   "peak": 2.7
+  },
+  {
+   "t": 7.2,
+   "side": "left",
+   "peak": 5.46
+  },
+  {
+   "t": 15.87,
+   "side": "right",
+   "peak": 1.82
+  },
+  {
+   "t": 17.47,
+   "side": "left",
+   "peak": 4.71
+  }
+ ],
+ "style": {
+  "smooth": 0.12,
+  "bouncy": 0.568,
+  "snappy": 0.058,
+  "chibi": 0.254
+ }
+}

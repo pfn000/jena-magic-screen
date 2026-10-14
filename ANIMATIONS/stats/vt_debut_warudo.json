@@ -1,0 +1,78 @@
+{
+ "id": "vt_debut_warudo",
+ "source": "https://www.youtube.com/watch?v=L8d8Hcn_QQY",
+ "channel": "Skulls Nightshade",
+ "seconds": 14.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": false
+ },
+ "speed_rad_s": 1.901,
+ "accel_rad_s2": 10.53,
+ "overshoot": 0.0,
+ "gesture_amp_rad": 0.0,
+ "gestures_per_min": 0.0,
+ "head_amp_deg": 12.4,
+ "sway_period_s": 2.84,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 4.447,
+   "vel_p95": 11.711,
+   "acc_mean": 23.17
+  },
+  "leftLowerArm": {
+   "vel_mean": 2.98,
+   "vel_p95": 6.859,
+   "acc_mean": 18.27
+  },
+  "leftHand": {
+   "vel_mean": 1.072,
+   "vel_p95": 2.215,
+   "acc_mean": 5.11
+  },
+  "rightUpperArm": {
+   "vel_mean": 4.429,
+   "vel_p95": 13.929,
+   "acc_mean": 25.3
+  },
+  "rightLowerArm": {
+   "vel_mean": 2.865,
+   "vel_p95": 6.729,
+   "acc_mean": 18.67
+  },
+  "rightHand": {
+   "vel_mean": 1.049,
+   "vel_p95": 2.316,
+   "acc_mean": 4.76
+  },
+  "spine": {
+   "vel_mean": 0.575,
+   "vel_p95": 2.092,
+   "acc_mean": 2.88
+  },
+  "chest": {
+   "vel_mean": 0.426,
+   "vel_p95": 1.531,
+   "acc_mean": 2.12
+  },
+  "neck": {
+   "vel_mean": 0.462,
+   "vel_p95": 0.967,
+   "acc_mean": 1.96
+  },
+  "head": {
+   "vel_mean": 0.706,
+   "vel_p95": 1.489,
+   "acc_mean": 3.04
+  }
+ },
+ "lipsync": null,
+ "onsets": [],
+ "style": {
+  "smooth": 0.341,
+  "bouncy": 0.0,
+  "snappy": 0.659,
+  "chibi": 0.0
+ }
+}

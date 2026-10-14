@@ -1,0 +1,461 @@
+{
+ "version": 2,
+ "note": "Motion styles learned from tracked clips (moves-pipeline/motion_stats.py): each clip's soft style from mean joint speed, acceleration and overshoot. default_mix = Saidie's example clips (weight 2) + public 3D VTuber clips. by_emotion: the picker leans each move toward these.",
+ "default_mix": {
+  "smooth": 0.302,
+  "bouncy": 0.352,
+  "snappy": 0.178,
+  "chibi": 0.168
+ },
+ "by_emotion": {
+  "shock": {
+   "smooth": 0.281,
+   "bouncy": 0.309,
+   "snappy": 0.245,
+   "chibi": 0.165
+  },
+  "hype": {
+   "smooth": 0.281,
+   "bouncy": 0.309,
+   "snappy": 0.245,
+   "chibi": 0.165
+  },
+  "funny": {
+   "smooth": 0.281,
+   "bouncy": 0.309,
+   "snappy": 0.245,
+   "chibi": 0.165
+  },
+  "laugh": {
+   "smooth": 0.281,
+   "bouncy": 0.309,
+   "snappy": 0.245,
+   "chibi": 0.165
+  },
+  "win": {
+   "smooth": 0.281,
+   "bouncy": 0.309,
+   "snappy": 0.245,
+   "chibi": 0.165
+  },
+  "smug": {
+   "smooth": 0.121,
+   "bouncy": 0.463,
+   "snappy": 0.168,
+   "chibi": 0.247
+  },
+  "happy": {
+   "smooth": 0.253,
+   "bouncy": 0.467,
+   "snappy": 0.056,
+   "chibi": 0.224
+  },
+  "music": {
+   "smooth": 0.506,
+   "bouncy": 0.267,
+   "snappy": 0.081,
+   "chibi": 0.146
+  },
+  "sleepy": {
+   "smooth": 1.0
+  },
+  "relaxed": {
+   "smooth": 0.988,
+   "bouncy": 0.0,
+   "snappy": 0.011,
+   "chibi": 0.0
+  },
+  "neutral": {
+   "smooth": 0.777,
+   "bouncy": 0.0,
+   "snappy": 0.223,
+   "chibi": 0.0
+  },
+  "explain": {
+   "smooth": 0.988,
+   "bouncy": 0.0,
+   "snappy": 0.011,
+   "chibi": 0.0
+  }
+ },
+ "learned": {
+  "talk_gestures_per_min": 3.8,
+  "vtuber3d_head_amp_deg": 10.1,
+  "human_talk_head_amp_deg": 2.0,
+  "sway_period_s": 4.03,
+  "reaction_speed_rad_s": 1.48,
+  "reaction_overshoot": 0.058,
+  "lipsync_reference": {
+   "mouth_cycles_per_s": 0.48,
+   "open_mean": 0.491,
+   "open_speed_per_s": 2.15,
+   "close_speed_per_s": 2.2
+  }
+ },
+ "clips": {
+  "DRyaRp3COvE": {
+   "style": {
+    "smooth": 0.942,
+    "bouncy": 0.031,
+    "snappy": 0.013,
+    "chibi": 0.013
+   },
+   "gestures_per_min": 14.3,
+   "head_amp_deg": 7.2,
+   "sway_period_s": 8.4,
+   "speed_rad_s": 0.13,
+   "overshoot": 0.093
+  },
+  "EYDDtTJ6TtQ_112": {
+   "style": {
+    "smooth": 0.674,
+    "bouncy": 0.132,
+    "snappy": 0.105,
+    "chibi": 0.088
+   },
+   "gestures_per_min": 8.1,
+   "head_amp_deg": 6.8,
+   "sway_period_s": 7.4,
+   "speed_rad_s": 0.701,
+   "overshoot": 0.078
+  },
+  "EYDDtTJ6TtQ_18": {
+   "style": {
+    "smooth": 0.0,
+    "bouncy": 0.555,
+    "snappy": 0.0,
+    "chibi": 0.444
+   },
+   "gestures_per_min": 5.7,
+   "head_amp_deg": 6.6,
+   "sway_period_s": 7.07,
+   "speed_rad_s": 1.375,
+   "overshoot": 0.499
+  },
+  "Eu_jgIfi7SQ": {
+   "style": {
+    "smooth": 0.98,
+    "bouncy": 0.005,
+    "snappy": 0.011,
+    "chibi": 0.003
+   },
+   "gestures_per_min": 5.4,
+   "head_amp_deg": 2.1,
+   "sway_period_s": 5.55,
+   "speed_rad_s": 0.101,
+   "overshoot": 0.025
+  },
+  "cIdMN8szJps": {
+   "style": {
+    "smooth": 0.892,
+    "bouncy": 0.061,
+    "snappy": 0.015,
+    "chibi": 0.032
+   },
+   "gestures_per_min": 10.7,
+   "head_amp_deg": 8.2,
+   "sway_period_s": 8.4,
+   "speed_rad_s": 0.14,
+   "overshoot": 0.141
+  },
+  "casual_standing_talk_donna": {
+   "style": {
+    "smooth": 0.977,
+    "bouncy": 0.006,
+    "snappy": 0.013,
+    "chibi": 0.004
+   },
+   "gestures_per_min": 7.3,
+   "head_amp_deg": 2.4,
+   "sway_period_s": 5.49,
+   "speed_rad_s": 0.142,
+   "overshoot": 0.02
+  },
+  "casual_standing_talk_sharon": {
+   "style": {
+    "smooth": 0.973,
+    "bouncy": 0.008,
+    "snappy": 0.013,
+    "chibi": 0.005
+   },
+   "gestures_per_min": 7.3,
+   "head_amp_deg": 1.4,
+   "sway_period_s": 8.23,
+   "speed_rad_s": 0.137,
+   "overshoot": 0.028
+  },
+  "clp3Ysai6w0": {
+   "style": {
+    "smooth": 0.988,
+    "bouncy": 0.0,
+    "snappy": 0.012,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 3.8,
+   "head_amp_deg": 2.2,
+   "sway_period_s": 5.22,
+   "speed_rad_s": 0.126,
+   "overshoot": 0.0
+  },
+  "hip_hop_warmup": {
+   "style": {
+    "smooth": 0.765,
+    "bouncy": 0.13,
+    "snappy": 0.069,
+    "chibi": 0.036
+   },
+   "gestures_per_min": 32.0,
+   "head_amp_deg": 8.2,
+   "sway_period_s": 3.75,
+   "speed_rad_s": 0.48,
+   "overshoot": 0.102
+  },
+  "lgupcR-BIW0": {
+   "style": {
+    "smooth": 0.841,
+    "bouncy": 0.088,
+    "snappy": 0.017,
+    "chibi": 0.054
+   },
+   "gestures_per_min": 10.8,
+   "head_amp_deg": 7.3,
+   "sway_period_s": 8.37,
+   "speed_rad_s": 0.148,
+   "overshoot": 0.171
+  },
+  "macarena": {
+   "style": {
+    "smooth": 0.0,
+    "bouncy": 0.556,
+    "snappy": 0.0,
+    "chibi": 0.444
+   },
+   "gestures_per_min": 4.0,
+   "head_amp_deg": 11.0,
+   "sway_period_s": 7.5,
+   "speed_rad_s": 1.255,
+   "overshoot": 0.744
+  },
+  "ohASxT9tTbg": {
+   "style": {
+    "smooth": 0.989,
+    "bouncy": 0.0,
+    "snappy": 0.011,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 3.8,
+   "head_amp_deg": 1.8,
+   "sway_period_s": 5.22,
+   "speed_rad_s": 0.121,
+   "overshoot": 0.0
+  },
+  "q_cha_cha_slide": {
+   "style": {
+    "smooth": 0.077,
+    "bouncy": 0.56,
+    "snappy": 0.04,
+    "chibi": 0.323
+   },
+   "gestures_per_min": 4.2,
+   "head_amp_deg": 8.3,
+   "sway_period_s": 2.84,
+   "speed_rad_s": 0.688,
+   "overshoot": 0.307
+  },
+  "q_cheer_motions_tutorial": {
+   "style": {
+    "smooth": 0.995,
+    "bouncy": 0.0,
+    "snappy": 0.005,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 0.0,
+   "head_amp_deg": 4.8,
+   "sway_period_s": 2.37,
+   "speed_rad_s": 0.051,
+   "overshoot": 0.0
+  },
+  "q_easy_tiktok_dance_tutorial": {
+   "style": {
+    "smooth": 0.495,
+    "bouncy": 0.249,
+    "snappy": 0.091,
+    "chibi": 0.166
+   },
+   "gestures_per_min": 8.5,
+   "head_amp_deg": 11.1,
+   "sway_period_s": 2.37,
+   "speed_rad_s": 0.815,
+   "overshoot": 0.128
+  },
+  "rVBHH5DwYFA_30": {
+   "style": {
+    "smooth": 0.0,
+    "bouncy": 0.556,
+    "snappy": 0.0,
+    "chibi": 0.444
+   },
+   "gestures_per_min": 3.1,
+   "head_amp_deg": 11.1,
+   "sway_period_s": 9.6,
+   "speed_rad_s": 1.271,
+   "overshoot": 0.64
+  },
+  "sx_carrey_dance": {
+   "style": {
+    "smooth": 0.506,
+    "bouncy": 0.267,
+    "snappy": 0.081,
+    "chibi": 0.146
+   },
+   "gestures_per_min": 20.5,
+   "head_amp_deg": 9.1,
+   "sway_period_s": 4.17,
+   "speed_rad_s": 0.685,
+   "overshoot": 0.153
+  },
+  "sx_feralune_driver": {
+   "style": {
+    "smooth": 0.602,
+    "bouncy": 0.0,
+    "snappy": 0.398,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 0.0,
+   "head_amp_deg": 12.6,
+   "sway_period_s": 5.83,
+   "speed_rad_s": 1.48,
+   "overshoot": 0.0
+  },
+  "sx_feralune_troll": {
+   "style": {
+    "smooth": 0.0,
+    "bouncy": 0.666,
+    "snappy": 0.031,
+    "chibi": 0.303
+   },
+   "gestures_per_min": 8.1,
+   "head_amp_deg": 8.4,
+   "sway_period_s": 1.84,
+   "speed_rad_s": 0.805,
+   "overshoot": 0.379
+  },
+  "sx_kumivt_unhinged": {
+   "style": {
+    "smooth": 0.242,
+    "bouncy": 0.26,
+    "snappy": 0.305,
+    "chibi": 0.192
+   },
+   "gestures_per_min": 5.1,
+   "head_amp_deg": 14.8,
+   "sway_period_s": 2.73,
+   "speed_rad_s": 1.773,
+   "overshoot": 0.058
+  },
+  "sx_reallife_lipsync": {
+   "style": {
+    "smooth": 0.31,
+    "bouncy": 0.463,
+    "snappy": 0.055,
+    "chibi": 0.172
+   },
+   "gestures_per_min": 38.7,
+   "head_amp_deg": 5.1,
+   "sway_period_s": 3.1,
+   "speed_rad_s": 0.463,
+   "overshoot": 0.268
+  },
+  "sx_salpoww_sleepy": {
+   "style": {
+    "smooth": 0.072,
+    "bouncy": 0.592,
+    "snappy": 0.059,
+    "chibi": 0.277
+   },
+   "gestures_per_min": 28.6,
+   "head_amp_deg": 6.1,
+   "sway_period_s": 7.33,
+   "speed_rad_s": 0.841,
+   "overshoot": 0.302
+  },
+  "sx_xtralir_skit": {
+   "style": {
+    "smooth": 0.12,
+    "bouncy": 0.568,
+    "snappy": 0.058,
+    "chibi": 0.254
+   },
+   "gestures_per_min": 13.1,
+   "head_amp_deg": 10.1,
+   "sway_period_s": 1.83,
+   "speed_rad_s": 0.842,
+   "overshoot": 0.283
+  },
+  "vetLPqfhXCc": {
+   "style": {
+    "smooth": 0.906,
+    "bouncy": 0.036,
+    "snappy": 0.034,
+    "chibi": 0.024
+   },
+   "gestures_per_min": 25.7,
+   "head_amp_deg": 6.8,
+   "sway_period_s": 4.67,
+   "speed_rad_s": 0.298,
+   "overshoot": 0.052
+  },
+  "vt_debut_warudo": {
+   "style": {
+    "smooth": 0.341,
+    "bouncy": 0.0,
+    "snappy": 0.659,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 0.0,
+   "head_amp_deg": 12.4,
+   "sway_period_s": 2.84,
+   "speed_rad_s": 1.901,
+   "overshoot": 0.0
+  },
+  "vt_dreamtrove": {
+   "style": {
+    "smooth": 0.791,
+    "bouncy": 0.0,
+    "snappy": 0.209,
+    "chibi": 0.0
+   },
+   "gestures_per_min": 0.0,
+   "head_amp_deg": 11.0,
+   "sway_period_s": 2.84,
+   "speed_rad_s": 1.093,
+   "overshoot": 0.0
+  },
+  "ymigWt5TOV8_30": {
+   "style": {
+    "smooth": 0.0,
+    "bouncy": 0.646,
+    "snappy": 0.0,
+    "chibi": 0.354
+   },
+   "gestures_per_min": 6.2,
+   "head_amp_deg": 8.7,
+   "sway_period_s": 1.92,
+   "speed_rad_s": 1.031,
+   "overshoot": 0.622
+  },
+  "zrKyX669few_150": {
+   "style": {
+    "smooth": 0.772,
+    "bouncy": 0.041,
+    "snappy": 0.172,
+    "chibi": 0.015
+   },
+   "gestures_per_min": 6.2,
+   "head_amp_deg": 11.2,
+   "sway_period_s": 2.13,
+   "speed_rad_s": 0.965,
+   "overshoot": 0.016
+  }
+ }
+}

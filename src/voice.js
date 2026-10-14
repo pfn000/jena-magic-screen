@@ -45,9 +45,21 @@ export class Voice {
       an.getFloatTimeDomainData(td); an.getByteFrequencyData(fd);
       let s = 0; for (const v of td) s += v * v;
       const rms = Math.sqrt(s / td.length);
-      let lo = 0, hi = 0;
-      for (let i = 0; i < fd.length; i++) { const f = i * binHz; if (f > 200 && f < 900) lo += fd[i]; else if (f >= 900 && f < 3500) hi += fd[i]; }
-      this.avatar.voice = { level: Math.min(1, rms * 5.5), round: lo / (lo + hi + 1) };
+      let lo = 0, hi = 0, f1 = 0, f2lo = 0, f2hi = 0;
+      for (let i = 0; i < fd.length; i++) {
+        const f = i * binHz, v = fd[i];
+        if (f > 200 && f < 900) lo += v; else if (f >= 900 && f < 3500) hi += v;
+        if (f > 250 && f < 850) f1 += v; else if (f >= 850 && f < 1500) f2lo += v; else if (f >= 1500 && f < 3300) f2hi += v;
+      }
+      // audio-driven lip sync: formant-band energy -> a blend of the five mouth shapes (F1 high = open 'aa',
+      // energy held low = rounded 'oh'/'ou', F2 high with a low F1 = spread 'ee'/'ih'); mixed with the text visemes
+      const tot = f1 + f2lo + f2hi + 1, a = f1 / tot, b = f2lo / tot, c = f2hi / tot;
+      const sc = { aa: a * 1.15, oh: b * 0.95, ou: b * 0.55 + Math.max(0, 0.35 - c) * 0.6, ee: c * 1.1, ih: c * 0.55 + a * 0.35 };
+      let sum = 0; for (const k in sc) { sc[k] = sc[k] ** 3; sum += sc[k]; } for (const k in sc) sc[k] /= sum || 1;
+      const level = Math.min(1, rms * 5.5), prev = this.avatar.voice?.level || 0;
+      // an energy onset (a stressed syllable) is a beat her head and hands can hit (src/motion.js)
+      if (level > prev * 1.6 + 0.12 && level > 0.3) this.avatar.voiceBeat = { at: performance.now(), level };
+      this.avatar.voice = { level, round: lo / (lo + hi + 1), mix: sc };
       trace.push(this.avatar.voice.level);
       requestAnimationFrame(tick);
     };

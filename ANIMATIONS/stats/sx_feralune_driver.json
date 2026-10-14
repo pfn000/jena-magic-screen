@@ -1,0 +1,83 @@
+{
+ "id": "sx_feralune_driver",
+ "source": "https://www.tiktok.com/@feralune/video/7692483246432603422",
+ "channel": "feralune",
+ "seconds": 11.7,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 1.48,
+ "accel_rad_s2": 8.67,
+ "overshoot": 0.0,
+ "gesture_amp_rad": 0.0,
+ "gestures_per_min": 0.0,
+ "head_amp_deg": 12.6,
+ "sway_period_s": 5.83,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 3.312,
+   "vel_p95": 10.836,
+   "acc_mean": 18.42
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.954,
+   "vel_p95": 5.246,
+   "acc_mean": 11.73
+  },
+  "leftHand": {
+   "vel_mean": 0.973,
+   "vel_p95": 2.747,
+   "acc_mean": 5.95
+  },
+  "rightUpperArm": {
+   "vel_mean": 3.521,
+   "vel_p95": 12.048,
+   "acc_mean": 22.46
+  },
+  "rightLowerArm": {
+   "vel_mean": 2.794,
+   "vel_p95": 7.388,
+   "acc_mean": 15.75
+  },
+  "rightHand": {
+   "vel_mean": 0.656,
+   "vel_p95": 1.769,
+   "acc_mean": 3.16
+  },
+  "spine": {
+   "vel_mean": 0.449,
+   "vel_p95": 2.13,
+   "acc_mean": 3.03
+  },
+  "chest": {
+   "vel_mean": 0.33,
+   "vel_p95": 1.55,
+   "acc_mean": 2.18
+  },
+  "neck": {
+   "vel_mean": 0.322,
+   "vel_p95": 0.734,
+   "acc_mean": 1.58
+  },
+  "head": {
+   "vel_mean": 0.491,
+   "vel_p95": 1.135,
+   "acc_mean": 2.45
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.09,
+  "open_mean": 0.06,
+  "open_speed_per_s": 1.08,
+  "close_speed_per_s": 0.44
+ },
+ "onsets": [],
+ "style": {
+  "smooth": 0.602,
+  "bouncy": 0.0,
+  "snappy": 0.398,
+  "chibi": 0.0
+ }
+}

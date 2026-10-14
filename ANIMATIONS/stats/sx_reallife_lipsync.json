@@ -1,0 +1,104 @@
+{
+ "id": "sx_reallife_lipsync",
+ "source": "https://www.tiktok.com/t/ZPLSf6xRL/",
+ "channel": null,
+ "seconds": 6.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 0.463,
+ "accel_rad_s2": 2.36,
+ "overshoot": 0.268,
+ "gesture_amp_rad": 0.5,
+ "gestures_per_min": 38.7,
+ "head_amp_deg": 5.1,
+ "sway_period_s": 3.1,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 0.888,
+   "vel_p95": 2.062,
+   "acc_mean": 4.25
+  },
+  "leftLowerArm": {
+   "vel_mean": 0.816,
+   "vel_p95": 1.977,
+   "acc_mean": 4.78
+  },
+  "leftHand": {
+   "vel_mean": 0.419,
+   "vel_p95": 1.022,
+   "acc_mean": 2.0
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.728,
+   "vel_p95": 1.6,
+   "acc_mean": 3.35
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.907,
+   "vel_p95": 2.156,
+   "acc_mean": 5.17
+  },
+  "rightHand": {
+   "vel_mean": 0.265,
+   "vel_p95": 0.541,
+   "acc_mean": 1.18
+  },
+  "spine": {
+   "vel_mean": 0.124,
+   "vel_p95": 0.428,
+   "acc_mean": 0.65
+  },
+  "chest": {
+   "vel_mean": 0.092,
+   "vel_p95": 0.318,
+   "acc_mean": 0.49
+  },
+  "neck": {
+   "vel_mean": 0.157,
+   "vel_p95": 0.497,
+   "acc_mean": 0.7
+  },
+  "head": {
+   "vel_mean": 0.239,
+   "vel_p95": 0.76,
+   "acc_mean": 1.06
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.48,
+  "open_mean": 0.491,
+  "open_speed_per_s": 2.15,
+  "close_speed_per_s": 2.2
+ },
+ "onsets": [
+  {
+   "t": 1.27,
+   "side": "right",
+   "peak": 2.41
+  },
+  {
+   "t": 2.53,
+   "side": "left",
+   "peak": 3.23
+  },
+  {
+   "t": 4.0,
+   "side": "right",
+   "peak": 2.1
+  },
+  {
+   "t": 5.73,
+   "side": "right",
+   "peak": 1.81
+  }
+ ],
+ "style": {
+  "smooth": 0.31,
+  "bouncy": 0.463,
+  "snappy": 0.055,
+  "chibi": 0.172
+ }
+}

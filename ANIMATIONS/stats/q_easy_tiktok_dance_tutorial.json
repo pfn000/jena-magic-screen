@@ -1,0 +1,97 @@
+{
+ "id": "q_easy_tiktok_dance_tutorial",
+ "source": "https://www.youtube.com/watch?v=SoRmqE7A_IE",
+ "channel": "MadFit",
+ "seconds": 14.2,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 0.815,
+ "accel_rad_s2": 3.85,
+ "overshoot": 0.128,
+ "gesture_amp_rad": 1.098,
+ "gestures_per_min": 8.5,
+ "head_amp_deg": 11.1,
+ "sway_period_s": 2.37,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 2.061,
+   "vel_p95": 4.407,
+   "acc_mean": 8.95
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.312,
+   "vel_p95": 2.885,
+   "acc_mean": 6.96
+  },
+  "leftHand": {
+   "vel_mean": 0.415,
+   "vel_p95": 1.457,
+   "acc_mean": 1.97
+  },
+  "rightUpperArm": {
+   "vel_mean": 1.794,
+   "vel_p95": 4.247,
+   "acc_mean": 8.01
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.173,
+   "vel_p95": 2.958,
+   "acc_mean": 6.91
+  },
+  "rightHand": {
+   "vel_mean": 0.293,
+   "vel_p95": 0.649,
+   "acc_mean": 1.35
+  },
+  "spine": {
+   "vel_mean": 0.198,
+   "vel_p95": 0.393,
+   "acc_mean": 0.66
+  },
+  "chest": {
+   "vel_mean": 0.148,
+   "vel_p95": 0.29,
+   "acc_mean": 0.48
+  },
+  "neck": {
+   "vel_mean": 0.298,
+   "vel_p95": 0.691,
+   "acc_mean": 1.26
+  },
+  "head": {
+   "vel_mean": 0.454,
+   "vel_p95": 1.063,
+   "acc_mean": 1.93
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.14,
+  "open_mean": 0.068,
+  "open_speed_per_s": 2.37,
+  "close_speed_per_s": 0.48
+ },
+ "onsets": [
+  {
+   "t": 1.0,
+   "side": "right",
+   "peak": 5.61
+  },
+  {
+   "t": 3.73,
+   "side": "right",
+   "peak": 3.58
+  }
+ ],
+ "style": {
+  "smooth": 0.495,
+  "bouncy": 0.249,
+  "snappy": 0.091,
+  "chibi": 0.166
+ }
+}

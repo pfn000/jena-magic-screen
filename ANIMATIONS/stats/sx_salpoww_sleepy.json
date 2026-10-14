@@ -1,0 +1,119 @@
+{
+ "id": "sx_salpoww_sleepy",
+ "source": "https://www.tiktok.com/@salpoww/video/7314082075252903200",
+ "channel": "salpoww",
+ "seconds": 14.7,
+ "fps": 15.0,
+ "has": {
+  "fingers": [],
+  "face": true
+ },
+ "speed_rad_s": 0.841,
+ "accel_rad_s2": 4.79,
+ "overshoot": 0.302,
+ "gesture_amp_rad": 0.631,
+ "gestures_per_min": 28.6,
+ "head_amp_deg": 6.1,
+ "sway_period_s": 7.33,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 2.172,
+   "vel_p95": 7.294,
+   "acc_mean": 13.4
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.202,
+   "vel_p95": 3.049,
+   "acc_mean": 6.38
+  },
+  "leftHand": {
+   "vel_mean": 0.44,
+   "vel_p95": 1.235,
+   "acc_mean": 2.4
+  },
+  "rightUpperArm": {
+   "vel_mean": 2.039,
+   "vel_p95": 7.672,
+   "acc_mean": 11.41
+  },
+  "rightLowerArm": {
+   "vel_mean": 1.323,
+   "vel_p95": 3.906,
+   "acc_mean": 8.3
+  },
+  "rightHand": {
+   "vel_mean": 0.537,
+   "vel_p95": 1.526,
+   "acc_mean": 2.95
+  },
+  "spine": {
+   "vel_mean": 0.168,
+   "vel_p95": 0.359,
+   "acc_mean": 0.72
+  },
+  "chest": {
+   "vel_mean": 0.125,
+   "vel_p95": 0.269,
+   "acc_mean": 0.54
+  },
+  "neck": {
+   "vel_mean": 0.159,
+   "vel_p95": 0.37,
+   "acc_mean": 0.7
+  },
+  "head": {
+   "vel_mean": 0.241,
+   "vel_p95": 0.561,
+   "acc_mean": 1.07
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.07,
+  "open_mean": 0.031,
+  "open_speed_per_s": 0.85,
+  "close_speed_per_s": 0.42
+ },
+ "onsets": [
+  {
+   "t": 0.6,
+   "side": "left",
+   "peak": 6.0
+  },
+  {
+   "t": 7.13,
+   "side": "right",
+   "peak": 2.91
+  },
+  {
+   "t": 8.53,
+   "side": "left",
+   "peak": 2.2
+  },
+  {
+   "t": 9.27,
+   "side": "right",
+   "peak": 3.1
+  },
+  {
+   "t": 10.4,
+   "side": "right",
+   "peak": 3.89
+  },
+  {
+   "t": 11.0,
+   "side": "left",
+   "peak": 3.49
+  },
+  {
+   "t": 12.4,
+   "side": "right",
+   "peak": 2.9
+  }
+ ],
+ "style": {
+  "smooth": 0.072,
+  "bouncy": 0.592,
+  "snappy": 0.059,
+  "chibi": 0.277
+ }
+}

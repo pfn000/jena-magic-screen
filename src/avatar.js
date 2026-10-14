@@ -319,7 +319,7 @@ export class Avatar {
         const pts = [lh, rh]; for (const s of ['left', 'right']) for (const f of ['IndexDistal', 'MiddleDistal', 'LittleDistal', 'ThumbDistal']) { const v = P(s + f); if (v) pts.push(v); }
         const handLow = Math.min(...pts.map((v) => v.y)), handHigh = Math.max(...pts.map((v) => v.y));
         const xs = pts.map((v) => v.x), handL = Math.min(...xs), handR = Math.max(...xs);
-        top = Math.max(head.y + 0.25, handHigh + 0.12);   // the head bone sits at the base of her skull: +0.25 clears her hair
+        top = Math.max(head.y + 0.32, handHigh + 0.12);   // the head bone sits at the base of her skull: +0.32 clears the crown of her hair (it touched the top edge at 1600 with +0.25)
         // face big AND both hands (with their fingers) in shot: the frame always reaches a little below the lower
         // hand (fingertips hang ~0.09 below the hand bone), never above the hips, and at most to mid-thigh
         bottom = Math.min(hips.y - 0.12, Math.max(handLow - 0.06, hips.y - 0.45));
@@ -837,6 +837,9 @@ export class Avatar {
       if (vis === 'closed') open *= 0.08; else if (vis === 'rest') open *= 0.25; else if (vis === 'half') open *= 0.55;
       const shape = vis && V[vis] !== undefined ? vis : this.voice ? (this.voice.round > 0.62 ? 'oh' : 'aa') : (this.talk.shape = now > (this.talk.shapeNext || 0) ? (this.talk.shapeNext = now + 120, ['aa', 'ih', 'ou', 'ee', 'oh'][Math.floor(Math.random() * 5)]) : this.talk.shape);
       V[shape] = open; if (shape !== 'aa') V.aa = open * 0.2;
+      // her real audio's formant mix (voice.js) shapes the mouth too, so lips follow the sound, not just the letters
+      const mix = this.voice?.mix;
+      if (mix && vis !== 'closed') for (const k of Object.keys(V)) V[k] = V[k] * 0.5 + open * (mix[k] || 0) * 0.6;
     }
     this._vis ||= { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
     for (const k of Object.keys(V)) { this._vis[k] = damp(this._vis[k], V[k], 22, dt); em.setValue(k, this._vis[k]); }

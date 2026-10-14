@@ -1,0 +1,127 @@
+{
+ "id": "hip_hop_warmup",
+ "source": null,
+ "channel": null,
+ "seconds": 15.0,
+ "fps": 15.0,
+ "has": {
+  "fingers": [
+   "left",
+   "right"
+  ],
+  "face": true
+ },
+ "speed_rad_s": 0.48,
+ "accel_rad_s2": 2.46,
+ "overshoot": 0.102,
+ "gesture_amp_rad": 0.375,
+ "gestures_per_min": 32.0,
+ "head_amp_deg": 8.2,
+ "sway_period_s": 3.75,
+ "per_joint": {
+  "leftUpperArm": {
+   "vel_mean": 1.186,
+   "vel_p95": 3.071,
+   "acc_mean": 6.48
+  },
+  "leftLowerArm": {
+   "vel_mean": 1.154,
+   "vel_p95": 3.699,
+   "acc_mean": 7.32
+  },
+  "leftHand": {
+   "vel_mean": 0.219,
+   "vel_p95": 0.479,
+   "acc_mean": 1.05
+  },
+  "rightUpperArm": {
+   "vel_mean": 0.798,
+   "vel_p95": 1.714,
+   "acc_mean": 3.19
+  },
+  "rightLowerArm": {
+   "vel_mean": 0.584,
+   "vel_p95": 1.846,
+   "acc_mean": 3.07
+  },
+  "rightHand": {
+   "vel_mean": 0.154,
+   "vel_p95": 0.33,
+   "acc_mean": 0.73
+  },
+  "spine": {
+   "vel_mean": 0.139,
+   "vel_p95": 0.257,
+   "acc_mean": 0.55
+  },
+  "chest": {
+   "vel_mean": 0.104,
+   "vel_p95": 0.195,
+   "acc_mean": 0.41
+  },
+  "neck": {
+   "vel_mean": 0.183,
+   "vel_p95": 0.344,
+   "acc_mean": 0.72
+  },
+  "head": {
+   "vel_mean": 0.277,
+   "vel_p95": 0.521,
+   "acc_mean": 1.08
+  }
+ },
+ "lipsync": {
+  "mouth_cycles_per_s": 0.07,
+  "open_mean": 0.06,
+  "open_speed_per_s": 1.24,
+  "close_speed_per_s": 0.53
+ },
+ "onsets": [
+  {
+   "t": 1.87,
+   "side": "left",
+   "peak": 1.31
+  },
+  {
+   "t": 2.73,
+   "side": "right",
+   "peak": 2.14
+  },
+  {
+   "t": 3.13,
+   "side": "left",
+   "peak": 1.95
+  },
+  {
+   "t": 5.6,
+   "side": "right",
+   "peak": 1.27
+  },
+  {
+   "t": 10.0,
+   "side": "right",
+   "peak": 1.27
+  },
+  {
+   "t": 11.6,
+   "side": "right",
+   "peak": 1.81
+  },
+  {
+   "t": 12.4,
+   "side": "right",
+   "peak": 1.9
+  },
+  {
+   "t": 13.8,
+   "side": "left",
+   "peak": 2.58
+  }
+ ],
+ "style": {
+  "smooth": 0.765,
+  "bouncy": 0.13,
+  "snappy": 0.069,
+  "chibi": 0.036
+ }
+}
