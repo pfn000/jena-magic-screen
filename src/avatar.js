@@ -228,6 +228,8 @@ export class Avatar {
     return this.floorY || 0;
   }
   // ask for a step (a big reaction, a turn): she re-plants a foot under her hips
+  // spin all the way around (or more): dir 1/-1, turns 1 = 360 degrees
+  spin(dir = Math.random() < 0.5 ? 1 : -1, ms = 1500 + Math.random() * 700, turns = 1) { this.spinState = { t0: performance.now(), dur: ms, dir, turns }; try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(performance.now()), kind: 'spin', what: (dir > 0 ? 'ccw' : 'cw') + ' ' + turns, why: 'spin' }); } catch {} return this.spinState; }
   requestStep(why = 'asked') { this.stepAsk = { why, at: performance.now() }; }
   // FEET: planted feet stay exactly on the ground (no float, no sink, no skating); she steps when her hips drift too
   // far from the base between her feet (> 9 cm), when her body turns away from her feet (> 20°), when a big reaction
@@ -237,8 +239,16 @@ export class Avatar {
     if (!this.feet || !this.feetRest) return;
     const H = this.vrm.humanoid, hips = H.getNormalizedBoneNode('hips');
     const hp = hips.getWorldPosition(_v[9]);
+    // spinning: she pivots on her feet (both feet turn around her hips with her, staying on the floor) instead of
+    // stepping or twisting her legs around each other
+    {
+      const d = (this._spinY || 0) - (this._spinPrev || 0);
+      this._spinPrev = this.spinState ? (this._spinY || 0) : 0;
+      if (Math.abs(d) > 1e-5) for (const s of ['left', 'right']) { const f = this.feet[s], dx = f.x - hp.x, dz = f.z - hp.z, c = Math.cos(d), sn = Math.sin(d); f.x = hp.x + dx * c + dz * sn; f.z = hp.z - dx * sn + dz * c; }
+    }
     const S = this.stepState;
-    if (S) {
+    if (this.spinState && !S) { /* no steps mid-spin */ }
+    else if (S) {
       const u = Math.min(1, (now - S.t0) / S.dur), e = u * u * (3 - 2 * u);
       const f = this.feet[S.side];
       f.lerpVectors(S.from, S.to, e);
@@ -263,7 +273,7 @@ export class Avatar {
       else if (turn > 0.35 && !noop) why = 'turn';
       else if (this.stepAsk && now - this.stepAsk.at < 1500) why = this.stepAsk.why;
       else if (now > this.nextIdleStep && ((!busy && now > (this.talk?.until || 0)) || now > this.nextIdleStep + 15000)) { why = 'idle'; this.nextIdleStep = now + 18000 + Math.random() * 30000; }
-      if (why && now - (this.lastStep || 0) > ((why === 'balance' || why === 'turn') ? 1600 : 700) && now - (this.lastStep || 0) > 700) {
+      if (why && now - (this.lastStep || 0) > ((why === 'balance' || why === 'turn') ? (turn > 0.6 || this.spinState ? 280 : 1600) : 700) && now - (this.lastStep || 0) > 700) {
         this.stepAsk = null;
         // the lighter foot steps: the one farther from under her hips
         const dl = Math.hypot(hp.x - this.feet.left.x, hp.z - this.feet.left.z), dr = Math.hypot(hp.x - this.feet.right.x, hp.z - this.feet.right.z);
@@ -283,6 +293,11 @@ export class Avatar {
         const other = this.feet[side === 'left' ? 'right' : 'left'], dx = to.x - other.x, dz = to.z - other.z, dd = Math.hypot(dx, dz);
         if (dd < 0.12 || dd > 0.45) { const k = THREE.MathUtils.clamp(dd, 0.12, 0.45) / (dd || 1); to.x = other.x + dx * k; to.z = other.z + dz * k; }
         to.y = this.groundY(to.x, to.z) + this.ankleH[side];
+        // crossing is fine (a cross-step, a pivot), but never more than ~6 cm past the other foot along her hips' side axis
+        const ax = new THREE.Vector3(1, 0, 0).applyAxisAngle(_v[6].set(0, 1, 0), turn > 0.2 ? yd : 0);
+        const sgn = Math.sign(this.feetRest.left.x - this.feetRest.right.x) || 1, want = side === 'left' ? sgn : -sgn;
+        const capCross = () => { const sep = ((to.x - other.x) * ax.x + (to.z - other.z) * ax.z) * want; if (sep < -0.06) { const k = (-0.06 - sep) * want; to.x += ax.x * k; to.z += ax.z * k; to.y = this.groundY(to.x, to.z) + this.ankleH[side]; } };
+        capCross();
         let len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
         if (len < 0.03 && why !== 'balance' && why !== 'turn') {   // an asked-for or idle step always visibly moves the foot
           const a = Math.random() * Math.PI * 2, r = 0.035 + Math.random() * 0.03;
@@ -290,6 +305,7 @@ export class Avatar {
           const ddx = to.x - other.x, ddz = to.z - other.z, d2 = Math.hypot(ddx, ddz);
           if (d2 < 0.12 || d2 > 0.45) { const k2 = THREE.MathUtils.clamp(d2, 0.12, 0.45) / (d2 || 1); to.x = other.x + ddx * k2; to.z = other.z + ddz * k2; }
           to.y = this.groundY(to.x, to.z) + this.ankleH[side];
+          capCross();
           len = Math.hypot(to.x - this.feet[side].x, to.z - this.feet[side].z);
         }
         if (len > 0.015) { try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(now), kind: 'step', what: side + ':' + style, why }); if (L.length > 400) L.shift(); } catch {} }
@@ -761,7 +777,7 @@ export class Avatar {
     const vrm = this.vrm;
     for (const f of this.preHooks || []) { try { f(dt, raw); } catch (e) { console.warn('pre hook', e); } }   // (dt, raw) before her pose + render, body or not (the /world room moves the camera here)
     if (vrm) {
-      if (this.fixedStep === undefined) this.fixedStep = new URLSearchParams(location.search).get('fixed') === '0' ? 0 : 1 / 60;
+      if (this.fixedStep === undefined) this.fixedStep = new URLSearchParams(location.search).get('fixed') === '1' ? 1 / 60 : 0;   // opt-in: the fixed-step + interpolation path measured 80x shakier at 120 Hz (hips jitter 0.48 vs 0.006 deg/frame)
       const STEP = this.fixedStep;
       if (!STEP) this.simulate(vrm, dt, t, now);
       else {
@@ -833,9 +849,13 @@ export class Avatar {
         hips.position.set(this.hipsRest.x + L * 0.075 + sway * 0.022, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003, this.hipsRest.z + N.py(t * 0.11) * 0.012);
       }
       // contrapposto: the standing leg's hip rises (+z lifts her left side), the spine and shoulders answer it
-      set('hips', 0, N.px(t * 0.1) * 0.07 + L * 0.06, L * 0.11 + sway * 0.02);
-      set('spine', 0.03 + breathe * 0.02 + N.sx(t * 0.13) * 0.03, N.sy(t * 0.12) * 0.06, -L * 0.13 + N.sz(t * 0.15) * 0.03);
-      set('chest', breathe * 0.035, N.cy(t * 0.14) * 0.035, -L * 0.03);
+      // a full free turn (spin): eased 360 degrees on the hips; her feet step around to follow (updateFeet)
+      let spinY = 0;
+      if (this.spinState) { const S2 = this.spinState, u = (now - S2.t0) / S2.dur; if (u >= 1) this.spinState = null; else { const e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u); spinY = e * Math.PI * 2 * S2.dir * S2.turns; } }
+      set('hips', 0, N.px(t * 0.1) * 0.07 + L * 0.06 + spinY, L * 0.11 + sway * 0.02);
+      this._spinY = spinY;
+      set('spine', 0.03 + breathe * 0.03 + N.sx(t * 0.13) * 0.04, N.sy(t * 0.12) * 0.06, -L * 0.13 + N.sz(t * 0.15) * 0.03);
+      set('chest', breathe * 0.05, N.cy(t * 0.14) * 0.05, -L * 0.04);
       set('upperChest', breathe * 0.02, 0, 0);
       set('neck', N.nx(t * 0.2) * 0.05, N.ny(t * 0.17) * 0.08, L * 0.04);
       if (this.look.until && now > this.look.until) { this.look.ty = 0; this.look.tx = 0; this.look.until = 0; }
@@ -851,6 +871,20 @@ export class Avatar {
       add('rightUpperArm', N.ar(t * 0.19) * 0.09 * restR, 0, -(N.ar(t * 0.13 + 40) * 0.06 + inhale * 0.02) * restR);
       add('leftLowerArm', 0, -(0.5 + 0.5 * N.el(t * 0.15)) * 0.2 * restL, 0);
       add('rightLowerArm', 0, (0.5 + 0.5 * N.er(t * 0.15)) * 0.2 * restR, 0);
+      // overlapping action: spine, neck, head and arms lag behind how fast her hips turn and sway (a critically
+      // damped spring each), so motion flows through her body instead of moving as one stiff block
+      {
+        const hy = hips ? hips.rotation.y : 0, hz = hips ? hips.rotation.z : 0;
+        const vy = dt > 0 ? (hy - (this._lhy ?? hy)) / dt : 0, vz = dt > 0 ? (hz - (this._lhz ?? hz)) / dt : 0;
+        this._lhy = hy; this._lhz = hz;
+        const sp = (this._lag ||= { y: 0, vy: 0, z: 0, vz: 0 }), k = 38, c = 2 * Math.sqrt(k);
+        const ty = THREE.MathUtils.clamp(-vy * 0.12, -0.6, 0.6), tz = THREE.MathUtils.clamp(-vz * 0.1, -0.25, 0.25);
+        sp.vy += (k * (ty - sp.y) - c * sp.vy) * dt; sp.y += sp.vy * dt;
+        sp.vz += (k * (tz - sp.z) - c * sp.vz) * dt; sp.z += sp.vz * dt;
+        add('spine', 0, sp.y * 0.35, sp.z * 0.4); add('chest', 0, sp.y * 0.25, sp.z * 0.3); add('neck', 0, sp.y * 0.2, 0); add('head', 0, sp.y * 0.3, sp.z * 0.3);
+        const fling = Math.min(0.5, Math.abs(sp.y) * 0.8);
+        add('leftUpperArm', 0, 0, fling * restL); add('rightUpperArm', 0, 0, -fling * restR);
+      }
       // legs: start straight-ish (knees a hair forward of locked), then IK plants each foot
       for (const s of ['left', 'right']) { set(s + 'UpperLeg', 0, 0, 0); set(s + 'LowerLeg', 0.03, 0, 0); set(s + 'Foot', 0, 0, 0); }
       for (const f of this.poseHooks) { try { f(vrm, dt); } catch (e) { console.warn('pose hook', e); } }

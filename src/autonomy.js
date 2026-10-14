@@ -196,6 +196,7 @@ export class Autonomy {
       () => this.lookAround(say(["just seeing what's up", 'looking around', 'what is going on over there'], 'look')),
       () => this.hip(pick(['left', 'right']), 4500 + Math.random() * 4500, say(['just standing here, being iconic', 'hand on hip, very cool', 'posing a little'], 'hip')),
       () => this.look(pick(['up', 'up', 'down']), 1600 + Math.random() * 1000, say(['thinking', 'daydreaming', 'lost in thought'], 'lookup')),
+      () => { this.avatar.spin?.(); this.lastMove = Date.now(); this.log(say(['spinning around real quick', 'full spin, why not', 'doing a little twirl', 'turning around to check behind me'], 'spin')); },
       () => this.face(pick(['relaxed', 'happy']), 3000 + Math.random() * 2500, say(['vibing', 'chilling', 'good mood'], 'face')),
       () => this.wave(pick(['left', 'right']), say(['saying hi to whoever is watching', 'hi!!', 'waving at chat'], 'wave')),
     ];

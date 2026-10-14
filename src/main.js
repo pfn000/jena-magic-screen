@@ -666,6 +666,7 @@ window.jena = {
   onReaction: (cb) => motion.onReaction(cb),
   react: (type, intensity) => motion.play(/^(react|direct|brag|talk|idle)_/.test(type) ? type : (['point', 'lean_in', 'wave', 'finger_guns', 'you'].includes(type) ? 'direct_' : ['smug', 'flex'].includes(type) ? 'brag_' : 'react_') + type, { intensity, trigger: 'api' }),
   motion,
+  spin: (dir, ms, turns) => motion.avatar?.spin?.(dir, ms, turns),
   // learned facial expressions: jena.expr.play('surprised'), .show('pout') (freeze at peak, null clears), .names, .state()
   expr: expressions,
   onExpression: (cb) => expressions.onExpression(cb),
