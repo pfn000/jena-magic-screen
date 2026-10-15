@@ -134,3 +134,6 @@ body.m-app.nos #m-top, body.m-app.nos #m-tabs, #nos-menubar, #nos-submenu, #nos-
 /* uniform 24px corners on every window, sheet and panel */
 body.nos .sheet-card, body.nos #takeover { border-radius: 24px !important; }
 @media (min-width: 701px) { body.nos #devpanel { border-radius: 24px; } }
+/* a window pulled over another one gets a denser frosted backing, so the two windows' text never mixes */
+body.nos-gl #stage .nos-win.nos-lifted:not(.nos-max) { background: rgba(255, 248, 252, .82) !important; backdrop-filter: blur(18px) saturate(1.2) !important; -webkit-backdrop-filter: blur(18px) saturate(1.2) !important; }
+body.nos-gl.nos-dark #stage .nos-win.nos-lifted:not(.nos-max) { background: rgba(44, 30, 22, .8) !important; }
