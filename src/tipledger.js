@@ -35,12 +35,14 @@ export function renderTips(rerender) {
   if (d.locked || d.status === 401) return h + '<p class="dp-warn">Mama only. Unlock with your passcode on this device first (the 💌 private drawer).</p>';
   if (d.error && !d.totals) return h + `<p class="dp-warn">The ledger did not load: ${esc(d.error)}</p>`;
   const t = d.totals || { amount: 0, taxes: 0, compute: 0, saidie: 0 };
-  h += `<div class="tl-tot"><div class="tl-box all"><small>All tips (${d.count || 0})</small><b>${money(t.amount)}</b></div>`;
-  for (const s of SPLIT) h += `<div class="tl-box"><small>${esc(s.label)} · ${s.pct}%</small><b>${money(t[s.key])}</b></div>`;
+  const live = d.source === 'stripe-live';   // not connected / Stripe error: show dashes, never a $0.00 that looks like a real total
+  h += `<div class="tl-tot"><div class="tl-box all"><small>All tips (${live ? d.count || 0 : '—'})</small><b>${live ? money(t.amount) : '—'}</b></div>`;
+  for (const s of SPLIT) h += `<div class="tl-box"><small>${esc(s.label)} · ${s.pct}%</small><b>${live ? money(t[s.key]) : '—'}</b></div>`;
   h += '</div>';
-  if (!d.rows?.length) h += '<div class="dp-card tl-empty">No tips yet. When someone tips, it shows up here with its split.</div>';
+  if (!d.rows?.length) h += live ? '<div class="dp-card tl-empty">No tips yet. When someone tips, it shows up here with its split.</div>' : '';
   else h += `<div class="tl-wrap"><table class="tl-tab"><thead><tr><th>Date</th><th>Tip</th>${SPLIT.map((s) => `<th title="${esc(s.label)} · ${s.pct}%">${SHORT[s.key]}</th>`).join('')}</tr></thead><tbody>${d.rows.map((r) => `<tr><td title="${esc(when(r.at))}">${esc(whenShort(r.at))}</td><td>${money(r.amountCents, r.currency)}</td>${SPLIT.map((s) => `<td>${money(r.split[s.key], r.currency)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const src = d.source === 'stripe-live' ? `Live from Stripe · read ${esc(when(Date.parse(d.readAt)))}` : `Snapshot from your Stripe · synced ${d.syncedAt ? esc(when(Date.parse(d.syncedAt))) : '?'}`;
-  h += `<p class="tl-note">${src}${d.note ? `<br>${esc(d.note)}` : ''}${d.liveError ? `<br>⚠️ ${esc(d.liveError)}` : ''}</p>`;
+  if (d.source === 'not_connected') h += `<p class="tl-note">${esc(d.note || 'Live tips need a read-only Stripe key added in Vercel (STRIPE_TIPS_READ_KEY). No tips shown yet.')}</p>`;
+  else if (d.source === 'stripe-live') h += `<p class="tl-note">Live from Stripe · read ${esc(when(Date.parse(d.readAt)))}</p>`;
+  if (d.liveError) h += `<p class="tl-note">⚠️ ${esc(d.liveError)}. No tips shown until Stripe answers.</p>`;
   return h;
 }

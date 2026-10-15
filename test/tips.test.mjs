@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { tipsRoute, NOT_CONNECTED_NOTE } from '../api/_lib/tips.js';
 import { splitCents, tipLedger, money, SPLIT, TIP_LINK } from '../src/tipsplit.mjs';
 
 const sum = (s) => s.taxes + s.compute + s.saidie;
@@ -72,10 +74,54 @@ test('tip button uses the exact Stripe link and stays wholesome', () => {
 });
 
 test('tip ledger API is mama-only and never writes to Stripe', () => {
-  const api = readFileSync(new URL('../api/jena.js', import.meta.url), 'utf8');
-  const fn = api.slice(api.indexOf('async function tipsRoute'), api.indexOf('async function handle('));
+  const fn = readFileSync(new URL('../api/_lib/tips.js', import.meta.url), 'utf8');
   assert.match(fn, /mama-only/);
   assert.match(fn, /401/);
   assert.ok(!/method:\s*'(POST|DELETE)'/.test(fn), 'GET only');
   assert.ok(!/refund|payout|charges/i.test(fn.replace(/Checkout Sessions: read/, '')));
+});
+
+test('/api/tips without the passcode is 401 and never touches Stripe', async () => {
+  let called = 0;
+  const r = await tipsRoute(new Request('https://x/api/tips'), { isMama: async () => false, env: { STRIPE_TIPS_READ_KEY: 'rk_test_x' }, fetchImpl: async () => { called++; } });
+  assert.equal(r.status, 401);
+  assert.equal((await r.json()).locked, true);
+  assert.equal(called, 0);
+  const r2 = await tipsRoute(new Request('https://x/api/tips'), {});   // no gate given = locked
+  assert.equal(r2.status, 401);
+});
+
+test('/api/tips (mama) without the Stripe key returns an empty list, source not_connected', async () => {
+  let called = 0;
+  const r = await tipsRoute(new Request('https://x/api/tips'), { isMama: async () => true, env: {}, fetchImpl: async () => { called++; } });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.source, 'not_connected');
+  assert.deepEqual(d.rows, []);
+  assert.equal(d.count, 0);
+  assert.equal(d.note, NOT_CONNECTED_NOTE);
+  assert.match(d.note, /STRIPE_TIPS_READ_KEY/);
+  assert.equal(called, 0);
+});
+
+test('/api/tips (mama) with a key reads paid sessions only, GET only, no session ids returned', async () => {
+  const seen = [];
+  const fetchImpl = async (u, o) => { seen.push([String(u), o?.method || 'GET']); return new Response(JSON.stringify({ has_more: false, data: [
+    { id: 'cs_1', payment_status: 'paid', amount_total: 500, currency: 'usd', created: 1760000000 },
+    { id: 'cs_2', payment_status: 'unpaid', amount_total: 900, currency: 'usd', created: 1760000100 },
+  ] }), { status: 200 }); };
+  const d = await (await tipsRoute(new Request('https://x/api/tips'), { isMama: async () => true, env: { STRIPE_TIPS_READ_KEY: 'rk_test_x' }, fetchImpl })).json();
+  assert.equal(d.source, 'stripe-live');
+  assert.equal(d.count, 1);
+  assert.equal(d.totals.amount, 500);
+  assert.ok(!JSON.stringify(d).includes('cs_1'));
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0][1], 'GET');
+  assert.match(seen[0][0], /payment_link=plink_/);
+});
+
+test('no tip data is committed in the repo', () => {
+  assert.ok(!existsSync(new URL('../api/_lib/tips-snapshot.js', import.meta.url)));
+  const api = readFileSync(new URL('../api/jena.js', import.meta.url), 'utf8');
+  assert.ok(!/tips-snapshot|TIPS_SNAPSHOT/.test(api));
 });
