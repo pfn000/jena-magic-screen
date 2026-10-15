@@ -111,7 +111,7 @@ export function mountNOS({ obs = false } = {}) {
     for (const el of document.querySelectorAll('#stage > .panel, #avatar-panel, #nos-about')) attach(el);
     for (const [el, W] of wins) if (!el.isConnected) { wins.delete(el); renderDock(); }
   }
-  function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); dirty = true; }
+  function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); dirty = true; updateFront(); }
   function apply(W) {
     const el = W.el;
     const t = (W.tx || W.ty || W.s !== 1) ? `translate(${W.tx}px, ${W.ty}px) scale(${W.s})` : '';
@@ -136,7 +136,7 @@ export function mountNOS({ obs = false } = {}) {
         else W[k] = from[k] + (to[k] - from[k]) * e;
       }
       apply(W);
-      if (p < 1) requestAnimationFrame(step); else { W.anim = null; done && done(); }
+      if (p < 1) requestAnimationFrame(step); else { W.anim = null; done && done(); updateFront(); }
     };
     requestAnimationFrame(step);
   }
