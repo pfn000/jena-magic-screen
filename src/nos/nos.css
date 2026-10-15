@@ -134,6 +134,8 @@ body.m-app.nos #m-top, body.m-app.nos #m-tabs, #nos-menubar, #nos-submenu, #nos-
 /* uniform 24px corners on every window, sheet and panel */
 body.nos .sheet-card, body.nos #takeover { border-radius: 24px !important; }
 @media (min-width: 701px) { body.nos #devpanel { border-radius: 24px; } }
+/* dev panel on a phone: the tab chips wrap onto rows, so no label is ever cut off at 390 */
+@media (max-width: 700px) { #devpanel nav { flex-wrap: wrap !important; overflow-x: visible !important; gap: 6px !important; } #devpanel nav button { flex: 0 1 auto !important; } }
 /* the window in FRONT of another one (.nos-front, set where two windows overlap) fully hides what is under it:
    its body is filled solid (no alpha), so no text behind can be read through it; a bright glass rim, top highlight,
    soft inner glow and lift shadow stay, so it still reads as liquid glass */

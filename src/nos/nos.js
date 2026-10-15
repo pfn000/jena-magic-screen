@@ -184,7 +184,7 @@ export function mountNOS({ obs = false } = {}) {
     el.classList.add('nos-max'); W.max = cur; W.mode = 'normal'; W.restoring = true; apply(W); syncMax();
     tween(W, { max: { x: home.left + tx, y: home.top + ty, w: home.width, h: home.height } }, 420, () => {
       el.classList.remove('nos-max'); W.max = null; Object.assign(el.style, { left: '', top: '', width: '', height: '' });
-      W.tx = tx; W.ty = ty; W.restoring = false; apply(W); syncMax(); if (el.id !== 'nos-about') el.style.zIndex = ''; settle(W);
+      W.tx = tx; W.ty = ty; W.restoring = false; apply(W); syncMax(); if (el.id !== 'nos-about') el.style.zIndex = ''; settle(W, 260, true);
     });
   }
   function minimize(W, closed = false) {
@@ -209,7 +209,7 @@ export function mountNOS({ obs = false } = {}) {
     if (!isPhone()) {   // its old spot may be taken now: measure it there at full size and cascade if it would land on another window
       W.anim = null; W.mode = 'normal'; W.tx = back.tx; W.ty = back.ty; W.s = 1; W.op = 0; apply(W); lockIn(W);
       back.tx = W.tx; back.ty = W.ty;
-      const n = nudgeFor(W); if (n) { back.tx += n.dx; back.ty += n.dy; }
+      const n = freeSpotFor(W) || nudgeFor(W); if (n) { back.tx += n.dx; back.ty += n.dy; }
       W.saved = { ...back }; W.mode = was; raise(W);
     }
     const from = W.mode === 'min' ? dockTarget(W) : { x: back.tx, y: back.ty + 30 };
@@ -288,9 +288,35 @@ export function mountNOS({ obs = false } = {}) {
     for (const [dx, dy] of steps) { const r = at(dx, dy); if (inside(r) && !others.some((o) => stacked(r, o))) return { dx, dy }; }
     return null;
   }
-  function settle(W, ms = 260) {
+  // a window coming back (reopened from the dock, restored from max) goes where it covers the LEAST of the other open
+  // windows: free screen space first (nearest to where it was), and only when nothing is free the least-covering spot;
+  // the CASCADE step above stays the fallback. Always inside the screen.
+  function freeSpotFor(W) {
+    if (isPhone() || W.mode !== 'normal' || W.max) return null;
+    const r0 = W.el.getBoundingClientRect(), others = openOthers(W).map((X) => X.el.getBoundingClientRect());
+    if (!others.length) return null;
+    const w = r0.width, h = r0.height;
+    const area = (r) => others.reduce((a, o) => a + Math.max(0, Math.min(r.right, o.right) - Math.max(r.left, o.left)) * Math.max(0, Math.min(r.bottom, o.bottom) - Math.max(r.top, o.top)), 0);
+    const at = (x, y) => ({ left: x, top: y, right: x + w, bottom: y + h });
+    const here = at(r0.left, r0.top), cover0 = area(here);
+    if (cover0 < 1 && !others.some((o) => stacked(here, o))) return null;
+    const x1 = VW - EDGE - w, y1 = VH - EDGE - h; if (x1 < EDGE || y1 < EDGE) return null;
+    const xs = [], ys = [], STEP = 16;
+    for (let x = EDGE; x < x1; x += STEP) xs.push(x); xs.push(x1);
+    for (let y = EDGE; y < y1; y += STEP) ys.push(y); ys.push(y1);
+    for (const o of others) { for (const x of [o.right + EDGE, o.left - EDGE - w]) if (x >= EDGE && x <= x1) xs.push(x); for (const y of [o.bottom + EDGE, o.top - EDGE - h]) if (y >= EDGE && y <= y1) ys.push(y); }
+    let best = null;
+    for (const x of xs) for (const y of ys) {
+      const r = at(x, y); if (others.some((o) => stacked(r, o))) continue;
+      const c = area(r), d = Math.hypot(x - r0.left, y - r0.top);
+      if (!best || c < best.c - 1 || (Math.abs(c - best.c) <= 1 && d < best.d)) best = { c, d, dx: x - r0.left, dy: y - r0.top };
+    }
+    if (!best || best.c >= cover0 - 1) return null;   // nothing covers less than where it is: the cascade decides
+    return { dx: best.dx, dy: best.dy };
+  }
+  function settle(W, ms = 260, free = false) {
     lockIn(W);
-    const n = nudgeFor(W); if (!n) return;
+    const n = (free && freeSpotFor(W)) || nudgeFor(W); if (!n) return;
     if (ms) tween(W, { tx: W.tx + n.dx, ty: W.ty + n.dy }, ms); else { W.tx += n.dx; W.ty += n.dy; apply(W); }
   }
   // the window in front fully hides what is under it: where two open windows overlap, the one on top gets a dense
