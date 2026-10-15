@@ -133,7 +133,13 @@ export class Avatar {
     this.onStatus('loading', 0);
     const loader = new GLTFLoader();
     loader.register((p) => new VRMLoaderPlugin(p));
-    const gltf = await loader.loadAsync(url, (e) => e.total && this.onStatus('loading', e.loaded / e.total));
+    // progress: the host serves the file compressed, so e.total (Content-Length) can be the compressed size while e.loaded
+    // counts decoded bytes, which read past 100% ("149%"). Pass a clamped fraction while it is honest, else bytes so far.
+    const gltf = await loader.loadAsync(url, (e) => {
+      const ok = e.lengthComputable !== false && e.total > 0 && e.loaded <= e.total;
+      this.onStatus('loading', ok ? Math.min(0.99, e.loaded / e.total) : null, e.loaded);
+    });
+    this.onStatus('loading', 1, 0);   // downloaded: parsing her body + first GPU upload
     const vrm = gltf.userData.vrm;
     if (!vrm) throw new Error('not a VRM file');
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
