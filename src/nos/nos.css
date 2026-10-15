@@ -134,8 +134,16 @@ body.m-app.nos #m-top, body.m-app.nos #m-tabs, #nos-menubar, #nos-submenu, #nos-
 /* uniform 24px corners on every window, sheet and panel */
 body.nos .sheet-card, body.nos #takeover { border-radius: 24px !important; }
 @media (min-width: 701px) { body.nos #devpanel { border-radius: 24px; } }
-/* a window pulled over another one gets a denser frosted backing, so the two windows' text never mixes */
-body.nos-gl #stage .nos-win.nos-lifted:not(.nos-max) { background: rgba(255, 248, 252, .82) !important; backdrop-filter: blur(18px) saturate(1.2) !important; -webkit-backdrop-filter: blur(18px) saturate(1.2) !important; }
-body.nos-gl.nos-dark #stage .nos-win.nos-lifted:not(.nos-max) { background: rgba(44, 30, 22, .8) !important; }
+/* the window in FRONT of another one (.nos-front, set where two windows overlap) fully hides what is under it:
+   a dense tint (>= .95) over the blur, so no text behind can be read through it; the glass rim, top highlight and
+   soft lift shadow stay, so it still reads as liquid glass */
+body.nos .nos-win.panel.nos-front:not(.nos-max), body.nos #avatar-panel.nos-win.nos-front:not(.nos-max), body.nos #nos-about.nos-win.nos-front {
+  background: linear-gradient(165deg, rgba(255, 255, 255, .975) 0%, rgba(255, 246, 251, .96) 55%, rgba(252, 240, 250, .955) 100%) !important;
+  backdrop-filter: blur(18px) saturate(1.2) !important; -webkit-backdrop-filter: blur(18px) saturate(1.2) !important;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(255, 255, 255, .7), inset 0 -14px 28px rgba(255, 170, 215, .14),
+    0 18px 46px rgba(60, 30, 90, .24), 0 2px 8px rgba(60, 30, 90, .12) !important; }
+body.nos.nos-dark .nos-win.panel.nos-front:not(.nos-max), body.nos.nos-dark #avatar-panel.nos-win.nos-front:not(.nos-max), body.nos.nos-dark #nos-about.nos-win.nos-front {
+  background: linear-gradient(165deg, rgba(56, 40, 30, .97) 0%, rgba(44, 30, 22, .96) 100%) !important;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .22), inset 0 0 0 1px rgba(255, 255, 255, .12), 0 18px 46px rgba(0, 0, 0, .4) !important; }
 /* dev panel on a phone: the tab chips wrap onto rows, so no label is ever cut off at 390 */
 @media (max-width: 700px) { #devpanel nav { flex-wrap: wrap !important; overflow-x: visible !important; gap: 6px !important; } #devpanel nav button { flex: 0 1 auto !important; } }

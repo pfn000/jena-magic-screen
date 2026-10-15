@@ -16,6 +16,8 @@ const ARC_SWIPE = 34;              // px of downward swipe starting on the arc t
 const ARC_TAP = 8;                 // px of travel still counted as a click on the arc
 const EDGE = 8;                    // a moved window stays this far inside the screen (locked in, never loose)
 const MAXP = 14;                   // max panes per GL layer
+const NEAR = 40;                   // two windows whose matching corners sit closer than this are 'on top of each other'
+const CASCADE = 48;                // ...so the later one steps this far away (cascade), staying inside the screen
 
 export const NOS_ABOUT = [
   ['Model', 'NCOM Slate PRO'], ['Manufacture', 'NCOM Systems'], ['Legal', '\u00a9 2025 NCOM Systems'],
@@ -109,7 +111,7 @@ export function mountNOS({ obs = false } = {}) {
     for (const el of document.querySelectorAll('#stage > .panel, #avatar-panel, #nos-about')) attach(el);
     for (const [el, W] of wins) if (!el.isConnected) { wins.delete(el); renderDock(); }
   }
-  function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); }
+  function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); dirty = true; }
   function apply(W) {
     const el = W.el;
     const t = (W.tx || W.ty || W.s !== 1) ? `translate(${W.tx}px, ${W.ty}px) scale(${W.s})` : '';
@@ -182,7 +184,7 @@ export function mountNOS({ obs = false } = {}) {
     el.classList.add('nos-max'); W.max = cur; W.mode = 'normal'; W.restoring = true; apply(W); syncMax();
     tween(W, { max: { x: home.left + tx, y: home.top + ty, w: home.width, h: home.height } }, 420, () => {
       el.classList.remove('nos-max'); W.max = null; Object.assign(el.style, { left: '', top: '', width: '', height: '' });
-      W.tx = tx; W.ty = ty; W.restoring = false; apply(W); syncMax(); if (el.id !== 'nos-about') el.style.zIndex = '';
+      W.tx = tx; W.ty = ty; W.restoring = false; apply(W); syncMax(); if (el.id !== 'nos-about') el.style.zIndex = ''; settle(W);
     });
   }
   function minimize(W, closed = false) {
@@ -201,8 +203,15 @@ export function mountNOS({ obs = false } = {}) {
   }
   function reopen(W) {
     if (W.mode !== 'min' && W.mode !== 'closed') return;
-    const back = W.saved || { tx: 0, ty: 0 };
+    const back = { ...(W.saved || { tx: 0, ty: 0 }) };
     W.el.classList.remove('nos-hidden');
+    const was = W.mode;
+    if (!isPhone()) {   // its old spot may be taken now: measure it there at full size and cascade if it would land on another window
+      W.anim = null; W.mode = 'normal'; W.tx = back.tx; W.ty = back.ty; W.s = 1; W.op = 0; apply(W); lockIn(W);
+      back.tx = W.tx; back.ty = W.ty;
+      const n = nudgeFor(W); if (n) { back.tx += n.dx; back.ty += n.dy; }
+      W.saved = { ...back }; W.mode = was; raise(W);
+    }
     const from = W.mode === 'min' ? dockTarget(W) : { x: back.tx, y: back.ty + 30 };
     W.tx = from.x; W.ty = from.y; W.s = W.mode === 'min' ? 0.16 : 0.85; W.op = 0; W.mode = 'normal'; apply(W);
     renderDock();
@@ -259,6 +268,57 @@ export function mountNOS({ obs = false } = {}) {
     if (dx || dy) { W.tx += dx; W.ty += dy; apply(W); }
   }
 
+  // windows never sit (nearly) on top of each other: a window that lands with any corner within NEAR px of the same
+  // corner of another open window cascades CASCADE px away, to the first free spot that stays inside the screen
+  function openOthers(W) {
+    return [...wins.values()].filter((X) => X !== W && X.mode === 'normal' && !X.anim && !X.max && X.op > 0.5 &&
+      !X.el.classList.contains('nos-hidden') && !X.el.classList.contains('nos-under-max') && X.el.getBoundingClientRect().width > 2);
+  }
+  function stacked(a, b) {
+    return (Math.abs(a.left - b.left) < NEAR && Math.abs(a.top - b.top) < NEAR) || (Math.abs(a.right - b.right) < NEAR && Math.abs(a.top - b.top) < NEAR) ||
+      (Math.abs(a.left - b.left) < NEAR && Math.abs(a.bottom - b.bottom) < NEAR) || (Math.abs(a.right - b.right) < NEAR && Math.abs(a.bottom - b.bottom) < NEAR);
+  }
+  function nudgeFor(W) {   // offset that un-stacks W (from its current rect), or null when nothing needs to move
+    if (isPhone() || W.mode !== 'normal' || W.max) return null;
+    const r0 = W.el.getBoundingClientRect(), others = openOthers(W).map((X) => X.el.getBoundingClientRect());
+    const at = (dx, dy) => ({ left: r0.left + dx, top: r0.top + dy, right: r0.right + dx, bottom: r0.bottom + dy });
+    const inside = (r) => r.left >= EDGE - 0.5 && r.top >= EDGE - 0.5 && r.right <= VW - EDGE + 0.5 && r.bottom <= VH - EDGE + 0.5;
+    if (!others.some((o) => stacked(at(0, 0), o))) return null;
+    const C = CASCADE, steps = [[C, C], [-C, -C], [C, -C], [-C, C], [2 * C, 2 * C], [-2 * C, -2 * C], [2 * C, -2 * C], [-2 * C, 2 * C], [2 * C, 0], [-2 * C, 0], [0, 2 * C], [0, -2 * C], [3 * C, 3 * C], [-3 * C, -3 * C], [3 * C, -3 * C], [-3 * C, 3 * C]];
+    for (const [dx, dy] of steps) { const r = at(dx, dy); if (inside(r) && !others.some((o) => stacked(r, o))) return { dx, dy }; }
+    return null;
+  }
+  function settle(W, ms = 260) {
+    lockIn(W);
+    const n = nudgeFor(W); if (!n) return;
+    if (ms) tween(W, { tx: W.tx + n.dx, ty: W.ty + n.dy }, ms); else { W.tx += n.dx; W.ty += n.dy; apply(W); }
+  }
+  // the window in front fully hides what is under it: where two open windows overlap, the one on top gets a dense
+  // tint (.nos-front, CSS) over its glass, so no text from the window behind can be read through it
+  function updateFront() {
+    const phone = isPhone(), front = new Set();
+    if (!phone) {
+      const vis = [...wins.values()].filter((X) => X.mode !== 'min' && X.mode !== 'closed' && X.op > 0.05 && !X.el.classList.contains('nos-hidden') && !X.el.classList.contains('nos-under-max'))
+        .map((X) => [X, X.el.getBoundingClientRect()]).filter(([, r]) => r.width > 2 && r.height > 2);
+      for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+        const [A, a] = vis[i], [B, b] = vis[j];
+        const l = Math.max(a.left, b.left, 0), t = Math.max(a.top, b.top, 0), r = Math.min(a.right, b.right, VW), btm = Math.min(a.bottom, b.bottom, VH);
+        if (r - l < 4 || btm - t < 4) continue;
+        let top = null;
+        for (const [fx, fy] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.8], [0.2, 0.8], [0.8, 0.2], [0.5, 0.15], [0.5, 0.85]]) {
+          const e = document.elementFromPoint(l + (r - l) * fx, t + (btm - t) * fy), w = e && e.closest('.nos-win');
+          if (w === A.el) { top = A; break; } if (w === B.el) { top = B; break; }
+        }
+        if (!top) {   // the overlap is covered by something else (menu, dock): fall back to z-index, then document order
+          const za = parseInt(getComputedStyle(A.el).zIndex) || 0, zb = parseInt(getComputedStyle(B.el).zIndex) || 0;
+          top = za !== zb ? (za > zb ? A : B) : (A.el.compareDocumentPosition(B.el) & Node.DOCUMENT_POSITION_FOLLOWING ? B : A);
+        }
+        front.add(top);
+      }
+    }
+    for (const X of wins.values()) X.el.classList.toggle('nos-front', front.has(X));
+  }
+
   /* ••• : tap = program menu bar, hold = move the window (laptop/tablet only; a phone app doesn't move) */
   function wireDots(W) {
     const dots = $('.nos-dots', W.ch);
@@ -279,7 +339,7 @@ export function mountNOS({ obs = false } = {}) {
         clearTimeout(holdT); dots.classList.remove('held');
         if (moving) {
           moving = false; W.lift = 0;
-          if (isPhone()) tween(W, { tx: 0, ty: 0 }, 380); else lockIn(W);
+          if (isPhone()) tween(W, { tx: 0, ty: 0 }, 380); else settle(W);
           return;
         }
         if (Math.hypot(st.dx, st.dy) < 10) toggleMenu(W);
@@ -513,7 +573,7 @@ export function mountNOS({ obs = false } = {}) {
         <h2>N\u2022OS</h2><dl class="nos-rows">${NOS_ABOUT.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
       body.append(el); scan();
     }
-    const W = wins.get(el); if (W.mode === 'min' || W.mode === 'closed') reopen(W);
+    const W = wins.get(el); if (W.mode === 'min' || W.mode === 'closed') reopen(W); else settle(W);
     W.el.style.zIndex = '74';
   }
 
@@ -541,12 +601,13 @@ export function mountNOS({ obs = false } = {}) {
   }
   function frame() {
     requestAnimationFrame(frame);
-    if (!gl) return;
+    if (!gl) { if (dirty) { dirty = false; updateFront(); } return; }
     if (M.v > 0 || M.iv > 0) layoutMenus();
     const [A, B] = panesFor();
     const s = (dark ? 'd' : 'l') + VW + 'x' + VH + A.map((p) => [p.r.left, p.r.top, p.r.width, p.r.height, p.op, p.lift].map((v) => Math.round(v * 10)).join(',')).join('|') + '#' + B.map((p) => [p.r.left, p.r.top, p.r.width, p.r.height, p.op].map((v) => Math.round(v * 10)).join(',')).join('|');
     if (!dirty && s === sig) return;
     dirty = false; sig = s;
+    updateFront();
     G1.draw(A, [], VW, VH, DPR, dark, 0);
     G2.draw(B, A, VW, VH, DPR, dark, 1);
   }
