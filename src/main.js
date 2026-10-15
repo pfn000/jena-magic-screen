@@ -30,6 +30,7 @@ import { mountTip } from './tip.js';
 import { Voice } from './voice.js';
 import { Mic } from './mic.js';
 import { mobileShell } from './mobile.js';
+import { mountNOS } from './nos/nos.js';   // N•OS liquid-glass windows (Q-UI); never in OBS / stream
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -734,6 +735,7 @@ if (cfg.obs) obsGuard();   // stream-safe: no reloads unless mama asks (src/obsg
 else window.__jenaObsReload = requestObsReload;
 
 window.__jenaMobile = mobileShell({ obs: cfg.obs });
+try { mountNOS({ obs: cfg.obs }); } catch (e) { console.warn('[nos] glass UI failed to start', e); }
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';

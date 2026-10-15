@@ -368,3 +368,18 @@ body.obs #talk.composer { display: none !important; }
 #tip-btn:hover{background:linear-gradient(90deg,#ffd1ec,#e0d4ff)}
 #tip-btn:active{transform:scale(.97)}
 body.obs #tip-btn,body.stream #tip-btn{display:none}
+
+/* developer panel on a phone (390 px): full screen, tabs scroll sideways, the body scrolls */
+@media (max-width: 480px) {
+  #devpanel { inset: 0; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); font-size: 12.5px; }
+  #devpanel header { flex-wrap: wrap; gap: 6px 10px; padding: 10px 12px; }
+  #devpanel header b { font-size: 14px; }
+  #devpanel .dp-sub { flex: 1 1 100%; order: 3; font-size: 11px; }
+  #devpanel .dp-close { min-width: 44px; min-height: 36px; }
+  #devpanel nav { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 8px 12px; }
+  #devpanel nav::-webkit-scrollbar { display: none; }
+  #devpanel nav button { flex: none; white-space: nowrap; min-height: 34px; }
+  #devpanel .dp-body { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 10px 12px 24px; }
+  #devpanel .dp-moves { grid-template-columns: 1fr 1fr; }
+}
+#devpanel .dp-body { min-height: 0; }
