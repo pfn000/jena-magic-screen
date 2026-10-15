@@ -564,6 +564,15 @@ export class Avatar {
         const gesture = Math.max(0, handHigh - (hips.y + 0.05)) + Math.max(0, handR - handL - 0.5);
         wantW = Math.max(0.66, handR - handL + 0.22) + Math.min(0.25, gesture * 0.5);
         cx = (handL + handR) / 2 * 0.5;
+        // seated (her chair): her hands rest on her knees/lap/armrests, so following them pulls a close camera down
+        // onto her legs. Jena is a minor: a seated close shot is head + upper body only, cut above her lap, never
+        // framed on her legs (Saidie's kid-safe rule; fix requested 2026-10-15).
+        if ((this.seatW || 0) > 0.25) {
+          const chest = P('upperChest') || P('chest') || head;
+          top = head.y + 0.32;
+          bottom = Math.max(hips.y + 0.12, Math.min(chest.y - 0.12, head.y - 0.45));
+          wantW = 0.7; cx = head.x * 0.5;
+        }
       }
     }
     if (top === undefined) { bottom = -0.16; top = this.height + 0.36; } // feet a little above the bottom, headroom for a raised arm
@@ -592,6 +601,7 @@ export class Avatar {
     } else {
       top = Math.max(head.y + 0.25, handTop + 0.12) + 0.06;   // hair top + headroom (a raised hand too)
       bottom = hips.y - 0.06;                                 // just below the waist, cut by the frame edge
+      if ((this.seatW || 0) > 0.25) bottom = hips.y + 0.12;   // seated: cut above her lap (kid-safe: never framed on her legs)
     }
     const wantW = Math.max(0.72, Math.abs(lh.x - rh.x) + 0.3);
     let d = Math.max((top - bottom) / 2 / tan, wantW / 2 / (tan * asp)) / zoom;
