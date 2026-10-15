@@ -12,6 +12,8 @@ body.nos-gl .nos-win.panel, body.nos-gl #avatar-panel.nos-win {
   border-color: transparent !important; box-shadow: none !important;
 }
 body.nos-gl .nos-win.panel { border: 0 !important; }
+body.nos-gl #stage .nos-win.nos-lifted, body.nos-gl #stage #avatar-panel.nos-win.nos-lifted { backdrop-filter: blur(10px) saturate(1.15) !important; -webkit-backdrop-filter: blur(10px) saturate(1.15) !important; }
+.nos-win.nos-under-max, body.nos-has-max #tip-btn { visibility: hidden !important; pointer-events: none !important; }
 .nos-win.nos-hidden { visibility: hidden !important; pointer-events: none !important; }
 .nos-win.nos-max { position: fixed !important; margin: 0 !important; z-index: 58; transform: none; }
 .nos-win.nos-sized { justify-self: start; align-self: start; }
@@ -35,7 +37,8 @@ body.nos #avatar-panel.nos-win { overflow: hidden; }
 .nos-arc.on path { filter: drop-shadow(0 0 6px rgba(255, 140, 190, .8)); }
 .nos-arc.armed path { stroke: #e8459b; }
 .nos-pill::after, .nos-arc::after { content: ''; position: absolute; inset: -6px; }
-.nos-rz { position: absolute; right: 0; bottom: 0; width: 56px; height: 56px; touch-action: none; cursor: nwse-resize; }
+.nos-rz { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; touch-action: none; cursor: nwse-resize; }   /* hit area: only the very corner, clear of send buttons */
+.nos-rz svg { position: absolute; right: 0; bottom: 0; width: 56px !important; height: 56px !important; pointer-events: none; }
 .nos-rz path { fill: none; stroke: currentColor; stroke-width: 5.5; stroke-linecap: round; opacity: 0; transition: opacity .18s; }
 .nos-rz:hover path, .nos-rz.show path { opacity: .9; }
 .nos-nope { position: absolute; right: 12px; bottom: 12px; font: 600 12px/1 system-ui, sans-serif; padding: 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, .8); color: #2d2140; opacity: 0; transition: opacity .2s; pointer-events: none !important; white-space: nowrap; }
@@ -85,7 +88,7 @@ body.m-app #nos-dock { bottom: calc(var(--m-tabs, 58px) + 12px); }
 body.m-app #nos-toast { top: calc(var(--m-top, 56px) + 8px); }
 
 /* About N•OS window */
-#nos-about { position: fixed; left: 50%; top: 50%; width: min(340px, calc(100vw - 32px)); margin: -200px 0 0 calc(min(340px, calc(100vw - 32px)) / -2); z-index: 62; display: block; }
+#nos-about { position: fixed; left: 50%; top: 50%; width: min(340px, calc(100vw - 32px)); margin: -200px 0 0 calc(min(340px, calc(100vw - 32px)) / -2); z-index: 74; display: block; }
 .nos-about-in { padding: 34px 22px 18px; text-align: center; color: #1f1630; }
 .nos-sym { width: 210px; max-width: 80%; margin: 0 auto 10px; padding: 16px 18px; border-radius: 18px; background: linear-gradient(135deg, #2a2140, #120d1c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18); }
 .nos-sym img { display: block; width: 100%; height: auto; }
@@ -106,3 +109,9 @@ body.nos-dark .nos-glass-ui, body.nos-dark #nos-dock .nos-chip, body.nos-dark .n
 body.nos-dark.nos-gl .nos-win.panel { color: #fff3e6; --ink: #fff3e6; --ink-soft: #f1d9c4; --m-ink: #fff3e6; --m-ink2: #f1d9c4; }
 body.nos-dark #nos-menubar button.open, body.nos-dark #nos-menubar button:hover, body.nos-dark #nos-submenu button:hover { background: rgba(255, 255, 255, .12); }
 body.nos-dark .nos-rows, body.nos-dark .nos-ops, body.nos-dark #nos-submenu button + button, body.nos-dark .nos-ops button + button { border-color: rgba(255, 255, 255, .16); }
+
+/* dark glass text on the phone shell */
+body.nos-dark.m-app #m-top, body.nos-dark.m-app #m-tabs, body.nos-dark.m-app #m-tabs button { color: #fff3e6; }
+body.nos-dark.m-app { --m-ink: #fff3e6; --m-ink2: #f1d9c4; }
+body.nos-dark .nos-win .panel-head h2, body.nos-dark #chat-list .msg, body.nos-dark .m-cap, body.nos-dark .run .trigger, body.nos-dark .run header { color: #fff3e6; }
+body.nos-dark #chat-list .msg b, body.nos-dark .run .who { color: #ffc6e4; }

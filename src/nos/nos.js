@@ -110,6 +110,8 @@ export function mountNOS({ obs = false } = {}) {
     el.style.transform = t;
     el.style.opacity = W.op >= 0.999 ? '' : String(W.op);
     el.style.visibility = W.op < 0.01 ? 'hidden' : '';
+    // a window pulled out of its spot can overlap another one: frost what is under it (the GL glass is one layer)
+    el.classList.toggle('nos-lifted', !!(W.max || Math.abs(W.tx) > 2 || Math.abs(W.ty) > 2 || W.w != null || el.id === 'nos-about'));
     if (W.max) Object.assign(el.style, { left: W.max.x + 'px', top: W.max.y + 'px', width: W.max.w + 'px', height: W.max.h + 'px' });
     else if (W.w != null) { el.style.width = W.w + 'px'; el.style.height = W.h + 'px'; }
     dirty = true;
@@ -143,6 +145,12 @@ export function mountNOS({ obs = false } = {}) {
     const cx = d.width ? d.left + d.width / 2 : VW / 2, cy = d.height ? d.top + d.height / 2 : VH - 60;
     return { x: cx - (r.left + r.width / 2) + W.tx, y: cy - (r.top + r.height / 2) + W.ty };
   }
+  function syncMax() {   // a maximized window is the only thing on screen: the others step out of the way
+    const any = [...wins.values()].some((X) => X.mode === 'max' || X.restoring);
+    body.classList.toggle('nos-has-max', any);
+    for (const X of wins.values()) X.el.classList.toggle('nos-under-max', any && X.mode !== 'max' && !X.restoring && X.el.id !== 'nos-about');
+    dirty = true;
+  }
   function maximize(W) {
     if (W.mode === 'max') return;
     closeMenus();
@@ -151,7 +159,7 @@ export function mountNOS({ obs = false } = {}) {
     W.tx = 0; W.ty = 0;
     W.max = { x: r.left, y: r.top, w: r.width, h: r.height };
     W.el.classList.add('nos-max'); W.mode = 'max'; W.el.style.zIndex = '58';
-    apply(W);
+    apply(W); syncMax();
     tween(W, { max: areaRect() }, 460);
     say(`${appFor(W.el).title}: maximized \u00b7 swipe the pill down to restore`);
   }
@@ -165,10 +173,10 @@ export function mountNOS({ obs = false } = {}) {
     el.style.transform = '';
     const home = el.getBoundingClientRect();
     const tx = W.home?.tx || 0, ty = W.home?.ty || 0;
-    el.classList.add('nos-max'); W.max = cur; W.mode = 'normal'; apply(W);
+    el.classList.add('nos-max'); W.max = cur; W.mode = 'normal'; W.restoring = true; apply(W); syncMax();
     tween(W, { max: { x: home.left + tx, y: home.top + ty, w: home.width, h: home.height } }, 420, () => {
       el.classList.remove('nos-max'); W.max = null; Object.assign(el.style, { left: '', top: '', width: '', height: '' });
-      W.tx = tx; W.ty = ty; apply(W); if (el.id !== 'nos-about') el.style.zIndex = '';
+      W.tx = tx; W.ty = ty; W.restoring = false; apply(W); syncMax(); if (el.id !== 'nos-about') el.style.zIndex = '';
     });
   }
   function minimize(W, closed = false) {
@@ -176,7 +184,7 @@ export function mountNOS({ obs = false } = {}) {
     closeMenus();
     if (W.mode === 'max') { // drop the maximized frame first so the window remembers its own spot
       W.el.classList.remove('nos-max'); Object.assign(W.el.style, { left: '', top: '', width: '', height: '' }); W.max = null;
-      W.tx = W.home?.tx || 0; W.ty = W.home?.ty || 0; apply(W);
+      W.tx = W.home?.tx || 0; W.ty = W.home?.ty || 0; W.mode = 'normal'; apply(W); syncMax();
     }
     W.mode = closed ? 'closed' : 'min';
     W.saved = { tx: W.tx, ty: W.ty };
@@ -394,9 +402,9 @@ export function mountNOS({ obs = false } = {}) {
       if (W.mode === 'min' || W.mode === 'closed') { W.el.classList.remove('nos-hidden'); }
       W.el.classList.remove('nos-max', 'nos-sized'); W.anim = null; W.max = null; W.w = W.h = null; W.home = null;
       Object.assign(W.el.style, { left: '', top: '', width: '', height: '', zIndex: '' });
-      W.mode = 'normal'; W.tx = W.ty = 0; W.s = 1; W.op = 1; apply(W);
+      W.mode = 'normal'; W.restoring = false; W.tx = W.ty = 0; W.s = 1; W.op = 1; apply(W);
     }
-    renderDock(); say('Windows reset');
+    renderDock(); syncMax(); say('Windows reset');
   }
 
   function toggleInfo(W) { if (M.info === W && M.iv > 0.5) closeInfo(); else openInfo(W); }
@@ -467,7 +475,7 @@ export function mountNOS({ obs = false } = {}) {
       body.append(el); scan();
     }
     const W = wins.get(el); if (W.mode === 'min' || W.mode === 'closed') reopen(W);
-    W.el.style.zIndex = '62';
+    W.el.style.zIndex = '74';
   }
 
   /* ---------------- render loop ---------------- */
@@ -477,17 +485,15 @@ export function mountNOS({ obs = false } = {}) {
     const phone = isPhone();
     for (const W of wins.values()) {
       const el = W.el;
-      if (el.classList.contains('nos-hidden') || W.op < 0.01) continue;
+      if (el.classList.contains('nos-hidden') || el.classList.contains('nos-under-max') || W.op < 0.01) continue;
       if (phone && el.id === 'avatar-panel') continue;
       const cs = el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
       if (!cs) continue;
       const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
       const k = r.width / (el.offsetWidth || r.width);
-      A.push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: 0, refr: 7, bevel: 18 });
+      (el.id === 'nos-about' ? B : A).push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: 0, refr: 7, bevel: 18 });
     }
     for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
-    const tip = $('#tip-btn, .tip-pill, #tip'); // the Tip Jena pill rides the same glass if it is on the page
-    if (tip && tip.offsetParent) { const r = tip.getBoundingClientRect(); if (r.width) A.push({ r, rad: r.height / 2, op: 1, sh: 0.5, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
     if (dock.classList.contains('show')) for (const c of dock.children) { const r = c.getBoundingClientRect(); B.push({ r, rad: r.height / 2, op: 1, sh: 0.6, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
     if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: 15, op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
     if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 16, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
