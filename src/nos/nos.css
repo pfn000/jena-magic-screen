@@ -115,3 +115,6 @@ body.nos-dark.m-app #m-top, body.nos-dark.m-app #m-tabs, body.nos-dark.m-app #m-
 body.nos-dark.m-app { --m-ink: #fff3e6; --m-ink2: #f1d9c4; }
 body.nos-dark .nos-win .panel-head h2, body.nos-dark #chat-list .msg, body.nos-dark .m-cap, body.nos-dark .run .trigger, body.nos-dark .run header { color: #fff3e6; }
 body.nos-dark #chat-list .msg b, body.nos-dark .run .who { color: #ffc6e4; }
+
+/* gestures on the chrome never select page text (phone long-press on ••• selected the chat greeting) */
+.nos-chrome, .nos-chrome * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

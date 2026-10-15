@@ -248,10 +248,10 @@ export function mountNOS({ obs = false } = {}) {
     track(dots, {
       down(st) {
         moving = false; sx = W.tx; sy = W.ty;
-        holdT = setTimeout(() => { moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; dirty = true; }, HOLD_MS);
+        holdT = setTimeout(() => { try { getSelection()?.removeAllRanges(); } catch {} moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; dirty = true; }, HOLD_MS);
       },
       move(st) {
-        if (!moving && Math.hypot(st.dx, st.dy) > 9 && performance.now() - st.t0 > 140) { clearTimeout(holdT); holdT = null; moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; }
+        if (!moving && Math.hypot(st.dx, st.dy) > 9 && performance.now() - st.t0 > 140) { clearTimeout(holdT); holdT = null; try { getSelection()?.removeAllRanges(); } catch {} moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; }
         if (!moving || W.mode !== 'normal') return;
         W.tx = sx + st.dx; W.ty = sy + st.dy;
         const r = W.el.getBoundingClientRect();   // keep the ••• reachable on screen
