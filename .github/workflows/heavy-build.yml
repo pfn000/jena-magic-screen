@@ -25,7 +25,7 @@ jobs:
           file: Dockerfile.template
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/jena-box:latest
+            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/jena-box:latest', github.repository_owner) || '' }}
             ghcr.io/${{ github.repository_owner }}/jena-box:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -36,4 +36,14 @@ jobs:
           ok=0; for i in $(seq 1 40); do if docker exec jb curl -fs http://127.0.0.1:8088/box/health; then ok=1; break; fi; sleep 4; done
           docker exec jb supervisorctl status || true
           docker logs jb 2>&1 | tail -40
+          if [ "$ok" != 1 ]; then
+            # surface the cause as annotations (readable without the full log)
+            echo "::error title=supervisor::$(docker exec jb supervisorctl status 2>&1 | tr '\n' '|' | cut -c1-3000)"
+            echo "::error title=docker-logs::$(docker logs jb 2>&1 | tail -60 | tr '\n' '|' | cut -c1-6000)"
+            for f in $(docker exec jb sh -c 'ls /var/log/supervisor/*.log /var/log/*.log 2>/dev/null' | head -8); do
+              echo "::error title=$f::$(docker exec jb tail -25 $f 2>&1 | tr '\n' '|' | cut -c1-4000)"
+            done
+            echo "::error title=ports::$(docker exec jb sh -c 'ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null' | tr '\n' '|' | cut -c1-2000)"
+            echo "::error title=curl::$(docker exec jb curl -sS -m 5 http://127.0.0.1:8088/box/health 2>&1 | cut -c1-1000)"
+          fi
           test "$ok" = 1
