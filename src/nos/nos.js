@@ -534,7 +534,7 @@ export function mountNOS({ obs = false } = {}) {
     }
     for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
     if (dock.classList.contains('show')) for (const c of dock.children) { const r = c.getBoundingClientRect(); B.push({ r, rad: r.height / 2, op: 1, sh: 0.6, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
-    if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: 15, op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
+    if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: Math.min(24, bar.offsetHeight / 2 || 20), op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
     if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 24, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
     if (M.iv > 0.01 && M.info) B.push({ r: info.getBoundingClientRect(), rad: 24, op: M.iv, sh: 0.8, lift: 0, menu: 1, refr: 7, bevel: 16 });
     return [A.slice(0, MAXP), B.slice(0, MAXP)];
