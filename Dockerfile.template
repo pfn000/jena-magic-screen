@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=llama /out/ /opt/llama/
 ENV LD_LIBRARY_PATH=/opt/llama
+# (every box/desktop/jena_*.py module rides beside her desk agent: jena_desk imports jena_memory, jena_skills, ...)
 # her own unix user (her desktop runs as her, never as root)
 RUN useradd -m -s /bin/bash jena && mkdir -p /models /state /home/jena/.jena /home/jena/notes /home/jena/learned /home/jena/memory && chown -R jena:jena /home/jena
 # voice: Piper + three free voices
@@ -38,7 +39,8 @@ RUN pip3 install --user --no-cache-dir --break-system-packages mcp mcp-server-fe
 USER root
 COPY . /opt/jena-repo
 RUN cp /opt/jena-repo/box/voice/tts_server.py /opt/voice/ \
- && cp /opt/jena-repo/box/desktop/jena_desk.py /home/jena/.jena_desk.py && cp /opt/jena-repo/box/desktop/jena_skills.py /home/jena/jena_skills.py \
+ && cp /opt/jena-repo/box/desktop/jena_desk.py /home/jena/.jena_desk.py \
+ && for f in /opt/jena-repo/box/desktop/jena_*.py; do cp "$f" /home/jena/; done \
  && cp /opt/jena-repo/box/desktop/firefox-user.js /home/jena/.firefox-user.js \
  && git clone --depth 30 https://github.com/pfn000/jena-magic-screen /home/jena/jena-repo || cp -r /opt/jena-repo /home/jena/jena-repo; \
     chown -R jena:jena /home/jena
