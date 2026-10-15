@@ -6,6 +6,7 @@ import { renderSecurity, handleSecurityClick } from './mamasec.js';
 import { mountSelfView } from './selfview.js';
 import { openTakeover } from './takeover.js';
 import { asks, startAsks, renderAsks, handleAskClick, pendingCount } from './signin.js';
+import { renderTips, TIPS_CSS } from './tipledger.js';
 // styles for the library / assets / site-edits tabs live here (dev panel only), so the page's own stylesheet is untouched
 const STUDIO_CSS = `#devpanel .dp-card{border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.04)}
 #devpanel .dp-card p{margin:6px 0 0;font-size:12px;line-height:1.45}
@@ -16,7 +17,7 @@ const STUDIO_CSS = `#devpanel .dp-card{border:1px solid rgba(255,255,255,.15);bo
 #devpanel .dp-asset{margin:0;padding:8px;border-radius:10px;background:repeating-conic-gradient(#2a2a2a 0 25%,#333 0 50%) 0 0/16px 16px;text-align:center}
 #devpanel .dp-asset img{max-width:100%;height:96px;object-fit:contain}
 #devpanel .dp-asset figcaption{font-size:11px;margin-top:6px;color:#ddd}`;
-if (typeof document !== 'undefined' && !document.getElementById('dp-studio-css')) { const st = document.createElement('style'); st.id = 'dp-studio-css'; st.textContent = STUDIO_CSS; document.head.appendChild(st); }
+if (typeof document !== 'undefined' && !document.getElementById('dp-studio-css')) { const st = document.createElement('style'); st.id = 'dp-studio-css'; st.textContent = STUDIO_CSS + '\n' + TIPS_CSS; document.head.appendChild(st); }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ago = (ts) => { if (!ts) return '—'; const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${(s / 3600).toFixed(1)}h ago`; };
 const gb = (b) => (b == null ? '?' : (b / 1e9).toFixed(1) + ' GB');
@@ -29,7 +30,7 @@ export class DevPanel {
     this.el = document.createElement('section');
     this.el.id = 'devpanel'; this.el.hidden = true;
     this.el.innerHTML = `<header><b>Jena · developer panel</b><span class="dp-sub">live data only · hidden from OBS</span><a href="/tab-live" target="_blank" rel="noopener" style="margin-left:auto;margin-right:8px;font-size:12px;color:#3ddc84;text-decoration:none;border:1px solid #1f5f3a;border-radius:999px;padding:1px 8px">🖥 Tab Live</a><button class="dp-close" aria-label="close">✕</button></header>
-      <nav>${['asks', 'live', 'self', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security', 'face'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', self: '🪞 Her body (self-view)', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys', face: '👀 Face + gaze' }[t]}</button>`).join('')}</nav>
+      <nav>${['asks', 'live', 'self', 'brain', 'sees', 'skills', 'learned', 'memory', 'mama', 'training', 'health', 'library', 'assets', 'edits', 'security', 'tips', 'face'].map((t, i) => `<button data-tab="${t}" class="${i ? '' : 'on'}">${{ asks: '🙋 Ask mama', live: 'Live updates', self: '🪞 Her body (self-view)', brain: 'Brain', sees: 'What she sees', skills: 'Skills + MCP', learned: 'What she learned', memory: 'Memories & chats', mama: 'Mama: activity + help', training: 'Training', health: 'Server health', library: 'Her library', assets: 'Assets she made', edits: 'Site edits (mama approves)', security: '🔐 Mama: devices & keys', tips: '💸 Mama: tips', face: '👀 Face + gaze' }[t]}</button>`).join('')}</nav>
       <div class="dp-body"></div>`;
     document.body.appendChild(this.el);
     this.body = this.el.querySelector('.dp-body');
@@ -182,6 +183,7 @@ export class DevPanel {
           <h3>MCP servers on her box ${s.mcp_checked_at ? '(checked ' + ago(s.mcp_checked_at) + ')' : '(not checked yet)'}</h3><ul>${Object.entries(s.mcp || {}).map(([n, m]) => `<li>${okDot(m.connected)}<b>${esc(n)}</b> — ${esc(m.what || '')}${m.tools ? `<br><small>tools: ${m.tools.map((t) => (t.allowed === false ? `<s title="blocked for Jena">${esc(t.name)}</s>` : esc(t.name))).join(', ')}${m.allow ? ' <i>(struck out = blocked for her)</i>' : ''}</small>` : `<br><small>${esc(m.error || '')}</small>`}</li>`).join('') || '<li>no MCP check yet</li>'}</ul>`;
       }
     }
+    if (this.tab === 'tips') h += renderTips(() => this.render());
     if (this.tab === 'security') h += renderSecurity(() => this.render());   // the cards' first loads re-render on their own (before: 'loading…' until a tap inside)
     if (this.tab === 'mama') {
       const a = this.data.activity?.data;

@@ -150,3 +150,8 @@
   body.m-app .m-body-wrap #self-eye canvas { max-width: 100%; }
   body.m-app #body-views { flex-wrap: wrap; }
 }
+
+@media (max-width: 480px) {
+  /* "Tip Jena": top-right of her stage on the phone (the name tag + voice button live in the top bar there) */
+  body.m-app #tip-btn { right: 12px; left: auto; top: 12px; bottom: auto; height: 34px; padding: 0 12px 0 10px; font-size: 13px; font-weight: 700; border: 0; background: rgba(255, 255, 255, .78); box-shadow: 0 4px 14px rgba(80, 40, 110, .18); }
+}

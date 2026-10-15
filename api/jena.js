@@ -19,6 +19,8 @@ import { boxLink, boxAuth, ttsToken, accept as acceptBox, relayBox } from './_li
 import { multiSearch, hotUrls } from './_lib/search.js';
 import { elevate, issue, verify, isPasscode, setCookie, clearCookie, noteDevice, mamaAuth, issueLink, verifyLink, linkUse } from './_lib/mama.js';
 import { intent as sayIntent, MAMA_ONLY } from '../box/jena-intent.mjs';
+import { tipLedger, TIP_LINK, TIP_PAYMENT_LINK_ID } from '../src/tipsplit.mjs';
+import { TIPS_SNAPSHOT } from './_lib/tips-snapshot.js';
 import { registrationOptions, verifyRegistration, loginOptions, verifyLogin, rpOf } from './_lib/webauthn.js';
 
 function routeOf(req) {
@@ -539,6 +541,34 @@ async function mamaSec(req, door) {
   } catch (e) { return json({ ok: false, error: `her box did not answer: ${e.message}` }, 502); }
 }
 
+// Jena's tip ledger (mama only). Live from Stripe when the site has a READ-ONLY restricted key in
+// STRIPE_TIPS_READ_KEY (Checkout Sessions: read); otherwise the snapshot Tab reads from Saidie's connected
+// Stripe and commits (api/_lib/tips-snapshot.js). Only paid checkout sessions of the tip link count. Never writes to Stripe.
+async function tipsRoute(req) {
+  const ok = checkKey(req).ok || !!(req.mamaAuth || (await mamaAuth(req))).via;
+  if (!ok) return json({ locked: true, error: 'the tip ledger is mama-only: unlock with your passcode on this device first' }, 401);
+  const key = (process.env.STRIPE_TIPS_READ_KEY || '').trim();
+  if (key) {
+    try {
+      const tips = []; let after = '', pages = 0, more = true;
+      while (more && pages < 10) {
+        const u = new URL('https://api.stripe.com/v1/checkout/sessions');
+        u.searchParams.set('payment_link', TIP_PAYMENT_LINK_ID); u.searchParams.set('limit', '100');
+        if (after) u.searchParams.set('starting_after', after);
+        const r = await fetch(u, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d?.error?.message || `Stripe answered ${r.status}`);
+        for (const s of d.data || []) if (s.payment_status === 'paid' && Number.isInteger(s.amount_total)) tips.push({ id: s.id, at: s.created * 1000, amountCents: s.amount_total, currency: s.currency });
+        more = !!d.has_more && d.data?.length; after = d.data?.at(-1)?.id || ''; pages++;
+      }
+      return json({ source: 'stripe-live', readAt: new Date().toISOString(), link: TIP_LINK, ...tipLedger(tips) });
+    } catch (e) {
+      return json({ source: 'snapshot', syncedAt: TIPS_SNAPSHOT.syncedAt, link: TIP_LINK, liveError: `live Stripe read failed: ${e.message}`, ...tipLedger(TIPS_SNAPSHOT.tips) });
+    }
+  }
+  return json({ source: 'snapshot', syncedAt: TIPS_SNAPSHOT.syncedAt, link: TIP_LINK, note: 'Live Stripe read access is not connected on the site yet, so this is the last snapshot Tab read from your Stripe. New tips show up after Tab re-syncs it.', ...tipLedger(TIPS_SNAPSHOT.tips) });
+}
+
 async function handle(req) {
   if (req.method === 'OPTIONS') return cors();
   const route = routeOf(req);
@@ -549,6 +579,7 @@ async function handle(req) {
     if (route === 'passkey') return await passkey(req);
     if (route === 'vault' && req.method === 'POST') return await mamaSec(req, 'vault');
     if (route === 'ghauth' && req.method === 'POST') return await mamaSec(req, 'gh');
+    if (route === 'tips') return await tipsRoute(req);
     if (route === 'config') return json(await config());
     if (route === 'version') { const b = buildInfo(); return new Response(JSON.stringify({ sha: b.commit, message: b.message, env: b.env, at: Date.now() }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0' } }); }
     if (route === 'box' && req.method === 'POST') { const env = await body(req), p = acceptBox(env); if (p) checkHealth(); const relay = p ? await relayBox(env, p) : null; return p ? json({ ok: true, url: p.url, relay }) : json({ error: 'bad signature' }, 401); }

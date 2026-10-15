@@ -26,6 +26,7 @@ import { DevPanel, deployBar } from './devpanel.js';
 import { FaceView } from './faceview.js';
 import { softRefresh } from './refresh.js';
 import { obsGuard, requestObsReload } from './obsguard.js';
+import { mountTip } from './tip.js';
 import { Voice } from './voice.js';
 import { Mic } from './mic.js';
 import { mobileShell } from './mobile.js';
@@ -79,6 +80,7 @@ const avatarTimer = setTimeout(() => avatarStill('her 3D body is taking long to 
 
 // her voice (Piper on her box) + lip-sync from the real audio
 if (cfg.obs) $('#voice-btn')?.remove();
+mountTip({ obs: cfg.obs });   // optional "Tip Jena" pill (src/tip.js); never in OBS
 const voice = new Voice(avatar, { obs: cfg.obs, button: cfg.obs ? null : $('#voice-btn') });
 const sfx = new Soundboard({ obs: cfg.obs, voice });   // her meme soundboard (src/soundboard.js)
 streamDirector(cfg, avatar);   // stream camera director: push-ins, punch-ins, low angles (src/stream.js)

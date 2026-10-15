@@ -361,3 +361,10 @@ body.obs #voice-btn{display:none}
 #talk.composer #gift { display: none; }   /* ⊕ does the same */
 .m-chips { display: none !important; }
 body.obs #talk.composer { display: none !important; }
+
+/* "Tip Jena" pill (src/tip.js): mirrors the voice button on the other side of her name tag; optional, quiet */
+#tip-btn{position:absolute;right:calc(50% + 92px);bottom:calc(3% + 2px);z-index:4;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px 0 11px;border-radius:99px;border:1.5px solid #fff;background:var(--glass-strong);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--ink);font-weight:800;font-size:13px;letter-spacing:.01em;text-decoration:none;white-space:nowrap;box-shadow:0 6px 18px rgba(120,70,140,.18);transition:background .2s,transform .15s}
+#tip-btn .tip-ic{font-size:15px;line-height:1}
+#tip-btn:hover{background:linear-gradient(90deg,#ffd1ec,#e0d4ff)}
+#tip-btn:active{transform:scale(.97)}
+body.obs #tip-btn,body.stream #tip-btn{display:none}
