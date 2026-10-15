@@ -2459,3 +2459,9 @@
 {"ts": 1792020116913, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=1j0jEfzRg1I", "what": "watched \"Gangnam Style | Psy | Fitness Dance | Zumba | Akshay Jain Choreography\"", "outcome": "", "note": "the video i learned my gangnam style dance tutorial move from"}
 {"ts": 1792020309312, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Turing_test", "what": "read about the Turing test", "outcome": "", "note": ""}
 {"ts": 1792020331142, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792021275629, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Seibu-en", "what": "read about \"Seibu-en\" and summarised it for mama", "outcome": "", "note": "Seibu-en is an amusement park located near Tokyo in Tokorozawa, Saitama Prefecture."}
+{"ts": 1792021347554, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Big_Shiny_Tunes", "what": "read about Big Shiny Tunes", "outcome": "", "note": ""}
+{"ts": 1792021437338, "kind": "site", "action": "new_site", "key": "site:https://developer.mozilla.org/en-US/docs/Learn", "what": "explored MDN learn (https://developer.mozilla.org/en-US/docs/Learn)", "outcome": "", "note": ""}
+{"ts": 1792021478059, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792021511073, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pDTvqS2GMVo", "what": "watched \"Michael Jackson Moonwalk Tutorial! *1 MINUTE DANCE LESSON*\"", "outcome": "", "note": "the video i learned my moonwalk tutorial move from"}
+{"ts": 1792021602913, "kind": "site", "action": "hot", "key": "site:https://GitHub.com", "what": "opened https://GitHub.com from my hot list", "outcome": "", "note": ""}
