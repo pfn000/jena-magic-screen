@@ -1,14 +1,20 @@
 // N•OS liquid-glass window system for the site (Q-UI). Ported from the approved N•OS window demo
 // (files/nos-window-demo, checker PASS): real WebGL2 refraction glass under every window, menu and popover,
-// the top-right ARC (drag = close), the PILL (swipe down = minimize, swipe up = maximize, tap = program info),
+// the top-right ARC (click = close, swipe down from the arc = close gesture), the PILL (swipe down = minimize, swipe up = maximize, tap = program info),
 // the ••• on the top line (tap = File | Edit | View glass bar, hold = move), a hidden resize corner that
 // jiggles when the window can't resize, and a soft shadow. Never runs in OBS / stream layouts; ?nos=0 turns it off.
+// PHONE (Saidie 4:59 PM Oct 15): a full native mobile-app experience, not the desktop window squeezed onto a phone:
+// no close button, no pill, no moving or resizing; only the ••• bar (tap = File | Edit | View). Laptop/tablet keep
+// the window version. Windows stay locked inside the screen and never cover the phone's top bar or tab bar.
 import './nos.css';
 
 const R = 24;                      // uniform window corner radius (Saidie's spec)
 const HOLD_MS = 350;               // ••• press-and-hold before the window moves
 const SWIPE = 26;                  // px of pill travel that counts as a swipe
-const CLOSE_PULL = 70;             // px of arc pull that closes the window
+const CLOSE_PULL = 70;             // px of arc pull (any direction) that closes the window
+const ARC_SWIPE = 34;              // px of downward swipe starting on the arc that closes the window (gesture)
+const ARC_TAP = 8;                 // px of travel still counted as a click on the arc
+const EDGE = 8;                    // a moved window stays this far inside the screen (locked in, never loose)
 const MAXP = 14;                   // max panes per GL layer
 
 export const NOS_ABOUT = [
@@ -103,7 +109,7 @@ export function mountNOS({ obs = false } = {}) {
     for (const el of document.querySelectorAll('#stage > .panel, #avatar-panel, #nos-about')) attach(el);
     for (const [el, W] of wins) if (!el.isConnected) { wins.delete(el); renderDock(); }
   }
-  function raise(W) { if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); }
+  function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); }
   function apply(W) {
     const el = W.el;
     const t = (W.tx || W.ty || W.s !== 1) ? `translate(${W.tx}px, ${W.ty}px) scale(${W.s})` : '';
@@ -152,7 +158,7 @@ export function mountNOS({ obs = false } = {}) {
     dirty = true;
   }
   function maximize(W) {
-    if (W.mode === 'max') return;
+    if (W.mode === 'max' || isPhone()) return;
     closeMenus();
     const r = W.el.getBoundingClientRect();
     W.home = { tx: W.tx, ty: W.ty };
@@ -180,7 +186,7 @@ export function mountNOS({ obs = false } = {}) {
     });
   }
   function minimize(W, closed = false) {
-    if (W.mode === 'min' || W.mode === 'closed') return;
+    if (W.mode === 'min' || W.mode === 'closed' || isPhone()) return;
     closeMenus();
     if (W.mode === 'max') { // drop the maximized frame first so the window remembers its own spot
       W.el.classList.remove('nos-max'); Object.assign(W.el.style, { left: '', top: '', width: '', height: '' }); W.max = null;
@@ -241,28 +247,39 @@ export function mountNOS({ obs = false } = {}) {
     });
   }
 
-  /* ••• : tap = program menu bar, hold = move the window */
+  /* keep a window fully inside the screen (or at least its top line, if it is bigger than the screen) */
+  function lockIn(W) {
+    if (W.mode !== 'normal' || W.max) return;
+    const r = W.el.getBoundingClientRect();
+    let dx = 0, dy = 0;
+    if (r.width <= VW - 2 * EDGE) { if (r.left < EDGE) dx = EDGE - r.left; else if (r.right > VW - EDGE) dx = VW - EDGE - r.right; }
+    else dx = EDGE - r.left;
+    if (r.height <= VH - 2 * EDGE) { if (r.top < EDGE) dy = EDGE - r.top; else if (r.bottom > VH - EDGE) dy = VH - EDGE - r.bottom; }
+    else dy = EDGE - r.top;
+    if (dx || dy) { W.tx += dx; W.ty += dy; apply(W); }
+  }
+
+  /* ••• : tap = program menu bar, hold = move the window (laptop/tablet only; a phone app doesn't move) */
   function wireDots(W) {
     const dots = $('.nos-dots', W.ch);
     let holdT = null, moving = false, sx = 0, sy = 0;
     track(dots, {
       down(st) {
-        moving = false; sx = W.tx; sy = W.ty;
+        moving = false; sx = W.tx; sy = W.ty; holdT = null;
+        if (isPhone() || W.mode !== 'normal') return;
         holdT = setTimeout(() => { try { getSelection()?.removeAllRanges(); } catch {} moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; dirty = true; }, HOLD_MS);
       },
       move(st) {
-        if (!moving && Math.hypot(st.dx, st.dy) > 9 && performance.now() - st.t0 > 140) { clearTimeout(holdT); holdT = null; try { getSelection()?.removeAllRanges(); } catch {} moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; }
+        if (!moving && !isPhone() && W.mode === 'normal' && Math.hypot(st.dx, st.dy) > 9 && performance.now() - st.t0 > 140) { clearTimeout(holdT); holdT = null; try { getSelection()?.removeAllRanges(); } catch {} moving = true; dots.classList.add('held'); closeMenus(); raise(W); W.lift = 1; }
         if (!moving || W.mode !== 'normal') return;
         W.tx = sx + st.dx; W.ty = sy + st.dy;
-        const r = W.el.getBoundingClientRect();   // keep the ••• reachable on screen
-        if (r.top < 4) W.ty += 4 - r.top;
-        apply(W);
+        apply(W); lockIn(W);
       },
       up(st) {
         clearTimeout(holdT); dots.classList.remove('held');
         if (moving) {
           moving = false; W.lift = 0;
-          if (isPhone()) tween(W, { tx: 0, ty: 0 }, 380); else apply(W);
+          if (isPhone()) tween(W, { tx: 0, ty: 0 }, 380); else lockIn(W);
           return;
         }
         if (Math.hypot(st.dx, st.dy) < 10) toggleMenu(W);
@@ -287,25 +304,45 @@ export function mountNOS({ obs = false } = {}) {
     pill.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleInfo(W); } if (e.key === 'ArrowDown') minimize(W); if (e.key === 'ArrowUp') maximize(W); });
   }
 
-  /* arc: drag it away from the corner to close */
+  /* arc (laptop/tablet): CLICK closes; a SWIPE DOWN that starts on the arc closes (gesture); a long pull away closes too.
+     A short wobble that is neither springs back. Phones have no arc (no close button on a phone app). */
+  function closeWin(W, how) {
+    if (isPhone() || W.mode === 'min' || W.mode === 'closed') return;
+    minimize(W, true);
+    say(`${appFor(W.el).title} closed \u00b7 reopen it from the dock`);
+    try { window.dispatchEvent(new CustomEvent('nos:close', { detail: { id: W.el.id, how } })); } catch {}
+  }
   function wireArc(W) {
     const arc = $('.nos-arc', W.ch);
-    let s0;
+    let s0, pulled;
+    const verdict = (st) => {
+      const pull = Math.hypot(st.dx, st.dy);
+      if (pull <= ARC_TAP) return 'click';
+      if (st.dy >= ARC_SWIPE && st.dy >= Math.abs(st.dx) * 0.7) return 'swipe-down';
+      if (st.dy >= 18 && st.dt && st.dy / st.dt > 0.45 && st.dy >= Math.abs(st.dx) * 0.7) return 'flick-down';
+      if (pull > CLOSE_PULL) return 'pull';
+      return null;
+    };
     track(arc, {
-      down() { arc.classList.add('on'); closeMenus(); s0 = { tx: W.tx, ty: W.ty }; },
+      down() { arc.classList.add('on'); closeMenus(); closeInfo(); s0 = { tx: W.tx, ty: W.ty, s: W.s, op: W.op }; pulled = false; },
       move(st) {
+        if (W.mode !== 'normal') return;
         const pull = Math.hypot(st.dx, st.dy);
-        W.tx = s0.tx + st.dx * 0.35; W.ty = s0.ty + st.dy * 0.35;
-        W.s = 1 - clamp(pull / CLOSE_PULL, 0, 1) * 0.06; W.op = 1 - clamp(pull / CLOSE_PULL, 0, 1) * 0.35;
-        arc.classList.toggle('armed', pull > CLOSE_PULL); apply(W);
+        if (!pulled && pull <= ARC_TAP) return;
+        pulled = true;
+        const down = Math.max(0, st.dy), k = clamp(Math.max(down / ARC_SWIPE, pull / CLOSE_PULL), 0, 1);
+        W.tx = s0.tx + st.dx * 0.12; W.ty = s0.ty + down * 0.35;
+        W.s = 1 - k * 0.05; W.op = 1 - k * 0.3;
+        arc.classList.toggle('armed', !!verdict({ ...st, dt: performance.now() - st.t0 }) && pull > ARC_TAP); apply(W);
       },
       up(st) {
         arc.classList.remove('on', 'armed');
-        if (Math.hypot(st.dx, st.dy) > CLOSE_PULL) { W.tx = s0.tx; W.ty = s0.ty; minimize(W, true); say(`${appFor(W.el).title} closed \u00b7 reopen it from the dock`); }
-        else tween(W, { tx: s0.tx, ty: s0.ty, s: 1, op: 1 }, 300);
+        const v = W.mode === 'normal' || W.mode === 'max' ? verdict(st) : null;
+        if (v) { if (pulled) { W.tx = s0.tx; W.ty = s0.ty; } closeWin(W, v); }
+        else if (pulled) tween(W, { tx: s0.tx, ty: s0.ty, s: 1, op: 1 }, 300);
       },
     });
-    arc.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Delete') minimize(W, true); });
+    arc.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete') { e.preventDefault(); closeWin(W, 'key'); } });
   }
 
   /* hidden resize corner (bottom-right); jiggles when the window can't resize */
@@ -347,8 +384,9 @@ export function mountNOS({ obs = false } = {}) {
     file: (W) => [
       ...(W.el.id === 'chat' || W.el.id === 'avatar-panel' ? [['Give Jena a file\u2026', 'gift']] : []),
       ['About N\u2022OS', 'about'],
+      ...(isPhone() ? [['App info', 'info']] : []),
       ...(isMama() && window.__jenaDev ? [['Developer panel', 'dev']] : []),
-      ['Close window', 'close'],
+      ...(isPhone() ? [] : [['Close window', 'close']]),   // a phone app has no close
     ],
     edit: (W) => [
       ['Copy window text', 'copy'],
@@ -357,7 +395,7 @@ export function mountNOS({ obs = false } = {}) {
     view: () => [
       ['Bigger text', 'zin'], ['Smaller text', 'zout'],
       [dark ? 'Light glass' : 'Dark glass', 'theme'],
-      ['Reset windows', 'reset'],
+      ...(isPhone() ? [] : [['Reset windows', 'reset']]),
     ],
   };
   function toggleMenu(W) { if (M.win === W && M.v > 0.5) closeMenus(); else openMenu(W); }
@@ -384,7 +422,8 @@ export function mountNOS({ obs = false } = {}) {
   sub.addEventListener('click', async (e) => {
     const a = e.target.closest('button')?.dataset.a, W = M.win; if (!a || !W) return;
     closeMenus();
-    if (a === 'close') { minimize(W, true); say(`${appFor(W.el).title} closed \u00b7 reopen it from the dock`); }
+    if (a === 'close') closeWin(W, 'menu');
+    else if (a === 'info') openInfo(W);
     else if (a === 'about') openAbout();
     else if (a === 'dev') window.__jenaDev?.open();
     else if (a === 'gift') $('#file-input')?.click();
@@ -397,14 +436,14 @@ export function mountNOS({ obs = false } = {}) {
     else if (a === 'theme') { dark = !dark; body.classList.toggle('nos-dark', dark); try { localStorage.setItem('nos.glass', dark ? 'dark' : 'light'); } catch {} dirty = true; }
     else if (a === 'reset') resetAll();
   });
-  function resetAll() {
+  function resetAll(quiet) {
     for (const W of wins.values()) {
       if (W.mode === 'min' || W.mode === 'closed') { W.el.classList.remove('nos-hidden'); }
       W.el.classList.remove('nos-max', 'nos-sized'); W.anim = null; W.max = null; W.w = W.h = null; W.home = null;
       Object.assign(W.el.style, { left: '', top: '', width: '', height: '', zIndex: '' });
       W.mode = 'normal'; W.restoring = false; W.tx = W.ty = 0; W.s = 1; W.op = 1; apply(W);
     }
-    renderDock(); syncMax(); say('Windows reset');
+    renderDock(); syncMax(); if (!quiet) say('Windows reset');
   }
 
   function toggleInfo(W) { if (M.info === W && M.iv > 0.5) closeInfo(); else openInfo(W); }
@@ -496,8 +535,8 @@ export function mountNOS({ obs = false } = {}) {
     for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
     if (dock.classList.contains('show')) for (const c of dock.children) { const r = c.getBoundingClientRect(); B.push({ r, rad: r.height / 2, op: 1, sh: 0.6, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
     if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: 15, op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
-    if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 16, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
-    if (M.iv > 0.01 && M.info) B.push({ r: info.getBoundingClientRect(), rad: 18, op: M.iv, sh: 0.8, lift: 0, menu: 1, refr: 7, bevel: 16 });
+    if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 24, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
+    if (M.iv > 0.01 && M.info) B.push({ r: info.getBoundingClientRect(), rad: 24, op: M.iv, sh: 0.8, lift: 0, menu: 1, refr: 7, bevel: 16 });
     return [A.slice(0, MAXP), B.slice(0, MAXP)];
   }
   function frame() {
@@ -514,10 +553,15 @@ export function mountNOS({ obs = false } = {}) {
   function resize() {
     VW = innerWidth; VH = innerHeight; DPR = Math.min(devicePixelRatio || 1, 2);
     for (const c of [base, over]) { c.width = Math.round(VW * DPR); c.height = Math.round(VH * DPR); }
-    for (const W of wins.values()) if (W.mode === 'max' && !W.anim) { W.max = areaRect(); apply(W); }
+    const ph = isPhone();
+    if (ph && !wasPhone && wins.size) resetAll(true);   // into the phone app: every window back in its place, nothing closed
+    wasPhone = ph;
+    for (const W of wins.values()) { if (W.mode === 'max' && !W.anim) { W.max = areaRect(); apply(W); } else if (!ph && W.mode === 'normal' && (W.tx || W.ty)) lockIn(W); }
     paintWallpaper();
   }
+  let wasPhone = isPhone();
   addEventListener('resize', resize);
+  new MutationObserver(() => { if (isPhone() !== wasPhone) resize(); }).observe(body, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(() => { scan(); dirty = true; }).observe($('#stage') || body, { childList: true });
   new MutationObserver(() => { dirty = true; }).observe(body, { attributes: true, attributeFilter: ['class', 'data-tab'] });
   scan(); resize(); requestAnimationFrame(frame);

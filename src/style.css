@@ -7,7 +7,7 @@
   --glass: rgba(255, 255, 255, 0.42);
   --glass-strong: rgba(255, 255, 255, 0.62);
   --edge: rgba(255, 255, 255, 0.7);
-  --r: 22px;
+  --r: 24px;   /* Saidie Oct 15 5:24 PM: 24px corners everywhere */
   --gap: clamp(10px, 1.3vw, 26px);
   font-family: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
