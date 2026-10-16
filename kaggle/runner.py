@@ -110,8 +110,14 @@ def run(step, script, *args, extra=None):
         sys.exit(code)
 
 if JOB == "chat":
+    train_max_len = int(os.environ.get("JENA_TRAIN_MAX_LEN", "2048"))
+    if not 512 <= train_max_len <= 4096:
+        sys.exit("JENA_TRAIN_MAX_LEN must be between 512 and 4096 tokens")
     ex = {"JENAXI_CHAT_DIR": dst,
-          "JENAXI_CHAT_CONFIG": json.dumps({"max_train_minutes": max(30, int((left_h() - 1.0) * 60))})}
+          "JENAXI_CHAT_CONFIG": json.dumps({
+              "max_train_minutes": max(30, int((left_h() - 1.0) * 60)),
+              "max_len": train_max_len,
+          })}
     run("finetune", "jenaxi_chat/finetune.py", extra=ex)
     if not os.path.exists(os.path.join(dst, "adapter_final", "adapter_config.json")):
         status(state="partial", done=False); say("fine-tune saved a checkpoint but is not finished; the next version resumes."); sys.exit(0)
