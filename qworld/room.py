@@ -198,6 +198,24 @@ def add_bump(name, scale, strength, dist=0.004):
     if old: nt.links.new(old[0].from_socket, bp.inputs['Normal'])
     nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
 add_bump('rug', 260.0, 0.55, 0.006)
+def rug_bands(name, R):
+    # woven-in colour bands that line up with the tufted rings (v1 checker: the rug read as a flat disc)
+    m = MATS[name]; nt = m.node_tree; N = nt.nodes; b = N['Principled BSDF']
+    src = [l for l in nt.links if l.to_socket == b.inputs['Base Color']]
+    if not src: return
+    tc = N.new('ShaderNodeTexCoord'); sep = N.new('ShaderNodeSeparateXYZ'); nt.links.new(tc.outputs['Object'], sep.inputs['Vector'])
+    cx = N.new('ShaderNodeCombineXYZ'); nt.links.new(sep.outputs['X'], cx.inputs['X']); nt.links.new(sep.outputs['Y'], cx.inputs['Y'])
+    ln = N.new('ShaderNodeVectorMath'); ln.operation = 'LENGTH'; nt.links.new(cx.outputs['Vector'], ln.inputs[0])
+    dv = N.new('ShaderNodeMath'); dv.operation = 'DIVIDE'; dv.inputs[1].default_value = R; nt.links.new(ln.outputs['Value'], dv.inputs[0])
+    cr = N.new('ShaderNodeValToRGB'); nt.links.new(dv.outputs[0], cr.inputs['Fac'])
+    E = cr.color_ramp.elements; E[0].position = 0.0; E[0].color = (1, 1, 1, 1); E[1].position = 1.0; E[1].color = (1, 1, 1, 1)
+    for pos, col in ((0.18, (1, 1, 1, 1)), (0.2, (0.62, 0.5, 0.95, 1)), (0.3, (0.62, 0.5, 0.95, 1)), (0.32, (1, 1, 1, 1)),
+                     (0.45, (1, 1, 1, 1)), (0.47, (0.42, 0.3, 0.72, 1)), (0.57, (0.42, 0.3, 0.72, 1)), (0.59, (1, 1, 1, 1)),
+                     (0.74, (1, 1, 1, 1)), (0.76, (1.3, 1.2, 1.12, 1)), (0.84, (1.3, 1.2, 1.12, 1)), (0.86, (0.7, 0.58, 0.92, 1))):
+        e = E.new(pos); e.color = col
+    mx = N.new('ShaderNodeMix'); mx.data_type = 'RGBA'; mx.blend_type = 'MULTIPLY'; mx.inputs['Factor'].default_value = 1.0
+    nt.links.new(src[0].from_socket, mx.inputs['A']); nt.links.new(cr.outputs['Color'], mx.inputs['B']); nt.links.new(mx.outputs['Result'], b.inputs['Base Color'])
+rug_bands('rug', 1.02)
 add_bump('duvet', 40.0, 0.18, 0.004)
 add_bump('mattress', 60.0, 0.12, 0.003)
 flat('metal', (0.06, 0.06, 0.07), rough=0.32, metal=1.0)
