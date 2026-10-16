@@ -1,5 +1,7 @@
 # Jena · magic screen
 
+> **Runtime upgrades in this branch:** JenaXI now has configurable 32K per-request context, bounded per-channel chat history, low-overhead speculative decoding and KV-cache tuning. See [JenaXI context & speed](docs/JENAXI_CONTEXT_AND_SPEED.md). Full OS gaming/VR requirements are documented in [Linux host setup](box/linux-host/README.md); an optional official Telegram Bot API sidecar is documented in [Telegram Bot API](box/telegram-bot-api/README.md).
+
 Jena's live stage: her VRM avatar on the left, her live **virtual desktop** top-right, **Twitch chat**
 and her **thought chain** underneath, over a dreamy pastel room. Works as a normal website (desktop and
 phone) and as an **OBS browser source** at 1920×1080.
