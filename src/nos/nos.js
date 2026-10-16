@@ -63,7 +63,12 @@ export function mountNOS({ obs = false } = {}) {
   wpImg.onerror = () => { wpReady = false; paintWallpaper(); };
   wpImg.src = '/bg-room.jpg';
   const wp = document.createElement('canvas');
-  let VW = innerWidth, VH = innerHeight, DPR = Math.min(devicePixelRatio || 1, 2);
+  let VW = innerWidth, VH = innerHeight, DPR = Math.min(devicePixelRatio || 1, 2), OX = 0, OY = 0;
+  /* the GL layers draw in the canvas's OWN css box (Oct 15 8:10 PM, Saidie's iPhone): iOS Safari's toolbars make
+     innerWidth/innerHeight disagree with the fixed canvas box (and resize events can arrive late or not at all), and any
+     mismatch stretched the glass past the window (off the right edge, over the tab bar, ••• floating above it).
+     So the size and origin are read from the canvas every frame and the buffer is rebuilt the moment they drift. */
+  const viewBox = () => { const r = base.getBoundingClientRect(); return r.width > 1 && r.height > 1 ? r : { left: 0, top: 0, width: innerWidth, height: innerHeight }; };
   function paintWallpaper() {
     const s = Math.min(1.25, 2048 / Math.max(VW, VH));
     const W = Math.max(2, Math.round(VW * s)), H = Math.max(2, Math.round(VH * s));
@@ -604,7 +609,14 @@ export function mountNOS({ obs = false } = {}) {
   }
 
   /* ---------------- render loop ---------------- */
-  let dirty = true, sig = '';
+  let dirty = true, sig = '', lastPanes = { A: [], B: [] };
+  function phoneClamp(r) {   // [0, viewport width] x [top bar bottom, tab bar top], in css px
+    const tb = $('#m-top')?.getBoundingClientRect(), bb = $('#m-tabs')?.getBoundingClientRect();
+    const x0 = Math.max(r.left, OX), x1 = Math.min(r.right, OX + VW);
+    const y0 = Math.max(r.top, tb && tb.height ? tb.bottom : OY), y1 = Math.min(r.bottom, bb && bb.height ? bb.top : OY + VH);
+    return { left: x0, top: y0, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0), right: x1, bottom: y1 };
+  }
+  const toView = (r) => ({ left: r.left - OX, top: r.top - OY, width: r.width, height: r.height, right: r.right - OX, bottom: r.bottom - OY });
   function panesFor() {
     const A = [], B = [];
     const phone = isPhone();
@@ -614,8 +626,9 @@ export function mountNOS({ obs = false } = {}) {
       if (phone && el.id === 'avatar-panel') continue;
       const cs = el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
       if (!cs) continue;
-      const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+      let r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
       const k = r.width / (el.offsetWidth || r.width);
+      if (phone && el.id !== 'nos-about') r = phoneClamp(r);   // a phone window never leaves the screen or reaches the top bar / tab bar
       (el.id === 'nos-about' ? B : A).push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: 0, refr: 7, bevel: 18 });
     }
     for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
@@ -623,13 +636,16 @@ export function mountNOS({ obs = false } = {}) {
     if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: Math.min(24, bar.offsetHeight / 2 || 20), op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
     if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 24, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
     if (M.iv > 0.01 && M.info) B.push({ r: info.getBoundingClientRect(), rad: 24, op: M.iv, sh: 0.8, lift: 0, menu: 1, refr: 7, bevel: 16 });
+    for (const p of A) p.r = toView(p.r); for (const p of B) p.r = toView(p.r);   // page coords -> the canvas's own coords
     return [A.slice(0, MAXP), B.slice(0, MAXP)];
   }
   function frame() {
     requestAnimationFrame(frame);
     if (!gl) { if (dirty) { dirty = false; updateFront(); } return; }
+    { const vb = viewBox(); if (Math.abs(vb.width - VW) > 0.5 || Math.abs(vb.height - VH) > 0.5 || Math.abs(vb.left - OX) > 0.5 || Math.abs(vb.top - OY) > 0.5 || Math.min(devicePixelRatio || 1, 2) !== DPR) resize(); }
     if (M.v > 0 || M.iv > 0) layoutMenus();
     const [A, B] = panesFor();
+    lastPanes = { A, B };
     const s = (dark ? 'd' : 'l') + VW + 'x' + VH + A.map((p) => [p.r.left, p.r.top, p.r.width, p.r.height, p.op, p.lift].map((v) => Math.round(v * 10)).join(',')).join('|') + '#' + B.map((p) => [p.r.left, p.r.top, p.r.width, p.r.height, p.op].map((v) => Math.round(v * 10)).join(',')).join('|');
     if (!dirty && s === sig) return;
     dirty = false; sig = s;
@@ -638,8 +654,9 @@ export function mountNOS({ obs = false } = {}) {
     G2.draw(B, A, VW, VH, DPR, dark, 1);
   }
   function resize() {
-    VW = innerWidth; VH = innerHeight; DPR = Math.min(devicePixelRatio || 1, 2);
+    const vb = viewBox(); VW = vb.width; VH = vb.height; OX = vb.left; OY = vb.top; DPR = Math.min(devicePixelRatio || 1, 2);
     for (const c of [base, over]) { c.width = Math.round(VW * DPR); c.height = Math.round(VH * DPR); }
+    dirty = true;
     const ph = isPhone();
     if (ph && !wasPhone && wins.size) resetAll(true);   // into the phone app: every window back in its place, nothing closed
     wasPhone = ph;
@@ -648,6 +665,9 @@ export function mountNOS({ obs = false } = {}) {
   }
   let wasPhone = isPhone();
   addEventListener('resize', resize);
+  addEventListener('orientationchange', () => setTimeout(resize, 120));
+  addEventListener('pageshow', resize);
+  if (window.visualViewport) { visualViewport.addEventListener('resize', resize); visualViewport.addEventListener('scroll', () => { dirty = true; }); }
   new MutationObserver(() => { if (isPhone() !== wasPhone) resize(); }).observe(body, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(() => { scan(); dirty = true; }).observe($('#stage') || body, { childList: true });
   new MutationObserver(() => { dirty = true; }).observe(body, { attributes: true, attributeFilter: ['class', 'data-tab'] });
@@ -655,7 +675,7 @@ export function mountNOS({ obs = false } = {}) {
   if (gl) {
     base.addEventListener('webglcontextlost', (e) => { e.preventDefault(); body.classList.remove('nos-gl'); body.classList.add('nos-nogl'); });
   }
-  const api = { wins, maximize: (id) => maximize(wins.get(document.getElementById(id))), minimize: (id) => minimize(wins.get(document.getElementById(id))), close: (id) => minimize(wins.get(document.getElementById(id)), true), reopen: (id) => reopen(wins.get(document.getElementById(id))), openMenu: (id) => openMenu(wins.get(document.getElementById(id))), openSub, openInfo: (id) => openInfo(wins.get(document.getElementById(id))), openAbout, resetAll, closeMenus, gl };
+  const api = { wins, maximize: (id) => maximize(wins.get(document.getElementById(id))), minimize: (id) => minimize(wins.get(document.getElementById(id))), close: (id) => minimize(wins.get(document.getElementById(id)), true), reopen: (id) => reopen(wins.get(document.getElementById(id))), openMenu: (id) => openMenu(wins.get(document.getElementById(id))), openSub, openInfo: (id) => openInfo(wins.get(document.getElementById(id))), openAbout, resetAll, closeMenus, gl, view: () => { const vb = viewBox(); return { VW, VH, OX, OY, DPR, bw: base.width, bh: base.height, box: { x: vb.left, y: vb.top, w: vb.width, h: vb.height }, panes: lastPanes.A.map((p) => ({ x: p.r.left + OX, y: p.r.top + OY, w: p.r.width, h: p.r.height, flat: p.flat || 0 })) }; } };
   window.__nos = api;
   return api;
 }
