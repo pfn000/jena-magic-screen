@@ -21,6 +21,8 @@ on:
       - "box/jena-gateway.mjs"
       - "box/docker/supervisord.conf"
       - "box/linux-host/**"
+      - "box/xr/**"
+      - "hf-zerogpu-space-template/**"
       - "box/telegram-bot-api/**"
       - "colab/jenaxi_chat/finetune.py"
       - "kaggle/runner.py"
