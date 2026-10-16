@@ -1,6 +1,17 @@
 name: JenaXI upgrade sanity checks
 
 on:
+  push:
+    paths:
+      - "box/llama-server-tuned.sh"
+      - "box/start-jenaxi-chat.sh"
+      - "box/jena-gateway.mjs"
+      - "box/docker/supervisord.conf"
+      - "box/linux-host/**"
+      - "box/telegram-bot-api/**"
+      - "colab/jenaxi_chat/finetune.py"
+      - "kaggle/runner.py"
+      - ".github/workflows/jenaxi-upgrade-checks.yml"
   pull_request:
     paths:
       - "box/llama-server-tuned.sh"
