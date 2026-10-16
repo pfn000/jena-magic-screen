@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Shared, configurable llama.cpp launcher for JenaXI. Context is the TOTAL KV/context budget
-# across server slots; e.g. CTX=32768 + PARALLEL=2 gives about 16K tokens per slot.
+# Shared, configurable llama.cpp launcher for JenaXI.
+# CTX_PER_SLOT uses llama.cpp's explicit per-slot KV budget when supported.
 set -euo pipefail
 
 : "${GGUF:?Set GGUF to the model GGUF file}"
@@ -17,6 +17,7 @@ MODEL_ALIAS="${MODEL_ALIAS:-JenaXI}"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8088}"
 CTX="${CTX:-16384}"
+CTX_PER_SLOT="${CTX_PER_SLOT:-}"
 PARALLEL="${PARALLEL:-1}"
 THREADS="${THREADS:-$CPU_COUNT}"
 THREADS_BATCH="${THREADS_BATCH:-$THREADS}"
@@ -35,11 +36,20 @@ for name in PORT CTX PARALLEL THREADS THREADS_BATCH BATCH_SIZE UBATCH_SIZE SPEC_
   value="${!name}"
   [[ "$value" =~ ^[1-9][0-9]*$ ]] || { printf '%s must be a positive integer (got %q)\n' "$name" "$value" >&2; exit 2; }
 done
-[[ "$FLASH_ATTN" == on || "$FLASH_ATTN" == off || "$FLASH_ATTN" == auto ]] || { echo 'FLASH_ATTN must be on, off, or auto' >&2; exit 2; }
+[[ "$FLASH_ATTN" == on || "$FLASH_ATTN" == off || "$FLASH_ATTN" == auto ]] || { echo "FLASH_ATTN must be on, off, or auto" >&2; exit 2; }
+if [[ -n "$CTX_PER_SLOT" && ! "$CTX_PER_SLOT" =~ ^[1-9][0-9]*$ ]]; then echo "CTX_PER_SLOT must be a positive integer" >&2; exit 2; fi
 
 HELP="$("$LLAMA_SERVER" --help 2>&1 || true)"
 has_option() { grep -Fq -- "$1" <<<"$HELP"; }
-ARGS=(-m "$GGUF" --alias "$MODEL_ALIAS" --host "$HOST" --port "$PORT" -c "$CTX" -np "$PARALLEL" -t "$THREADS")
+ARGS=(-m "$GGUF" --alias "$MODEL_ALIAS" --host "$HOST" --port "$PORT" -np "$PARALLEL" -t "$THREADS")
+if [[ -n "$CTX_PER_SLOT" ]] && has_option "--kv-unified-per-slot"; then
+  ARGS+=(--kv-unified-per-slot "$CTX_PER_SLOT")
+  CTX_LABEL="per-slot=$CTX_PER_SLOT"
+else
+  if [[ -n "$CTX_PER_SLOT" ]]; then CTX=$((CTX_PER_SLOT * PARALLEL)); fi
+  ARGS+=(-c "$CTX")
+  CTX_LABEL="pool=$CTX"
+fi
 has_option '--threads-batch' && ARGS+=(-tb "$THREADS_BATCH")
 has_option '--batch-size' && ARGS+=(-b "$BATCH_SIZE")
 has_option '--ubatch-size' && ARGS+=(-ub "$UBATCH_SIZE")
