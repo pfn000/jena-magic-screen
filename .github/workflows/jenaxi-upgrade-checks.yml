@@ -8,6 +8,8 @@ on:
       - "box/jena-gateway.mjs"
       - "box/docker/supervisord.conf"
       - "box/linux-host/**"
+      - "box/xr/**"
+      - "hf-zerogpu-space-template/**"
       - "box/telegram-bot-api/**"
       - "colab/jenaxi_chat/finetune.py"
       - "kaggle/runner.py"
@@ -43,7 +45,15 @@ jobs:
       - name: Check gateway JavaScript syntax
         run: node --check box/jena-gateway.mjs
       - name: Check Python syntax
-        run: python3 -m py_compile colab/jenaxi_chat/finetune.py kaggle/runner.py
+        run: python3 -m py_compile colab/jenaxi_chat/finetune.py kaggle/runner.py hf-zerogpu-space-template/app.py box/xr/osc_bridge.py box/xr/test_osc_bridge.py
+      - name: Test OSC bridge
+        run: python3 -m unittest box/xr/test_osc_bridge.py
+      - name: Fetch OpenVR SDK headers
+        run: git clone --depth 1 https://github.com/ValveSoftware/openvr "$RUNNER_TEMP/openvr"
+      - name: Configure NCOM virtual HMD driver
+        run: cmake -S box/xr/openvr-driver -B "$RUNNER_TEMP/ncom-focalos" -DOPENVR_SDK_ROOT="$RUNNER_TEMP/openvr"
+      - name: Build NCOM virtual HMD driver
+        run: cmake --build "$RUNNER_TEMP/ncom-focalos" --config Release
       - name: Validate Telegram sidecar Compose configuration
         env:
           TELEGRAM_API_ID: "12345"
