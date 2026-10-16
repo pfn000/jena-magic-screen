@@ -27,9 +27,10 @@ SYSTEM_PROMPT = os.environ.get(
 # ZeroGPU documents that model placement belongs at module scope. CUDA emulation is
 # available during Space startup; actual GPU execution occurs inside @spaces.GPU.
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_ID, token=HF_TOKEN)
+_GPU_DTYPE = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 MODEL = AutoModelForCausalLM.from_pretrained(
     MODEL_ID,
-    torch_dtype=torch.bfloat16,
+    torch_dtype=_GPU_DTYPE,
     token=HF_TOKEN,
 ).to("cuda").eval()
 
