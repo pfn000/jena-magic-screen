@@ -16,7 +16,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = os.environ.get("JENAXI_ZEROGPU_MODEL_ID", "Qwen/Qwen2.5-1.5B-Instruct")
 HF_TOKEN = os.environ.get("HF_TOKEN") or None
-MAX_INPUT_TOKENS = max(1024, min(int(os.environ.get("JENAXI_MAX_INPUT_TOKENS", "8192")), 32768))
+MAX_INPUT_TOKENS = max(1024, min(int(os.environ.get("JENAXI_MAX_INPUT_TOKENS", "16384")), 32768))
 MAX_NEW_TOKENS = max(16, min(int(os.environ.get("JENAXI_MAX_NEW_TOKENS", "256")), 1024))
 SYSTEM_PROMPT = os.environ.get(
     "JENAXI_SYSTEM_PROMPT",
