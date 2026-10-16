@@ -1,0 +1,10 @@
+{
+  "signals": {
+    "head_yaw": { "parameter": "NCOM_HeadYaw", "type": "float", "min": -1.0, "max": 1.0 },
+    "head_pitch": { "parameter": "NCOM_HeadPitch", "type": "float", "min": -1.0, "max": 1.0 },
+    "left_blink": { "parameter": "NCOM_LeftBlink", "type": "float", "min": 0.0, "max": 1.0 },
+    "right_blink": { "parameter": "NCOM_RightBlink", "type": "float", "min": 0.0, "max": 1.0 },
+    "mouth_open": { "parameter": "NCOM_MouthOpen", "type": "float", "min": 0.0, "max": 1.0 },
+    "wave": { "parameter": "NCOM_Wave", "type": "bool" }
+  }
+}
