@@ -100,14 +100,18 @@ export class DevPanel {
   armCorner() {
     let taps = [];
     const hit = (x, y) => x < 70 && y < 70;
+    let last = 0;
     const onTap = (e) => {
       const p = e.touches?.[0] || e;
       if (!hit(p.clientX, p.clientY)) return;
       const now = Date.now();
+      if (now - last < 120) return;   // one finger can fire touchstart + pointerdown: count it once
+      last = now;
       taps = taps.filter((t) => now - t < 3000); taps.push(now);
       if (taps.length >= 5) { taps = []; this.el.hidden ? this.open() : this.close(); }
     };
     window.addEventListener('pointerdown', onTap, true);
+    window.addEventListener('touchstart', onTap, { capture: true, passive: true });   // iPhone Safari: the corner sits under the phone top bar
     if (new URLSearchParams(location.search).get('dev') === '1') setTimeout(() => this.open(), 500);
   }
   // mama drives her real desktop (full mouse + keyboard) through a one-time token; her own hands pause meanwhile

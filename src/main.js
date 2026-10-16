@@ -30,6 +30,7 @@ import { mountTip } from './tip.js';
 import { Voice } from './voice.js';
 import { Mic } from './mic.js';
 import { mobileShell } from './mobile.js';
+import { mountNOS } from './nos/nos.js';   // N•OS liquid-glass windows (Q-UI); never in OBS / stream
 import { BodyViews, VIEWS } from './bodyviews.js';
 
 const $ = (s) => document.querySelector(s);
@@ -48,9 +49,12 @@ streamLayout(cfg);   // /stream?layout=wide|phone: the VTuber layout (src/stream
 // ---------------- avatar ----------------
 const status = $('#avatar-status');
 const avatar = new Avatar($('#avatar-canvas'), {
-  onStatus: (s, p) => {
-    status.textContent = s === 'ready' ? '' : `waking Jena up… ${Math.round(p * 100)}%`;
-    status.hidden = s === 'ready';
+  onStatus: (s, p, bytes) => {
+    // never over 100%: a fraction when the size is known, else MB so far; "almost there" while she is parsed + uploaded
+    const what = p == null ? (bytes ? ` ${(bytes / 1048576).toFixed(1)} MB` : '') : p >= 1 ? ' almost there' : ` ${Math.max(0, Math.min(99, Math.round(p * 100)))}%`;
+    status.textContent = s === 'ready' ? '' : `waking Jena up…${what}`;
+    // once the still picture has stood in for her (8 s), late progress ticks must not bring the bubble back over it
+    status.hidden = s === 'ready' || document.body.classList.contains('avatar-still');
   },
 });
 // Her body loads beside everything else and never holds the page: no WebGL, or nothing after 8 s, shows a
@@ -734,6 +738,7 @@ if (cfg.obs) obsGuard();   // stream-safe: no reloads unless mama asks (src/obsg
 else window.__jenaObsReload = requestObsReload;
 
 window.__jenaMobile = mobileShell({ obs: cfg.obs });
+try { mountNOS({ obs: cfg.obs }); } catch (e) { console.warn('[nos] glass UI failed to start', e); }
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';
