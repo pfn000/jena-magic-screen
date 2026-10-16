@@ -299,8 +299,59 @@ async function brain(req, res, url, base, modelName) {
       const mkBody = (extraSys) => modelName === 'JenaXI-0'
         ? { prompt: msgs.filter((m) => m.role !== 'system').map((m) => (m.role === 'user' ? '<|mama|>' : '<|jena|>') + m.content).join('\n') + '\n<|jena|>', temperature: Math.min(b.temperature ?? 0.7, 0.7), max_tokens: Math.min(+(b.max_tokens || 120), 160), stop: ['<|mama|>', '\n<|', '</s>'], ...anti }
         : { messages: extraSys ? [{ role: 'system', content: msgs[0].content + '\n' + extraSys }, ...msgs.slice(1)] : msgs, temperature: Math.min(b.temperature ?? 0.6, creative ? 0.85 : 0.6), top_p: 0.9, max_tokens: Math.min(+(b.max_tokens || b.n_predict || 140), 160), ...anti };
+      const zeroGpuUrl = E('JENA_ZEROGPU_SPACE_URL', '').replace(/\/+$/, '');
+      const zeroGpuTimeout = Math.min(60000, Math.max(5000, Number(E('JENA_ZEROGPU_TIMEOUT_MS', '25000')) || 25000));
+      const zeroGpuToken = E('JENA_ZEROGPU_HF_TOKEN', '');
+      const callZeroGpu = async (payload) => {
+        const headers = { 'Content-Type': 'application/json' };
+        if (zeroGpuToken) headers.Authorization = 'Bearer ' + zeroGpuToken;
+        const start = await fetch(zeroGpuUrl + '/gradio_api/call/chat_completions', {
+          method: 'POST', headers, body: JSON.stringify({ data: [payload] }),
+          signal: AbortSignal.timeout(zeroGpuTimeout),
+        });
+        const startData = await start.json().catch(() => ({}));
+        if (!start.ok) throw new Error(startData?.error || startData?.detail || 'ZeroGPU enqueue HTTP ' + start.status);
+        const eventId = startData?.event_id;
+        if (typeof eventId !== 'string' || !eventId) throw new Error('ZeroGPU did not return a Gradio event_id');
+        const result = await fetch(zeroGpuUrl + '/gradio_api/call/chat_completions/' + encodeURIComponent(eventId), {
+          headers: zeroGpuToken ? { Authorization: 'Bearer ' + zeroGpuToken } : {},
+          signal: AbortSignal.timeout(zeroGpuTimeout),
+        });
+        if (!result.ok) throw new Error('ZeroGPU result HTTP ' + result.status);
+        const stream = await result.text();
+        const lines = stream.split(/\r?\n/).filter((line) => line.startsWith('data:'));
+        let completion = null;
+        for (const line of lines) {
+          const raw = line.slice(5).trim();
+          if (!raw || raw === 'null') continue;
+          let value;
+          try { value = JSON.parse(raw); } catch { continue; }
+          const candidates = Array.isArray(value) ? value : [value];
+          for (const candidate of candidates) {
+            if (candidate && typeof candidate === 'object' && Array.isArray(candidate.choices)) completion = candidate;
+          }
+        }
+        if (!completion) throw new Error('ZeroGPU returned no chat-completion result');
+        return completion;
+      };
       const ask = async (extraSys) => {
         const backendBody = mkBody(extraSys); rec.request = backendBody;
+        if (zeroGpuUrl && modelName !== 'JenaXI-0' && Array.isArray(backendBody.messages)) {
+          try {
+            const remote = await callZeroGpu({
+              messages: backendBody.messages,
+              temperature: backendBody.temperature,
+              top_p: backendBody.top_p,
+              max_new_tokens: backendBody.max_tokens,
+            });
+            usage = remote.usage || null;
+            rec.remoteBackend = 'huggingface-zerogpu';
+            return remote.choices?.[0]?.message?.content ?? '';
+          } catch (e) {
+            // ZeroGPU is on-demand and quota/queue-limited. Keep the local model as a live fallback.
+            rec.remoteFallback = String(e?.message || e).slice(0, 240);
+          }
+        }
         const r = await fetch(base + (modelName === 'JenaXI-0' ? '/v1/completions' : '/v1/chat/completions'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...backendBody, stream: false }), signal: AbortSignal.timeout(45000),
         });
