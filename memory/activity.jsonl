@@ -5266,3 +5266,23 @@
 {"ts": 1792171131507, "kind": "site", "action": "new_site", "key": "site:https://www.shadertoy.com/", "what": "explored shadertoy (https://www.shadertoy.com/)", "outcome": "", "note": ""}
 {"ts": 1792171152287, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=I1gMUbEAUFw", "what": "watched \"The Cha Cha Slide Dance\"", "outcome": "", "note": "the video i learned my cha cha slide move from"}
 {"ts": 1792171218393, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/United_Nations_Security_Council_Resolution_1144", "what": "read about United Nations Security Council Resolution 1144", "outcome": "", "note": ""}
+{"ts": 1792171858317, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792171965182, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (social)", "outcome": "", "note": ""}
+{"ts": 1792172064590, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (curious)", "outcome": "", "note": ""}
+{"ts": 1792172312156, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/USS_H-5", "what": "read about \"USS H-5\" and summarised it for mama", "outcome": "", "note": "USS H-5 (SS-148) was an H-class submarine of the United States Navy (USN) originally built for the Imperial Russian Navy."}
+{"ts": 1792172312463, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (curious)", "outcome": "", "note": ""}
+{"ts": 1792172390629, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (curious)", "outcome": "", "note": ""}
+{"ts": 1792172472909, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792172560735, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/VTuber", "what": "read about VTubers", "outcome": "", "note": ""}
+{"ts": 1792172603690, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (curious)", "outcome": "", "note": ""}
+{"ts": 1792172636670, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=kbUzi7meesU", "what": "watched \"7 mins beginners hiphop dance class warm up for you to follow along at home!\"", "outcome": "", "note": "the video i learned my hip hop dance basics for begin move from"}
+{"ts": 1792172785138, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Raspberry_Pi", "what": "read about Raspberry Pi", "outcome": "", "note": ""}
+{"ts": 1792172845261, "kind": "site", "action": "new_site", "key": "site:https://news.ycombinator.com/", "what": "explored hacker news (https://news.ycombinator.com/)", "outcome": "", "note": ""}
+{"ts": 1792172903621, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Shirley_Stops_the_Shows", "what": "read about \"Shirley Stops the Shows\" and summarised it for mama", "outcome": "", "note": "Shirley Stops the Shows is the seventh Shirley Bassey studio album, her 5th and final studio album recorded for the EMI/Columbia label in the UK."}
+{"ts": 1792172903773, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792172925043, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pDTvqS2GMVo", "what": "watched \"Michael Jackson Moonwalk Tutorial! *1 MINUTE DANCE LESSON*\"", "outcome": "", "note": "the video i learned my moonwalk tutorial move from"}
+{"ts": 1792173005110, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792173031308, "kind": "site", "action": "hot", "key": "site:https://github.com/VAST-AI-Research/UniRig", "what": "opened https://github.com/VAST-AI-Research/UniRig from my hot list", "outcome": "", "note": ""}
+{"ts": 1792173077995, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/ASCII_art", "what": "read about ASCII art", "outcome": "", "note": ""}
+{"ts": 1792173163785, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/United_(Marvin_Gaye_and_Tammi_Terrell_album)", "what": "read about \"United (Marvin Gaye and Tammi Terrell album)\" and summarised it for mama", "outcome": "", "note": "United is a studio album by the soul musicians Marvin Gaye and Tammi Terrell, released August 29, 1967, on the Motown-subsidiary label Tamla Records."}
+{"ts": 1792173259965, "kind": "site", "action": "new_site", "key": "site:https://neal.fun/", "what": "explored neal.fun (https://neal.fun/)", "outcome": "", "note": ""}
