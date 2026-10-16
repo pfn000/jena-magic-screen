@@ -4,10 +4,11 @@ This change updates the runtime and chat fine-tune configuration; it does not ch
 
 ## What changed
 
-- JenaXI-chat defaults to a 32,768-token total context/KV pool across two server slots, or approximately 16,384 tokens per simultaneous request. llama.cpp divides the configured total context between slots.
+- JenaXI-chat requests up to 32,768 context tokens per slot, with two slots for two simultaneous requests. Current llama.cpp builds use the explicit per-slot KV-pool option; older builds fall back to a 65,536-token total context pool.
 - K/V cache defaults to q8_0, with Flash Attention enabled when the server binary exposes those flags. This reduces KV-cache memory compared with full-precision cache and can make longer contexts practical. Backend/model compatibility and actual speed still need to be benchmarked.
 - ngram-mod speculative decoding is enabled by default. It is lightweight and needs no separate draft-model file; it can accelerate repeated token patterns, but it is workload-dependent and is not a promise of faster generation for every prompt.
 - The fallback JenaXI-0 remains at its existing 1,024-token context because it is a separately trained small model. Increasing its context will not make that model smarter.
+- The gateway now stores a bounded recent-turn history (up to 40 messages / 36,000 characters) for actual website traffic and reloads it into the next prompt. Private mama history and public chat history are stored separately. This makes the larger window usable instead of repeatedly sending a single isolated question.
 - The chat fine-tuning cap grows from 768 to 2,048 tokens so longer training examples are not cut off as early.
 
 ## Configuration
@@ -16,7 +17,8 @@ These values are read by the Docker supervisor when the box starts:
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| JENA_CHAT_CTX_TOTAL | 32768 | Total context pool for JenaXI-chat across all slots |
+| JENA_CHAT_CTX_PER_SLOT | 32768 | Per-request context limit with current llama.cpp; keep within the model's supported 32K window |
+| JENA_CHAT_CTX_TOTAL | 65536 | Fallback total context pool for builds without the per-slot option; per-slot setting takes precedence on current builds |
 | JENA_CHAT_PARALLEL | 2 | Simultaneous requests; the total pool is divided among slots |
 | JENA_CHAT_THREADS | 3 | Generation CPU threads |
 | JENA_CHAT_THREADS_BATCH | 3 | Prompt-processing CPU threads |
@@ -26,14 +28,13 @@ These values are read by the Docker supervisor when the box starts:
 | JENA_SPEC_TYPE | ngram-mod | Set to none to disable speculative decoding |
 | JENA_SPEC_NGRAM_MATCH | 24 | n-gram lookup length |
 | JENA_SPEC_NGRAM_MIN / JENA_SPEC_NGRAM_MAX | 48 / 64 | Speculative draft range |
-| JENA_BASE_CTX_TOTAL | 1024 | Fallback model context (kept conservative) |
 | JENA_TRAIN_MAX_LEN | 2048 | Chat fine-tune sequence cap; 4,096 is an opt-in experiment |
 
 ## Larger windows
 
-The fine-tuned chat model is based on Qwen/Qwen2.5-1.5B-Instruct, whose documented context capacity is 32K tokens. To target up to 32K tokens per request with two concurrent slots, set JENA_CHAT_CTX_TOTAL=65536 and confirm the host has enough RAM/VRAM. That total is an allocation across slots, not a per-request number. Do not set the runtime above the architecture's supported limit without a deliberate RoPE-scaling experiment and validation. Longer context consumes more memory and usually increases prompt-prefill latency; it is useful when the conversation actually needs that history, not as a universal speed boost.
+The fine-tuned chat model is based on Qwen/Qwen2.5-1.5B-Instruct, whose documented context capacity is 32K tokens. The current server targets up to 32K tokens per request and allows two simultaneous requests. Do not set the runtime above the architecture's supported limit without a deliberate RoPE-scaling experiment and validation. Longer context consumes more memory and usually increases prompt-prefill latency; it is useful when the conversation actually needs that history, not as a universal speed boost. The gateway's bounded history is a separate limit from the model's 32K context and should be tested with the actual tokenizer.
 
-The standalone box/start-jenaxi.sh uses a single slot and defaults to CTX=16384; there CTX is the total pool for that one slot. CTX=32768 targets a 32K request window if resources permit.
+The standalone box/start-jenaxi.sh uses a single slot and defaults to CTX=16384; set CTX=32768 there to target the model's full 32K window if resources permit. For the supervised chat process, change JENA_CHAT_CTX_PER_SLOT (not CTX) to tune the per-request budget.
 
 ## Re-training the chat model
 
