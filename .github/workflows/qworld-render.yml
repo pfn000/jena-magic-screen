@@ -1,0 +1,139 @@
+name: qworld-render
+# Jena's room (Q-WORLD) Blender renders/bake on this public repo's runners. Branch q-world only; edit qworld/REQUEST.json to run.
+run-name: "qworld ${{ github.event.head_commit.message }}"
+on:
+  push:
+    branches: [q-world]
+    paths: ['qworld/REQUEST.json']
+permissions:
+  contents: read
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      tasks: ${{ steps.r.outputs.tasks }}
+      samples: ${{ steps.r.outputs.samples }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        run: |
+          python3 -c "import json; r = json.load(open('qworld/REQUEST.json')); print('tasks=' + json.dumps(r['tasks'])); print('samples=' + str(r.get('samples', 128)))" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        task: ${{ fromJSON(needs.setup.outputs.tasks) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Blender
+        id: cb
+        uses: actions/cache@v4
+        with:
+          path: ~/blender
+          key: blender-4.2.3-linux
+      - name: Install Blender 4.2.3 LTS
+        if: steps.cb.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/blender && cd ~/blender
+          curl -sSL --retry 5 https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz | tar -xJ --strip-components=1
+      - name: System libs
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libsm6 libxkbcommon0 libegl1 >/dev/null
+      - name: Cache textures
+        uses: actions/cache@v4
+        with:
+          path: tex
+          key: qworld-tex-${{ hashFiles('qworld/fetch_assets.py') }}
+      - name: Fetch CC0 textures
+        run: |
+          pip install -q pillow numpy || pip install -q --break-system-packages pillow numpy
+          [ -f tex/credits.json ] || python3 qworld/fetch_assets.py tex
+          mkdir -p out && cp tex/credits.json out/credits.json
+      - name: Fetch a finished bake (glb-<run> tasks re-export the GLB from that run's lightmaps)
+        if: startsWith(matrix.task, 'glb-')
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TASK: ${{ matrix.task }}
+        run: |
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          mkdir -p out
+          python3 - <<'PY'
+          import os, shutil
+          from huggingface_hub import hf_hub_download
+          src = os.environ["TASK"].split("-", 1)[1]
+          for n in ("lightmap.pfm", "lightmap_day.pfm", "env.hdr", "env_day.hdr"):
+              p = hf_hub_download("Saidie000/tab-render-out", "runs/%s/%s" % (src, n), repo_type="dataset", token=os.environ["HF_TOKEN"])
+              shutil.copy(p, os.path.join("out", n)); print("got", n, os.path.getsize(p))
+          PY
+      - name: Blender
+        run: |
+          set -o pipefail
+          mkdir -p out
+          ~/blender/blender -b --factory-startup -noaudio --python-exit-code 3 -P qworld/room.py -- --task ${{ matrix.task }} --tex tex --out out --samples ${{ needs.setup.outputs.samples }} 2>&1 | grep -v -E '^Fra:|Sample [0-9]' | tee out/log-${{ matrix.task }}.txt | tail -n 150
+          ls -la out
+      - name: Denoise + encode lightmap
+        if: matrix.task == 'bake' || startsWith(matrix.task, 'glb-')
+        run: |
+          (curl -sSL --retry 3 -o oidn.tgz https://github.com/RenderKit/oidn/releases/download/v2.3.1/oidn-2.3.1.x86_64.linux.tar.gz && mkdir -p oidn && tar -xzf oidn.tgz -C oidn --strip-components=1) || echo "no oidn"
+          for SUF in "" _day; do
+            [ -f out/lightmap$SUF.pfm ] || continue
+            if [ -x oidn/bin/oidnDenoise ]; then oidn/bin/oidnDenoise -f RTLightmap --hdr out/lightmap$SUF.pfm -o out/lightmap${SUF}_dn.pfm || echo "denoise failed"; fi
+            python3 qworld/encode_lightmap.py out $SUF
+          done
+          rm -f out/*.pfm
+          ls -la out
+      - name: Publish this job's outputs to the private HF dataset
+        if: always()
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          TASK: ${{ matrix.task }}
+        run: |
+          [ -n "$HF_TOKEN" ] || { echo "no HF_TOKEN"; exit 0; }
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          python3 - <<'PY'
+          import os, time, random
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          for k in range(6):
+              try:
+                  api.upload_folder(folder_path="out", path_in_repo="runs/" + os.environ["RUN_ID"], repo_id="Saidie000/tab-render-out",
+                                    repo_type="dataset", commit_message="blender run %s %s" % (os.environ["RUN_ID"], os.environ["TASK"]))
+                  print("published", os.environ["TASK"]); break
+              except Exception as e:
+                  print("retry", k, repr(e)[:200]); time.sleep(10 + random.random() * 20)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: out-${{ matrix.task }}
+          path: out/
+          retention-days: 7
+  publish:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish outputs to the private HF dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          [ -n "$HF_TOKEN" ] || { echo "no HF_TOKEN"; exit 0; }
+          ls -la out
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          python3 - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(folder_path="out", path_in_repo="runs/" + os.environ["RUN_ID"],
+              repo_id="Saidie000/tab-render-out", repo_type="dataset", commit_message="blender run " + os.environ["RUN_ID"])
+          print("published runs/" + os.environ["RUN_ID"])
+          PY
+# rev 1792172263376898189

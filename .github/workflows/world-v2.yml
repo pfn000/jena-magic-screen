@@ -1,0 +1,61 @@
+name: world-v2 room assets + viewer proof shots
+# Branch q-world only (Jena's room viewer at /world-v2/). Not on main.
+on:
+  push:
+    branches: [q-world]
+    paths: ['public/world-v2/SOURCE_RUN']
+permissions:
+  contents: write
+concurrency: { group: world-v2, cancel-in-progress: false }
+jobs:
+  assets-and-shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: q-world }
+      - name: Pull the baked room from the private render dataset
+        env: { HF_TOKEN: "${{ secrets.HF_TOKEN }}" }
+        run: |
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          python3 - <<'PY'
+          import os, shutil
+          from huggingface_hub import hf_hub_download
+          run = open('public/world-v2/SOURCE_RUN').read().strip()
+          for n in ('room.glb', 'lightmap.webp', 'lightmap_day.webp', 'env.hdr', 'env_day.hdr', 'cameras.json', 'exterior_day.jpg', 'exterior_night.jpg'):
+              p = hf_hub_download('Saidie000/tab-render-out', 'runs/%s/%s' % (run, n), repo_type='dataset', token=os.environ['HF_TOKEN'])
+              shutil.copy(p, os.path.join('public/world-v2', n)); print('got', n, os.path.getsize(p))
+          PY
+          ls -la public/world-v2
+      - name: Commit the assets to q-world
+        run: |
+          git config user.name "world-v2-bot"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/world-v2
+          if git diff --cached --quiet; then echo "assets unchanged"; else
+            git commit -q -m "world-v2: baked room assets from tab-render run $(cat public/world-v2/SOURCE_RUN)"
+            for k in 1 2 3; do git pull -q --rebase origin q-world && git push -q origin HEAD:q-world && break; sleep 5; done
+          fi
+          git log -1 --format='%H %s'
+      - name: Viewer proof shots (headless Chromium + SwiftShader WebGL)
+        run: |
+          mkdir -p /tmp/pw shots && cp ops/world-v2-shot.mjs /tmp/pw/shot.mjs
+          (cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.48.2 >/dev/null && npx playwright install --with-deps chromium >/dev/null)
+          (cd public && nohup python3 -m http.server 8765 >/dev/null 2>&1 &)
+          sleep 2
+          node /tmp/pw/shot.mjs http://localhost:8765/world-v2/index.html shots 1600 900 2>&1 | tee shots/log-viewer.txt || true
+          node /tmp/pw/shot.mjs http://localhost:8765/world-v2/index.html shots 390 844 2>&1 | tee -a shots/log-viewer.txt || true
+          git rev-parse HEAD > shots/commit.txt; ls -la shots
+      - name: Publish the shots to the private render dataset
+        if: always()
+        env: { HF_TOKEN: "${{ secrets.HF_TOKEN }}", RUN_ID: "${{ github.run_id }}" }
+        run: |
+          python3 - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          HfApi(token=os.environ['HF_TOKEN']).upload_folder(folder_path='shots', path_in_repo='runs/msw-' + os.environ['RUN_ID'],
+              repo_id='Saidie000/tab-render-out', repo_type='dataset', commit_message='world-v2 viewer shots ' + os.environ['RUN_ID'])
+          print('published runs/msw-' + os.environ['RUN_ID'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: world-v2-shots, path: shots/, retention-days: 7 }

@@ -1,0 +1,8 @@
+{
+ "tasks": [
+  "bake"
+ ],
+ "samples": 128,
+ "req": "fx-bake2",
+ "note": "re-bake: duvet underside removed, lightmap margin 0.005, rug colour bands"
+}
