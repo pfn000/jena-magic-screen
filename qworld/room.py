@@ -388,7 +388,10 @@ def quilt(name, size, loc, r, mat, parent, cell=0.3, depth=0.03, cuts=56):
         pf = (abs(math.sin(math.pi * x / cell)) * abs(math.sin(math.pi * y / cell))) ** 0.4
         v.co.z = z + depth * pf * edge - depth * 0.35 * edge
     d = ob.modifiers.new('d', 'DISPLACE'); tx = bpy.data.textures.new(name + '_wr', 'CLOUDS'); tx.noise_scale = 0.22; d.texture = tx; d.strength = 0.02
-    apply_mods(ob); smooth(ob, 80); setmat(ob, mat); return ob
+    apply_mods(ob)
+    bm = bmesh.new(); bm.from_mesh(ob.data)          # drop the hidden underside (it sits in the mattress and baked black into the web lightmap)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z < -0.5], context='FACES'); bm.to_mesh(ob.data); bm.free()
+    smooth(ob, 80); setmat(ob, mat); return ob
 du = quilt('Bed_Duvet', (BW + 0.12, BL * 0.72, 0.1), (0, -BL * 0.15, 0.66), 0.05, 'duvet', bed, cell=0.34, depth=0.05)
 rbox('Bed_DuvetFold', (BW + 0.13, 0.22, 0.12), (0, BL * 0.21, 0.69), 0.055, 'duvet', 6, bed, sub=1)
 pillow('Bed_Pillow_L', (0.6, 0.4, 0.22), (-0.33, BL / 2 - 0.32, 0.72), 'plush', bed, rot=(math.radians(-12), 0, 0))

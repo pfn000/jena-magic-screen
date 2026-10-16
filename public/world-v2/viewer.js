@@ -105,8 +105,15 @@ if (lb) { if (!LOOKS.day) lb.style.display = 'none'; lb.onclick = () => setLook(
 setLook(Q.get('look') === 'day' ? 'day' : 'night');
 
 const tmp = new THREE.Vector3();
+// presets are framed for 16:9; on a tall phone screen keep the same horizontal view instead of cropping to a sliver
+function fitFov(f) {
+  const a = innerWidth / innerHeight; if (a >= 16 / 9) return f;
+  const h = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(f) / 2) * 16 / 9);
+  return Math.min(90, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / a)) * 0.82);
+}
+let CUR = 'wide';
 function goto(name, instant) {
-  const c = CAMS[name]; if (!c) return;
+  const c = CAMS[name]; if (!c) return; CUR = name;
   document.querySelectorAll('#bar button[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === name));
   const p0 = camera.position.clone(), t0 = controls.target.clone(), f0 = camera.fov;
   const p1 = new THREE.Vector3(...c.position), t1 = new THREE.Vector3(...c.target);
@@ -115,7 +122,7 @@ function goto(name, instant) {
   function step(now) {
     const k = dur ? Math.min(1, (now - start) / dur) : 1, e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
     camera.position.lerpVectors(p0, p1, e); controls.target.lerpVectors(t0, t1, e);
-    camera.fov = f0 + (c.fov - f0) * e; camera.updateProjectionMatrix();
+    camera.fov = f0 + (fitFov(c.fov) - f0) * e; camera.updateProjectionMatrix();
     if (k < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -130,7 +137,7 @@ function clampInside() {
   p.x = THREE.MathUtils.clamp(p.x, -ROOM.x, ROOM.x); p.z = THREE.MathUtils.clamp(p.z, -ROOM.zb, ROOM.zf); p.y = THREE.MathUtils.clamp(p.y, ROOM.y0, ROOM.y1);
 }
 addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  camera.aspect = innerWidth / innerHeight; const cc = CAMS[CUR]; if (cc) camera.fov = fitFov(cc.fov); camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
 let frames = 0;

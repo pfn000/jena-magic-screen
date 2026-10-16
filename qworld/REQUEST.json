@@ -1,11 +1,8 @@
 {
  "tasks": [
-  "day-wide",
-  "tex-wide",
-  "day-desk",
-  "tex-desk"
+  "bake"
  ],
  "samples": 128,
- "req": "fx-rug3",
- "note": "rug colour bands (fixed mix sockets); wide + desk re-render"
+ "req": "fx-bake2",
+ "note": "re-bake: duvet underside removed, lightmap margin 0.005, rug colour bands"
 }
