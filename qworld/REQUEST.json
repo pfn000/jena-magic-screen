@@ -1,0 +1,23 @@
+{
+ "tasks": [
+  "clay-wide",
+  "clay-desk",
+  "clay-bed",
+  "clay-window",
+  "clay-chair",
+  "day-wide",
+  "day-desk",
+  "day-bed",
+  "day-window",
+  "day-chair",
+  "tex-wide",
+  "tex-desk",
+  "tex-bed",
+  "tex-window",
+  "tex-chair",
+  "bake"
+ ],
+ "samples": 128,
+ "req": "fx-full1",
+ "note": "fix round 9225a5bc"
+}
