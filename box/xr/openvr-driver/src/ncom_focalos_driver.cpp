@@ -52,7 +52,6 @@ public:
         properties->SetStringProperty(container, vr::Prop_ManufacturerName_String, "NCOM Systems");
         properties->SetStringProperty(container, vr::Prop_ModelNumber_String, "NCOM Focal OS Virtual HMD");
         properties->SetStringProperty(container, vr::Prop_SerialNumber_String, kSerial);
-        properties->SetStringProperty(container, vr::Prop_RenderModelName_String, "{ncom}/focalos_virtual_hmd");
         properties->SetFloatProperty(container, vr::Prop_DisplayFrequency_Float, 90.0f);
         properties->SetFloatProperty(container, vr::Prop_UserIpdMeters_Float, 0.063f);
         properties->SetBoolProperty(container, vr::Prop_IsOnDesktop_Bool, true);
