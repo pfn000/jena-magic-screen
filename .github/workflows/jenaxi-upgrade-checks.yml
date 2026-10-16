@@ -29,6 +29,7 @@ on:
       - ".github/workflows/jenaxi-upgrade-checks.yml"
   workflow_dispatch:
 
+# Covers the JenaXI runtime, optional ZeroGPU client/template, OSC tests, OpenVR driver build, and Telegram sidecar config.
 permissions:
   contents: read
 
