@@ -86,7 +86,24 @@ function mamaFacts() {
 }
 const RECENT = { mama: [], pub: [] };   // last replies per side, so a repeated question gets a different wording
 const LAST_FILE = `${STATE}/last_turn.json`;   // the last exchange per side (mama / public), kept across restarts
-const LAST = (() => { try { return { mama: null, pub: null, ...JSON.parse(fs.readFileSync(LAST_FILE, 'utf8')) }; } catch { return { mama: null, pub: null }; } })();
+const LAST = (() => {
+  let parsed = {};
+  try { parsed = JSON.parse(fs.readFileSync(LAST_FILE, 'utf8')); } catch {}
+  return { mama: null, pub: null, ...parsed,
+    history: { mama: [], pub: [], ...(parsed.history && typeof parsed.history === 'object' ? parsed.history : {}) } };
+})();
+const HISTORY_MAX_MESSAGES = 40;
+const HISTORY_MAX_CHARS = 36000;
+function recordTurn(side, userText, assistantText) {
+  const history = LAST.history[side];
+  history.push(
+    { role: 'user', content: String(userText || '').slice(0, 6000) },
+    { role: 'assistant', content: String(assistantText || '').slice(0, 6000) }
+  );
+  while (history.length > HISTORY_MAX_MESSAGES) history.splice(0, 2);
+  const chars = () => history.reduce((sum, item) => sum + String(item.content || '').length, 0);
+  while (history.length > 2 && chars() > HISTORY_MAX_CHARS) history.splice(0, 2);
+}
 // ---------------------------------------------------------------- intent layer: plain speech -> her actions (box/jena-intent.mjs)
 // The site asks /box/skills/auto first, then her brain answers. Here a plain phrasing ("any new mail?", "go open youtube",
 // "sign into grok", "look that up") becomes the action; unsure -> she asks "you want me to X?" and a yes runs it.
@@ -229,6 +246,17 @@ async function brain(req, res, url, base, modelName) {
   let text = '', usage = null, rawReply = '';
   try {
     const isMama = req.headers['x-jena-mama'] === '1' && !String(req.url).startsWith('/japi') && (!req.headers['cf-ray'] || siteAuthOk(req.headers['x-jena-auth']));
+    const historySide = isMama ? 'mama' : 'pub';
+    // The hosted site sends only the current turn. Rehydrate bounded history for real site traffic,
+    // but do not prepend it to third-party API calls or local skill/tool prompts.
+    if (req.headers['cf-ray'] && !String(req.url).startsWith('/japi')) {
+      const hasAssistant = messages.some((m) => m.role === 'assistant');
+      const userCount = messages.filter((m) => m.role === 'user').length;
+      const saved = LAST.history[historySide];
+      if (!hasAssistant && userCount <= 1 && saved.length) {
+        messages = [...messages.filter((m) => m.role === 'system'), ...saved, ...messages.filter((m) => m.role !== 'system')];
+      }
+    }
     const allFacts = mamaFacts(), seenFacts = isMama ? allFacts : allFacts.filter((f) => !f.private);
     const box = { ...(await boxFacts()), mamaFacts: seenFacts };
     const facts = T.factsBlock(box);
@@ -313,7 +341,12 @@ async function brain(req, res, url, base, modelName) {
   const lastText = text, lastUserText = userText;
   if (rec.private) Object.assign(rec, { user: '(private, mama only)', reply: '(private)', raw: '', fact: rec.fact ? { private: true, ts: rec.fact.ts } : undefined });   // /brain/log is readable by the public site
   logBrain(rec);
-  if (!String(req.url).startsWith('/japi')) LAST[rec.mama ? 'mama' : 'pub'] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() }; try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {} if (/\b(?:look (?:it|that) up|search (?:it|for it)|wanna me look|want me to look)\b/i.test(lastText) && !String(req.url).startsWith('/japi')) { const q0 = String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 300); PENDING[rec.mama ? 'mama' : 'pub'] = { it: { action: 'web_search', confidence: 1, args: { query: q0 }, label: `look up "${q0.slice(0, 60)}"`, canon: `search ${q0}`, text: q0, via: 'offer' }, ts: Date.now() }; } { const R2 = RECENT[rec.mama ? 'mama' : 'pub']; R2.push(String(lastText).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()); if (R2.length > 6) R2.shift(); }
+  if (!String(req.url).startsWith('/japi')) {
+    const side = rec.mama ? 'mama' : 'pub';
+    LAST[side] = { q: String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 400), a: lastText.slice(0, 400), ts: Date.now() };
+    if (req.headers['cf-ray']) recordTurn(side, lastUserText, lastText);
+    try { fs.writeFileSync(LAST_FILE, JSON.stringify(LAST)); } catch {}
+  } if (/\b(?:look (?:it|that) up|search (?:it|for it)|wanna me look|want me to look)\b/i.test(lastText) && !String(req.url).startsWith('/japi')) { const q0 = String(lastUserText).replace(/^\[[^\]]*\]\s*[^:]{0,40}:\s*/, '').trim().slice(0, 300); PENDING[rec.mama ? 'mama' : 'pub'] = { it: { action: 'web_search', confidence: 1, args: { query: q0 }, label: `look up "${q0.slice(0, 60)}"`, canon: `search ${q0}`, text: q0, via: 'offer' }, ts: Date.now() }; } { const R2 = RECENT[rec.mama ? 'mama' : 'pub']; R2.push(String(lastText).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()); if (R2.length > 6) R2.shift(); }
   const id = 'jx-' + t0, created = Math.floor(t0 / 1000);
   const extra = { jena: { model: modelName, ms: rec.ms, guarded: !!rec.guarded, usage, routed: rec.routed || null, caught: (rec.caught || []).map((c) => ({ s: c.s.slice(0, 160), why: c.why })), oops: rec.oops || null, action: rec.action || null } };
   if (isChat) {

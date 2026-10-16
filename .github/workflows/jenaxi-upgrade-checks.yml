@@ -1,0 +1,51 @@
+name: JenaXI upgrade sanity checks
+
+on:
+  push:
+    paths:
+      - "box/llama-server-tuned.sh"
+      - "box/start-jenaxi-chat.sh"
+      - "box/jena-gateway.mjs"
+      - "box/docker/supervisord.conf"
+      - "box/linux-host/**"
+      - "box/telegram-bot-api/**"
+      - "colab/jenaxi_chat/finetune.py"
+      - "kaggle/runner.py"
+      - ".github/workflows/jenaxi-upgrade-checks.yml"
+  pull_request:
+    paths:
+      - "box/llama-server-tuned.sh"
+      - "box/start-jenaxi-chat.sh"
+      - "box/jena-gateway.mjs"
+      - "box/docker/supervisord.conf"
+      - "box/linux-host/**"
+      - "box/telegram-bot-api/**"
+      - "colab/jenaxi_chat/finetune.py"
+      - "kaggle/runner.py"
+      - ".github/workflows/jenaxi-upgrade-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check shell scripts
+        run: bash -n box/llama-server-tuned.sh box/start-jenaxi-chat.sh box/linux-host/check-vr-readiness.sh
+      - name: Check gateway JavaScript syntax
+        run: node --check box/jena-gateway.mjs
+      - name: Check Python syntax
+        run: python3 -m py_compile colab/jenaxi_chat/finetune.py kaggle/runner.py
+      - name: Validate Telegram sidecar Compose configuration
+        env:
+          TELEGRAM_API_ID: "12345"
+          TELEGRAM_API_HASH: "ci-placeholder-not-a-secret"
+        run: docker compose -f box/telegram-bot-api/docker-compose.yml config --quiet

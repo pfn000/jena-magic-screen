@@ -9,7 +9,7 @@ from common import load_persona, oasst_pairs, dolly_pairs, general_chat_files, w
 SMOKE = os.environ.get("JENAXI_SMOKE", "0") == "1"
 BASE = os.environ.get("JENAXI_CHAT_BASE", "trl-internal-testing/tiny-Qwen2ForCausalLM-2.5" if SMOKE else "Qwen/Qwen2.5-1.5B-Instruct")
 BASE_LICENSE = "Apache-2.0"
-CFG = dict(lora_r=32, lora_alpha=64, lora_dropout=0.05, lr=2e-4, epochs=2, micro_batch=4, grad_accum=4, max_len=768,
+CFG = dict(lora_r=32, lora_alpha=64, lora_dropout=0.05, lr=2e-4, epochs=2, micro_batch=4, grad_accum=4, max_len=2048,
            max_train_minutes=80, ckpt_minutes=10, n_oasst=3000, n_dolly=1500)
 if SMOKE: CFG.update(epochs=1, micro_batch=2, grad_accum=1, max_len=256, max_train_minutes=2, ckpt_minutes=0.1, n_oasst=20, n_dolly=20)
 CFG.update(json.loads(os.environ.get("JENAXI_CHAT_CONFIG", "{}")))
