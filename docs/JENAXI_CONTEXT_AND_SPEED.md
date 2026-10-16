@@ -24,7 +24,7 @@ These values are read by the Docker supervisor when the box starts:
 | JENA_CHAT_THREADS_BATCH | 3 | Prompt-processing CPU threads |
 | JENA_CHAT_BATCH / JENA_CHAT_UBATCH | 512 / 128 | Logical/physical batch sizes |
 | JENA_KV_CACHE_K / JENA_KV_CACHE_V | q8_0 / q8_0 | Quantized K/V cache types |
-| JENA_FLASH_ATTN | on | Flash Attention: on, off, or auto |
+| JENA_FLASH_ATTN | auto | Let llama.cpp choose Flash Attention when the active backend/model supports it; override with on/off |
 | JENA_SPEC_TYPE | ngram-mod | Set to none to disable speculative decoding |
 | JENA_SPEC_NGRAM_MATCH | 24 | n-gram lookup length |
 | JENA_SPEC_NGRAM_MIN / JENA_SPEC_NGRAM_MAX | 48 / 64 | Speculative draft range |
