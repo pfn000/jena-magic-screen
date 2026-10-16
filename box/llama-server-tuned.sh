@@ -46,7 +46,6 @@ if [[ -n "$CTX_PER_SLOT" ]] && has_option "--kv-unified-per-slot"; then
   ARGS+=(--kv-unified-per-slot "$CTX_PER_SLOT")
   CTX_LABEL="per-slot=$CTX_PER_SLOT"
 else
-  if [[ -n "$CTX_PER_SLOT" ]]; then CTX=$((CTX_PER_SLOT * PARALLEL)); fi
   ARGS+=(-c "$CTX")
   CTX_LABEL="pool=$CTX"
 fi
