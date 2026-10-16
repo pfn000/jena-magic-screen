@@ -67,7 +67,5 @@ if [[ "$SPEC_TYPE" != none ]] && has_option '--spec-type'; then
 fi
 if [[ "$JINJA" == 1 ]] && has_option '--jinja'; then ARGS+=(--jinja); fi
 
-PER_SLOT=$(( (CTX + PARALLEL - 1) / PARALLEL ))
-printf 'Starting %s on %s:%s | context pool=%s | slots=%s | approx max per slot=%s | threads=%s | KV=%s/%s | flash-attn=%s | speculative=%s\n' \
-  "$MODEL_ALIAS" "$HOST" "$PORT" "$CTX" "$PARALLEL" "$PER_SLOT" "$THREADS" "$CACHE_TYPE_K" "$CACHE_TYPE_V" "$FLASH_ATTN" "$SPEC_TYPE" >&2
+printf 'Starting %s on %s:%s | ctx-size-option=%s | ctx-per-slot-option=%s | slots=%s | threads=%s | KV=%s/%s | flash-attn=%s | speculative=%s\n' "$MODEL_ALIAS" "$HOST" "$PORT" "$CTX" "$CTX_PER_SLOT" "$PARALLEL" "$THREADS" "$CACHE_TYPE_K" "$CACHE_TYPE_V" "$FLASH_ATTN" "$SPEC_TYPE" >&2
 exec "$LLAMA_SERVER" "${ARGS[@]}"
