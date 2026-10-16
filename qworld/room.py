@@ -214,7 +214,7 @@ def rug_bands(name, R):
                      (0.74, (1, 1, 1, 1)), (0.76, (1.3, 1.2, 1.12, 1)), (0.84, (1.3, 1.2, 1.12, 1)), (0.86, (0.7, 0.58, 0.92, 1))):
         e = E.new(pos); e.color = col
     mx = N.new('ShaderNodeMix'); mx.data_type = 'RGBA'; mx.blend_type = 'MULTIPLY'; mx.inputs['Factor'].default_value = 1.0
-    nt.links.new(src[0].from_socket, mx.inputs['A']); nt.links.new(cr.outputs['Color'], mx.inputs['B']); nt.links.new(mx.outputs['Result'], b.inputs['Base Color'])
+    nt.links.new(src[0].from_socket, mx.inputs[6]); nt.links.new(cr.outputs['Color'], mx.inputs[7]); nt.links.new(mx.outputs[2], b.inputs['Base Color'])   # colour A/B/Result (Mix has float/vector/colour sockets with the same names)
 rug_bands('rug', 1.02)
 add_bump('duvet', 40.0, 0.18, 0.004)
 add_bump('mattress', 60.0, 0.12, 0.003)

@@ -6,6 +6,6 @@
   "tex-desk"
  ],
  "samples": 128,
- "req": "fx-rug2",
- "note": "rug colour bands; wide + desk re-render"
+ "req": "fx-rug3",
+ "note": "rug colour bands (fixed mix sockets); wide + desk re-render"
 }
