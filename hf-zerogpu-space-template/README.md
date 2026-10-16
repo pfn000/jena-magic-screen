@@ -18,7 +18,7 @@ This is an optional Hugging Face Spaces ZeroGPU worker for request/response mode
 1. In this Space's **Settings → Hardware**, select **ZeroGPU**.
 2. Add Space variables/secrets:
    - **JENAXI_ZEROGPU_MODEL_ID**: a Transformers-compatible model repository. It defaults to **Qwen/Qwen2.5-1.5B-Instruct** as a working baseline; set it to JenaXI's merged Hugging Face model only after that model is published in a Transformers/Safetensors format.
-   - **JENAXI_MAX_INPUT_TOKENS**: input prompt limit, default 8192, maximum 32768 in this template.
+   - **JENAXI_MAX_INPUT_TOKENS**: input prompt limit, default 16384, maximum 32768 in this template.
    - **JENAXI_MAX_NEW_TOKENS**: output cap, default 256, maximum 1024.
    - **HF_TOKEN**: secret only if the chosen model is gated/private.
    - Optional **JENAXI_SYSTEM_PROMPT**.
