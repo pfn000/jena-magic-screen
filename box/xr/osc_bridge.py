@@ -23,6 +23,7 @@ MAPPING_PATH = Path(os.environ.get("NCOM_OSC_MAPPING", str(HERE / "avatar-mappin
 HTTP_PORT = int(os.environ.get("NCOM_OSC_HTTP_PORT", "8765"))
 VRCHAT_SEND_PORT = int(os.environ.get("NCOM_VRCHAT_SEND_PORT", "9000"))
 VRCHAT_RECV_PORT = int(os.environ.get("NCOM_VRCHAT_RECV_PORT", "9001"))
+POSE_DRIVER_PORT = int(os.environ.get("NCOM_OPENVR_POSE_PORT", "18881"))
 SIGNAL_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 PARAM_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 
@@ -245,6 +246,7 @@ class Handler(BaseHTTPRequestHandler):
                 "listen_host": "127.0.0.1",
                 "vrchat_send_port": VRCHAT_SEND_PORT,
                 "vrchat_receive_port": VRCHAT_RECV_PORT,
+                "openvr_pose_port": POSE_DRIVER_PORT,
                 "avatar_id": STATE.avatar_id,
                 "last_seen_at": STATE.last_seen_at,
                 "received_messages": STATE.messages,
@@ -254,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, body)
 
     def do_POST(self) -> None:
-        if self.path != "/v1/signal":
+        if self.path not in {"/v1/signal", "/v1/pose"}:
             self._json(404, {"error": "not found"})
             return
         try:
@@ -262,7 +264,34 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > 8192:
                 raise ValueError("body length must be between 1 and 8192 bytes")
             payload = json.loads(self.rfile.read(length))
-            signal_name = payload.get("signal") if isinstance(payload, dict) else None
+            if not isinstance(payload, dict):
+                raise ValueError("body must be a JSON object")
+
+            if self.path == "/v1/pose":
+                position = payload.get("position")
+                orientation = payload.get("orientation")
+                if not isinstance(position, list) or len(position) != 3:
+                    raise ValueError("position must be [x, y, z] in metres")
+                if not isinstance(orientation, list) or len(orientation) != 4:
+                    raise ValueError("orientation must be quaternion [w, x, y, z]")
+                numbers = position + orientation
+                if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)) for v in numbers):
+                    raise ValueError("pose values must be finite JSON numbers")
+                coords = [float(v) for v in position]
+                quat = [float(v) for v in orientation]
+                if any(abs(v) > 100.0 for v in coords):
+                    raise ValueError("pose position exceeds +/-100 metres")
+                norm = math.sqrt(sum(v * v for v in quat))
+                if norm < 0.5 or norm > 1.5:
+                    raise ValueError("quaternion norm must be between 0.5 and 1.5")
+                quat = [v / norm for v in quat]
+                packet = struct.pack("<7f", *(coords + quat))
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+                    sender.sendto(packet, ("127.0.0.1", POSE_DRIVER_PORT))
+                self._json(200, {"ok": True, "pose_port": POSE_DRIVER_PORT, "position": coords, "orientation": quat})
+                return
+
+            signal_name = payload.get("signal")
             if not isinstance(signal_name, str) or not SIGNAL_RE.fullmatch(signal_name):
                 raise ValueError("signal must be a configured signal key")
             spec = MAPPING.get(signal_name)
@@ -275,15 +304,14 @@ class Handler(BaseHTTPRequestHandler):
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
                 sender.sendto(packet, ("127.0.0.1", VRCHAT_SEND_PORT))
             self._json(200, {"ok": True, "signal": signal_name, "parameter": spec["parameter"], "value": value})
-        except (ValueError, TypeError, json.JSONDecodeError, UnicodeError) as exc:
+        except (ValueError, TypeError, json.JSONDecodeError, UnicodeError, struct.error) as exc:
             self._json(400, {"error": str(exc)[:240]})
         except OSError as exc:
-            self._json(502, {"error": "OSC send failed: " + str(exc)[:180]})
-
+            self._json(502, {"error": "UDP send failed: " + str(exc)[:180]})
 
 def main() -> None:
     global MAPPING
-    if not 1 <= HTTP_PORT <= 65535 or not 1 <= VRCHAT_SEND_PORT <= 65535 or not 1 <= VRCHAT_RECV_PORT <= 65535:
+    if not all(1 <= p <= 65535 for p in (HTTP_PORT, VRCHAT_SEND_PORT, VRCHAT_RECV_PORT, POSE_DRIVER_PORT)):
         raise SystemExit("Ports must be between 1 and 65535")
     try:
         MAPPING = load_mapping(MAPPING_PATH)
