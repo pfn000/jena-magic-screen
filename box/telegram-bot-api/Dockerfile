@@ -12,7 +12,7 @@ RUN git clone --depth 1 --recursive https://github.com/tdlib/telegram-bot-api.gi
 FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3 zlib1g libstdc++6 libgcc-s1 \
+    ca-certificates libssl3 zlib1g libstdc++6 libgcc-s1 bash \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --home-dir /data --create-home --shell /usr/sbin/nologin botapi \
  && mkdir -p /data/files /tmp/telegram-bot-api \
