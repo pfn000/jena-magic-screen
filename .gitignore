@@ -5,3 +5,6 @@ dist/
 public/bg-room.jpg
 public/mediapipe/
 __pycache__/
+
+# Local VRChat avatar-specific OSC parameters; use the committed example as a template.
+box/xr/avatar-mapping.json

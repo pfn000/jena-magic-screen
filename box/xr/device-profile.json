@@ -1,0 +1,59 @@
+{
+  "schema": "ncom.xr.device-profile.v1",
+  "identity": {
+    "vendor": "NCOM Systems",
+    "product": "NCOM Focal OS",
+    "device_id": "ncom.focalos",
+    "device_class": "virtual-hmd",
+    "serial": "NCOM-FOCALOS-VIRTUAL-HMD-001"
+  },
+  "host": {
+    "platform_id": "n.os",
+    "display_name": "N.OS / LinuxOS",
+    "role": "pc-hybrid-xr-host",
+    "note": "The OS is the host PC platform; SteamVR sees a separate HMD device registered by the OpenVR driver."
+  },
+  "runtime": {
+    "steamvr": {
+      "driver_id": "ncom_focalos",
+      "pose_udp_port": 18881,
+      "pose_packet": "7 little-endian IEEE-754 float32 values: x,y,z metres then quaternion w,x,y,z",
+      "render_transport": "prototype-only; a complete compositor/display transport is still required"
+    },
+    "openxr": {
+      "initial_route": "SteamVR OpenXR runtime through the registered OpenVR driver",
+      "ncom_native_runtime": "not implemented in this branch",
+      "vr_environment_blend_mode": "XR_ENVIRONMENT_BLEND_MODE_OPAQUE",
+      "ar_environment_blend_modes": [
+        "XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND",
+        "XR_ENVIRONMENT_BLEND_MODE_ADDITIVE"
+      ],
+      "ar_advertisement_policy": "Only advertise an AR blend mode if the selected runtime and the actual optical/display or passthrough camera pipeline support it."
+    }
+  },
+  "modes": {
+    "vr": {
+      "enabled_when": [
+        "a live pose source is connected",
+        "an XR compositor and display/streaming output path are implemented",
+        "the GPU and runtime support the target application"
+      ]
+    },
+    "ar": {
+      "enabled_when": [
+        "real optical see-through or camera passthrough is available",
+        "the OpenXR runtime can compose with the real-world underlay",
+        "the camera/display permissions and calibration are valid"
+      ]
+    }
+  },
+  "vrchat_osc": {
+    "send_host": "127.0.0.1",
+    "send_port": 9000,
+    "receive_host": "127.0.0.1",
+    "receive_port": 9001,
+    "bridge_http_host": "127.0.0.1",
+    "bridge_http_port": 8765
+  },
+  "status": "integration-profile-and-enumeration-prototype-not-a-finished-certified-xr-runtime"
+}
