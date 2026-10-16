@@ -11,6 +11,7 @@ if [[ ! -f "$GGUF" ]]; then
 fi
 
 export GGUF
+export LLAMA_SERVER="${JENA_LLAMA_SERVER:-/opt/llama/llama-server}"
 export MODEL_ALIAS="${JENA_CHAT_ALIAS:-JenaXI-chat}"
 export HOST="${JENA_CHAT_HOST:-127.0.0.1}"
 export PORT="${JENA_CHAT_PORT:-8091}"
