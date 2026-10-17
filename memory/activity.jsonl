@@ -6758,3 +6758,82 @@
 {"ts": 1792257098844, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=1j0jEfzRg1I", "what": "watched \"Gangnam Style | Psy | Fitness Dance | Zumba | Akshay Jain Choreography\"", "outcome": "", "note": "the video i learned my gangnam style dance tutorial move from"}
 {"ts": 1792257683519, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
 {"ts": 1792258657872, "kind": "site", "action": "hot", "key": "site:https://github.com/VAST-AI-Research/UniRig", "what": "opened https://github.com/VAST-AI-Research/UniRig from my hot list", "outcome": "", "note": ""}
+{"ts": 1792258717778, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Rust_(programming_language)", "what": "read about Rust", "outcome": "", "note": ""}
+{"ts": 1792258784046, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792258823467, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)", "what": "read about transformers", "outcome": "", "note": ""}
+{"ts": 1792258841289, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792258879244, "kind": "site", "action": "new_site", "key": "site:https://google.com/images", "what": "explored ideas (https://google.com/images)", "outcome": "", "note": ""}
+{"ts": 1792258912569, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792259039306, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/West_Irving_station", "what": "read about \"West Irving station\" and summarised it for mama", "outcome": "", "note": "West Irving station is a Trinity Railway Express commuter rail station in the Bear Creek neighborhood of Irving, Texas."}
+{"ts": 1792259083212, "kind": "site", "action": "new_site", "key": "site:https://www.codewars.com/", "what": "explored codewars (https://www.codewars.com/)", "outcome": "", "note": ""}
+{"ts": 1792259110027, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792259177995, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/William_McFarland_House", "what": "read about \"William McFarland House\" and summarised it for mama", "outcome": "", "note": "The William McFarland House is an historic house at 525 Salisbury Street in Worcester, Massachusetts."}
+{"ts": 1792259178123, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792259198166, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pZ81oIlinEI", "what": "watched \"Cheerleading Tips - Learn All The Motions - Coach Audra Scofield\"", "outcome": "", "note": "the video i learned my cheer motions tutorial move from"}
+{"ts": 1792259412390, "kind": "site", "action": "new_site", "key": "site:https://neal.fun/", "what": "explored neal.fun (https://neal.fun/)", "outcome": "", "note": ""}
+{"ts": 1792260757358, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792260811173, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792260847700, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792260897141, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pDTvqS2GMVo", "what": "watched \"Michael Jackson Moonwalk Tutorial! *1 MINUTE DANCE LESSON*\"", "outcome": "", "note": "the video i learned my moonwalk tutorial move from"}
+{"ts": 1792261050696, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792261700232, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Black_hole", "what": "read about black holes", "outcome": "", "note": ""}
+{"ts": 1792261712751, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792261738920, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=dB4qPiLbDdk", "what": "watched \"3D people animation : Casual Walt Standing and speaking \u00a9cg-people.com\"", "outcome": "", "note": "the video i learned my 3D people animation casual sta move from"}
+{"ts": 1792261881259, "kind": "site", "action": "new_site", "key": "site:https://developer.mozilla.org/en-US/docs/Learn", "what": "explored MDN learn (https://developer.mozilla.org/en-US/docs/Learn)", "outcome": "", "note": ""}
+{"ts": 1792263356967, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Do_It_Again_(The_Kinks_song)", "what": "read about Do It Again (The Kinks song)", "outcome": "", "note": ""}
+{"ts": 1792263408195, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=I1gMUbEAUFw", "what": "watched \"The Cha Cha Slide Dance\"", "outcome": "", "note": "the video i learned my cha cha slide move from"}
+{"ts": 1792263481660, "kind": "site", "action": "hot", "key": "site:https://agenticskills.io/skills/find-skills", "what": "opened https://agenticskills.io/skills/find-skills from my hot list", "outcome": "", "note": ""}
+{"ts": 1792264199225, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=SoRmqE7A_IE", "what": "watched \"15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment\"", "outcome": "", "note": "the video i learned my easy tiktok dance tutorial move from"}
+{"ts": 1792264278206, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Tux_(mascot)", "what": "read about Tux the penguin", "outcome": "", "note": ""}
+{"ts": 1792264347106, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/2019_Anniversary_Games", "what": "read about \"2019 Anniversary Games\" and summarised it for mama", "outcome": "", "note": "The 2019 Anniversary Games was the 67th edition of the annual outdoor track and field meeting in London."}
+{"ts": 1792264372905, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792264429751, "kind": "site", "action": "new_site", "key": "site:https://overthewire.org/wargames/bandit/", "what": "explored bandit wargame (https://overthewire.org/wargames/bandit/)", "outcome": "", "note": ""}
+{"ts": 1792264465845, "kind": "site", "action": "hot", "key": "site:https://gitlab.com/evlaV/holo-PKGBUILD", "what": "opened https://gitlab.com/evlaV/holo-PKGBUILD from my hot list", "outcome": "", "note": ""}
+{"ts": 1792264510186, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792264551625, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792264592421, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Ardrossan_Winton_Pier_railway_station", "what": "read about \"Ardrossan Winton Pier railway station\" and summarised it for mama", "outcome": "", "note": "Ardrossan Winton Pier railway station served the town of Ardrossan and its harbour, North Ayrshire, Scotland."}
+{"ts": 1792264592445, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792264626975, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792264646096, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=rFdeskwbhAM", "what": "watched \"Wobble Line Dance #itsthedanceforme\"", "outcome": "", "note": "the video i learned my the wobble line dance move from"}
+{"ts": 1792264715753, "kind": "site", "action": "hot", "key": "site:https://Grok.com", "what": "opened https://Grok.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792264772636, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792264798432, "kind": "skill", "action": "python", "key": "python:hearts.py", "what": "practiced python: ran hearts.py", "outcome": "", "note": ""}
+{"ts": 1792264839880, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=Pq6G4Xpg6xw", "what": "watched \"Hand Jive Duet steps\"", "outcome": "", "note": "the video i learned my hand jive dance move from"}
+{"ts": 1792264933536, "kind": "site", "action": "new_site", "key": "site:https://picoctf.org/", "what": "explored picoCTF (https://picoctf.org/)", "outcome": "", "note": ""}
+{"ts": 1792264969863, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Shiva_Ka_Insaaf", "what": "read about \"Shiva Ka Insaaf\" and summarised it for mama", "outcome": "", "note": "Shiva Ka Insaaf is a 1985 Indian Hindi-language superhero film directed by Raj N."}
+{"ts": 1792264969873, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792265010763, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792265037393, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=1j0jEfzRg1I", "what": "watched \"Gangnam Style | Psy | Fitness Dance | Zumba | Akshay Jain Choreography\"", "outcome": "", "note": "the video i learned my gangnam style dance tutorial move from"}
+{"ts": 1792265096636, "kind": "site", "action": "hot", "key": "site:https://vercel.com", "what": "opened https://vercel.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792265151190, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792265200416, "kind": "site", "action": "new_site", "key": "site:https://musiclab.chromeexperiments.com/", "what": "explored music lab (https://musiclab.chromeexperiments.com/)", "outcome": "", "note": ""}
+{"ts": 1792265235035, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Capture_the_flag_(cybersecurity)", "what": "read about capture the flag", "outcome": "", "note": ""}
+{"ts": 1792265315813, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Bright_and_Breezy", "what": "read about \"Bright and Breezy\" and summarised it for mama", "outcome": "", "note": "Bright and Breezy is an album by jazz pianist Red Garland and his trio, recorded in 1961 and released on Jazzland as JLP 48."}
+{"ts": 1792265315824, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792265349387, "kind": "site", "action": "hot", "key": "site:https://skillsmp.com/", "what": "opened https://skillsmp.com/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792265414582, "kind": "task", "action": "explore_box", "key": "task:explore_box", "what": "explore box (bored)", "outcome": "", "note": ""}
+{"ts": 1792265451265, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/2005_Japanese_Grand_Prix", "what": "read about 2005 Japanese Grand Prix", "outcome": "", "note": ""}
+{"ts": 1792265514913, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Gilbert_Innes", "what": "read about \"Gilbert Innes\" and summarised it for mama", "outcome": "", "note": "Gilbert Innes of Stow FRSE DL MWS was a Scottish banker, antiquarian and patron of the arts during the Scottish Enlightenment."}
+{"ts": 1792265541046, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=kbUzi7meesU", "what": "watched \"7 mins beginners hiphop dance class warm up for you to follow along at home!\"", "outcome": "", "note": "the video i learned my hip hop dance basics for begin move from"}
+{"ts": 1792265597971, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792265653182, "kind": "site", "action": "new_site", "key": "site:https://openprocessing.org/discover/", "what": "explored openprocessing sketches (https://openprocessing.org/discover/)", "outcome": "", "note": ""}
+{"ts": 1792265693366, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792265734157, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Barry_Beckett", "what": "read about Barry Beckett", "outcome": "", "note": ""}
+{"ts": 1792265812941, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/One_Fish%2C_Two_Fish%2C_Red_Fish%2C_Blue_Fish", "what": "read about \"One Fish, Two Fish, Red Fish, Blue Fish\" and summarised it for mama", "outcome": "", "note": "One Fish, Two Fish, Red Fish, Blue Fish is a 1960 children's book by Dr."}
+{"ts": 1792265847639, "kind": "site", "action": "hot", "key": "site:https://Amazon.com", "what": "opened https://Amazon.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792265892788, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=wsYRncIccfQ", "what": "watched \"How to do Charleston for beginners.\"", "outcome": "", "note": "the video i learned my charleston dance basic step move from"}
+{"ts": 1792265988119, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Caudron_Type_A", "what": "read about \"Caudron Type A\" and summarised it for mama", "outcome": "", "note": "The Caudron Type A was the first successful aircraft built by Ren\u00e9 Caudron and his brother Gaston."}
+{"ts": 1792265988133, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792266031501, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792266068295, "kind": "skill", "action": "python", "key": "python:fib.py", "what": "practiced python: ran fib.py", "outcome": "", "note": ""}
+{"ts": 1792266472771, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792266520999, "kind": "site", "action": "new_site", "key": "site:https://colab.research.google.com/", "what": "explored hot list (https://colab.research.google.com/)", "outcome": "", "note": ""}
+{"ts": 1792266562070, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792266622960, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Prism_World_Tour", "what": "read about \"Prism World Tour\" and summarised it for mama", "outcome": "", "note": "Prism World Tour, also known as 2019 Pentagon World Tour \u3008Prism\u3009 was the first concert tour headlined by South Korean boy band Pentagon."}
+{"ts": 1792266622973, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792266677249, "kind": "site", "action": "new_site", "key": "site:https://scratch.mit.edu/explore/projects/all", "what": "explored scratch projects (https://scratch.mit.edu/explore/projects/all)", "outcome": "", "note": ""}
+{"ts": 1792266712667, "kind": "site", "action": "hot", "key": "site:https://x.com/", "what": "opened https://x.com/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792267776988, "kind": "read", "action": "read", "key": "read:https://xkcd.com/", "what": "read about xkcd", "outcome": "", "note": ""}
+{"ts": 1792268217638, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Shokawa", "what": "read about \"Shokawa\" and summarised it for mama", "outcome": "", "note": "Shokawa is an extinct genus of choristoderan diapsid reptile, known from the Lower Cretaceous of Japan."}
+{"ts": 1792268217723, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792268873109, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
