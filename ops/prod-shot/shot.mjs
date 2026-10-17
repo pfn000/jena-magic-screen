@@ -54,7 +54,14 @@ if (SET === 'sitepass') {   // site pass: main page at desktop + phone, the no-G
     page.on('console', (m) => { const t = m.text(); if (/room|webgpu|error|warn/i.test(t)) logs.push(m.type() + ': ' + t.slice(0, 300)); });
     const t0 = Date.now();
     await page.goto(base + '/', { waitUntil: 'load', timeout: 90000 });
-    const adapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
+    const adapter = await page.evaluate(async () => {
+      const d = { gpu: !!navigator.gpu };
+      try { const a = await navigator.gpu.requestAdapter(); d.adapter = !!a; const c = await navigator.gpu.requestAdapter({ featureLevel: 'compatibility', powerPreference: 'low-power' }); d.adapterCompat = !!c;
+        if (c) { const feats = [...c.features]; d.features = feats.length; try { const dev = await c.requestDevice({ requiredFeatures: feats }); d.device = !!dev; dev.destroy(); } catch (e) { d.deviceErr = String(e).slice(0, 200); }
+          try { const dev2 = await c.requestDevice(); d.devicePlain = !!dev2; dev2.destroy(); } catch (e) { d.devicePlainErr = String(e).slice(0, 200); } }
+      } catch (e) { d.err = String(e).slice(0, 200); }
+      return d;
+    });
     await page.waitForFunction(roomDone, null, { timeout: 240000, polling: 1000 }).catch((e) => logs.push('wait: ' + String(e).slice(0, 200)));
     await page.waitForTimeout(5000);
     const st = await page.evaluate(() => window.__roomBg ? JSON.parse(JSON.stringify(window.__roomBg)) : null).catch(() => null);
