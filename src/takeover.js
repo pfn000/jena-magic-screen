@@ -325,12 +325,12 @@ export function openTakeover({ source = 'takeover', title } = {}) {
       const k = await window.jenaTrust?.ensureMama?.('Taking over her desktop');
       if (k && !closed) return connect();
     }
-    if (!r.ok) { st.textContent = r.summary || 'could not connect'; if (!r.auth) retry(); return; }
+    if (!r.ok) { st.textContent = r.auth ? 'signed out · sign in again to keep her desk' : (r.summary || 'could not connect'); if (!r.auth) retry(); return; }
     if (r.phone) w.dataset.portrait = r.phone.join('x');
     ctl?.destroy();
     ctl = mountTakeover(body, { ws: r.ws, protocol: r.protocol, onState: (s) => {
       if (s === 'connected') { tries = 0; tick(); }
-      else if (!closed && s === 'dropped') { st.textContent = 'reconnecting…'; retry(); }   // phone slept / tunnel blip: back in, same session, never gives up
+      else if (!closed && (s === 'dropped' || s === 'closed')) { st.textContent = 'reconnecting…'; retry(); }   // any disconnect not from ✓ Done (phone slept, tunnel blip, clean server close): back in, same session, never gives up
       else if (!closed) st.textContent = 'disconnected';
     } });
     w.ctl = ctl;
