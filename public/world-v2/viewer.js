@@ -9,6 +9,17 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // Baked lighting: diffuse light comes only from the Cycles lightmap; the panorama gives reflections, not a second diffuse fill.
+// duvet: its quilt creases baked black in places (lightmap texels inside the puffs); a small max-dilation of the lightmap
+// fills those holes from the lit texels around them (the bake leaves a 10 px margin per island, so nothing bleeds in)
+const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', `
+  vec2 lmPx = 1.0 / vec2( textureSize( lightMap, 0 ) );
+  vec3 lmMax = lightMapTexel.rgb;
+  for ( int i = 0; i < 8; i ++ ) {
+    float a = float( i ) * 0.7853982;
+    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a ), sin( a ) ) * lmPx * 3.0 ).rgb );
+    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a + 0.39 ), sin( a + 0.39 ) ) * lmPx * 7.0 ).rgb );
+  }
+  vec3 lightMapIrradiance = mix( lightMapTexel.rgb, lmMax, 0.8 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 THREE.ShaderChunk.lights_fragment_maps = THREE.ShaderChunk.lights_fragment_maps.replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 
 const Q = new URLSearchParams(location.search);
@@ -75,6 +86,7 @@ gltf.scene.traverse(o => {
   for (const m of mats) {
     if (m.aoMap) { m.aoMap = null; }
     if (hasLM) { m.lightMap = lm; m.lightMapIntensity = LM_SCALE * Math.PI; n++; LMMATS.push(m); }
+    if (hasLM && m.name === 'duvet' && !Q.has('rawlm')) { m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_maps>', DUVET_LM); }; m.customProgramCacheKey = () => 'duvet-dilate'; }
     if (/^sky/i.test(m.name)) { SKYMATS.push(m); continue; }
     if (m.emissive && (m.emissiveIntensity > 0) && m.emissive.getHex() !== 0) EMATS.push([m, m.emissiveIntensity]);
     m.envMapIntensity = hasLM ? 0.9 : 1.0;
@@ -106,10 +118,12 @@ setLook(Q.get('look') === 'day' ? 'day' : 'night');
 
 const tmp = new THREE.Vector3();
 // presets are framed for 16:9; on a tall phone screen keep the same horizontal view instead of cropping to a sliver
-function fitFov(f) {
+// (portrait cap: ?vmax= degrees of vertical view; the seated chair view gets a wider cap so the desk is not a zoomed sliver)
+function fitFov(f, name) {
   const a = innerWidth / innerHeight; if (a >= 16 / 9) return f;
   const h = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(f) / 2) * 16 / 9);
-  return Math.min(90, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / a)) * 0.82);
+  const cap = parseFloat(Q.get('vmax') || (name === 'chair' && a < 1 ? '104' : '90'));
+  return Math.min(cap, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / a)) * 0.82);
 }
 let CUR = 'wide';
 function goto(name, instant) {
@@ -117,16 +131,16 @@ function goto(name, instant) {
   document.querySelectorAll('#bar button[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === name));
   const p0 = camera.position.clone(), t0 = controls.target.clone(), f0 = camera.fov;
   const p1 = new THREE.Vector3(...c.position), t1 = new THREE.Vector3(...c.target);
-  if (name === 'chair' && innerWidth < innerHeight) {   // tall phone: lean back in the seat so the desk + both monitors fit (was a zoomed sliver)
+  if (name === 'chair' && innerWidth < innerHeight) {   // tall phone: sit a touch higher/back in the seat (?lean=metres to try others)
     const back = p1.clone().sub(t1).setY(0).normalize();
-    p1.addScaledVector(back, 0.38); p1.y += 0.06;
+    p1.addScaledVector(back, parseFloat(Q.get('lean') ?? '0.06')); p1.y += parseFloat(Q.get('rise') ?? '0.04');
   }
   if (name === 'chair') t1.sub(p1).normalize().multiplyScalar(0.02).add(p1);   // seated: orbit around the eyes = look around from the chair
   const dur = instant ? 0 : 900, start = performance.now();
   function step(now) {
     const k = dur ? Math.min(1, (now - start) / dur) : 1, e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
     camera.position.lerpVectors(p0, p1, e); controls.target.lerpVectors(t0, t1, e);
-    camera.fov = f0 + (fitFov(c.fov) - f0) * e; camera.updateProjectionMatrix();
+    camera.fov = f0 + (fitFov(c.fov, name) - f0) * e; camera.updateProjectionMatrix();
     if (k < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -141,7 +155,7 @@ function clampInside() {
   p.x = THREE.MathUtils.clamp(p.x, -ROOM.x, ROOM.x); p.z = THREE.MathUtils.clamp(p.z, -ROOM.zb, ROOM.zf); p.y = THREE.MathUtils.clamp(p.y, ROOM.y0, ROOM.y1);
 }
 addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight; const cc = CAMS[CUR]; if (cc) camera.fov = fitFov(cc.fov); camera.updateProjectionMatrix();
+  camera.aspect = innerWidth / innerHeight; const cc = CAMS[CUR]; if (cc) camera.fov = fitFov(cc.fov, CUR); camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
 let frames = 0;

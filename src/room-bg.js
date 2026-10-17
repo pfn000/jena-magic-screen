@@ -20,6 +20,17 @@ const log = (...a) => console.info('[room]', ...a);
 // Baked lighting: diffuse light comes only from the lightmap; the panorama adds reflections, not a second fill.
 // Patched per material (onBeforeCompile), so her avatar's materials are never touched.
 const NO_IBL_DIFFUSE = THREE.ShaderChunk.lights_fragment_maps.replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
+// duvet: its quilt creases baked black in places (lightmap texels inside the puffs); a small max-dilation of the lightmap
+// fills those holes from the lit texels around them (the bake leaves a 10 px margin per island, so nothing bleeds in)
+const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', `
+  vec2 lmPx = 1.0 / vec2( textureSize( lightMap, 0 ) );
+  vec3 lmMax = lightMapTexel.rgb;
+  for ( int i = 0; i < 8; i ++ ) {
+    float a = float( i ) * 0.7853982;
+    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a ), sin( a ) ) * lmPx * 3.0 ).rgb );
+    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a + 0.39 ), sin( a + 0.39 ) ) * lmPx * 7.0 ).rgb );
+  }
+  vec3 lightMapIrradiance = mix( lightMapTexel.rgb, lmMax, 0.8 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 const LOOKS = {
   night: { lmFile: 'lightmap.webp', envFile: 'env.hdr', ext: 'exterior_night.jpg', lms: 4.0, bg: 0x05040a, emis: 1.0, exp: 1.5, sky: 1.3 },
   day: { lmFile: 'lightmap_day.webp', envFile: 'env_day.hdr', ext: 'exterior_day.jpg', lms: 8.0, bg: 0xbcd3f0, emis: 0.13, exp: 1.1, sky: 1.0 },
@@ -114,8 +125,9 @@ async function build(mode, look) {
       }
       if (hasLM) {
         m.lightMap = lm; m.lightMapIntensity = L.lms * Math.PI;
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_maps>', NO_IBL_DIFFUSE); };
-        m.customProgramCacheKey = () => 'room-baked';
+        const duvet = m.name === 'duvet', chunk = duvet ? DUVET_LM : NO_IBL_DIFFUSE;
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_maps>', chunk); };
+        m.customProgramCacheKey = () => (duvet ? 'room-duvet' : 'room-baked');
       }
       if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) m.emissiveIntensity *= L.emis;
       m.envMapIntensity = hasLM ? 0.9 : 1.0;

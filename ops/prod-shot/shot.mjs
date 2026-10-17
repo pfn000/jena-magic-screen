@@ -30,13 +30,23 @@ async function shot(sz, path, file, waitFn, settle) {
 }
 const roomDone = () => window.__roomBg && ['shown', 'fallback', 'off'].includes(window.__roomBg.state);
 const viewerReady = () => window.__ready === true;
-for (const sz of SIZES) await shot(sz, '/', `main-${sz.name}.png`, roomDone, 4000);
-await shot(SIZES[0], '/?look=day', 'main-1600-day.png', roomDone, 4000);
-await shot(SIZES[1], '/?look=day', 'main-390-day.png', roomDone, 4000);
-for (const sz of SIZES) await shot(sz, '/world-v2/?cam=chair&shot=1', `world-chair-${sz.name}.png`, viewerReady, 3000);
-for (const look of ['night', 'day']) {
-  await shot(SIZES[0], `/world-v2/?cam=bed&look=${look}&shot=1&nobar`, `world-bed-1600-${look}.png`, viewerReady, 3000);
-  await shot(SIZES[1], `/world-v2/?cam=bed&look=${look}&shot=1`, `world-bed-390-${look}.png`, viewerReady, 3000);
+const SET = process.env.SET || 'all';
+if (SET === 'all' || SET === 'main') {
+  for (const sz of SIZES) await shot(sz, '/', `main-${sz.name}.png`, roomDone, 4000);
+  await shot(SIZES[0], '/?look=day', 'main-1600-day.png', roomDone, 4000);
+  await shot(SIZES[2], '/?look=day', 'main-402-day.png', roomDone, 4000);
+}
+if (SET === 'all' || SET === 'world') {
+  for (const sz of SIZES) await shot(sz, '/world-v2/?cam=chair&shot=1', `world-chair-${sz.name}.png`, viewerReady, 3000);
+  for (const look of ['night', 'day']) {
+    await shot(SIZES[0], `/world-v2/?cam=bed&look=${look}&shot=1&nobar`, `world-bed-1600-${look}.png`, viewerReady, 3000);
+    await shot(SIZES[1], `/world-v2/?cam=bed&look=${look}&shot=1`, `world-bed-390-${look}.png`, viewerReady, 3000);
+  }
+}
+if (SET === 'chairtry') {   // phone chair framing variants (viewer ?lean= ?rise= ?vmax=)
+  for (const [k, q] of [['base90', 'lean=0&rise=0&vmax=90'], ['v104', 'lean=0&rise=0&vmax=104'], ['v112', 'lean=0&rise=0&vmax=112'], ['l12v104', 'lean=0.12&rise=0.04&vmax=104']])
+    await shot(SIZES[2], `/world-v2/?cam=chair&shot=1&${q}`, `chairtry-402-${k}.png`, viewerReady, 2500);
+  await shot(SIZES[0], '/world-v2/?cam=bed&look=night&shot=1&nobar&rawlm=1', 'world-bed-1600-night-rawlm.png', viewerReady, 3000);
 }
 fs.writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1));
 await browser.close();

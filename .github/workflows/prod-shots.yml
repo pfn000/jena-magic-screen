@@ -7,6 +7,7 @@ on:
       base: { description: 'site base URL', required: false, default: 'https://jena-magic-screen.vercel.app' }
       expect: { description: 'commit sha prefix /api/config must report first (empty = no wait)', required: false, default: '' }
       tag: { description: 'label for the output folder', required: false, default: 'prod' }
+      set: { description: 'all | main | world | chairtry', required: false, default: 'all' }
 permissions:
   contents: read
 jobs:
@@ -28,7 +29,7 @@ jobs:
           done
           echo "deploy never reported $EXPECT"; exit 1
       - name: Shoot
-        env: { BASE: "${{ inputs.base }}" }
+        env: { BASE: "${{ inputs.base }}", SET: "${{ inputs.set }}" }
         run: |
           mkdir -p /tmp/pw shots && cp ops/prod-shot/shot.mjs /tmp/pw/shot.mjs
           (cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.48.2 >/dev/null && npx playwright install --with-deps chromium >/dev/null)
