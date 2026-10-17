@@ -4,7 +4,7 @@
 // the N•OS glass wallpaper (window.__nos.setWallpaper) or, without N•OS, to a canvas inside #bg.
 // Phones and weak laptops (iPhone, Intel N200 4 GB) render ONE frame at a capped size, then free the GPU entirely
 // (scene, textures and the WebGL context are disposed); only strong desktops keep a slow drifting camera.
-// Renderer: WebGPU (three/webgpu, loaded only on devices whose browser exposes navigator.gpu and returns an adapter),
+// Renderer: WebGPU (three/webgpu, loaded only for the live room on strong desktops whose browser returns a WebGPU adapter),
 // else WebGL2 (OpenGL ES 3.0 in the browser). A WebGPU start or frame that fails falls back to WebGL2 on the spot.
 // No GPU at all, a load error or a slow network leaves the plain dark gradient (#bg); the old bg-room.jpg is gone.
 // URL: ?gpu=webgl forces WebGL2, ?gpu=webgpu skips the adapter pre-check.
@@ -95,9 +95,12 @@ function show(frame) {
 }
 function refresh() { if (shownIn === 'nos') window.__nos?.refreshWallpaper?.(); }
 
-async function webgpuOK() {
+async function webgpuOK(mode) {
   if (Q.get('gpu') === 'webgl' || !navigator.gpu) return false;
   if (Q.get('gpu') === 'webgpu') return true;
+  // a still (phones, weak laptops) is ONE frame and then the GPU is freed: WebGPU buys nothing there, so stills keep the
+  // proven WebGL2 look; the live drifting room on strong desktops gets WebGPU
+  if (mode !== 'live') return false;
   try { return !!(await Promise.race([navigator.gpu.requestAdapter(), new Promise((r) => setTimeout(() => r(null), 3000))])); } catch { return false; }
 }
 async function makeRenderer(canvas, mode, kind) {
@@ -140,7 +143,7 @@ function blankFrame(c) {
 }
 
 async function build(mode, look) {
-  const order = (await webgpuOK()) ? ['webgpu', 'webgl'] : ['webgl'];
+  const order = (await webgpuOK(mode)) ? ['webgpu', 'webgl'] : ['webgl'];
   let err = null;
   for (const kind of order) {
     try { const R2 = await buildWith(mode, look, kind); state.renderer = kind; return R2; }
