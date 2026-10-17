@@ -117,6 +117,10 @@ function goto(name, instant) {
   document.querySelectorAll('#bar button[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === name));
   const p0 = camera.position.clone(), t0 = controls.target.clone(), f0 = camera.fov;
   const p1 = new THREE.Vector3(...c.position), t1 = new THREE.Vector3(...c.target);
+  if (name === 'chair' && innerWidth < innerHeight) {   // tall phone: lean back in the seat so the desk + both monitors fit (was a zoomed sliver)
+    const back = p1.clone().sub(t1).setY(0).normalize();
+    p1.addScaledVector(back, 0.38); p1.y += 0.06;
+  }
   if (name === 'chair') t1.sub(p1).normalize().multiplyScalar(0.02).add(p1);   // seated: orbit around the eyes = look around from the chair
   const dur = instant ? 0 : 900, start = performance.now();
   function step(now) {

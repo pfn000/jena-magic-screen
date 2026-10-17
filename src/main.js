@@ -739,6 +739,8 @@ else window.__jenaObsReload = requestObsReload;
 
 window.__jenaMobile = mobileShell({ obs: cfg.obs });
 try { mountNOS({ obs: cfg.obs }); } catch (e) { console.warn('[nos] glass UI failed to start', e); }
+// Jena's 3D room as the live background (lazy, after first paint; falls back to bg-room.jpg): src/room-bg.js
+if (!cfg.obs && !cfg.bgNone) import('./room-bg.js').then((m) => m.mountRoomBg({ obs: cfg.obs, waitFor: () => avatar.ready || document.body.classList.contains('avatar-still') })).catch((e) => console.warn('[room] background failed to start', e));
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';

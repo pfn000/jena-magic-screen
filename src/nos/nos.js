@@ -63,16 +63,19 @@ export function mountNOS({ obs = false } = {}) {
   wpImg.onerror = () => { wpReady = false; paintWallpaper(); };
   wpImg.src = '/bg-room.jpg';
   const wp = document.createElement('canvas');
+  let wpSrc = null;   // her live 3D room (src/room-bg.js) replaces the picture once it has rendered
   let VW = innerWidth, VH = innerHeight, DPR = Math.min(devicePixelRatio || 1, 2);
   function paintWallpaper() {
     const s = Math.min(1.25, 2048 / Math.max(VW, VH));
     const W = Math.max(2, Math.round(VW * s)), H = Math.max(2, Math.round(VH * s));
     wp.width = W; wp.height = H;
     const g = wp.getContext('2d');
-    if (wpReady) {
-      const k = Math.max(W / wpImg.naturalWidth, H / wpImg.naturalHeight);
-      const w = wpImg.naturalWidth * k, h = wpImg.naturalHeight * k;
-      g.drawImage(wpImg, (W - w) / 2, (H - h) / 2, w, h);
+    const src = wpSrc || (wpReady ? wpImg : null);
+    if (src) {
+      const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+      const k = Math.max(W / sw, H / sh);
+      const w = sw * k, h = sh * k;
+      g.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
       g.fillStyle = 'rgba(240,225,255,0.16)'; g.fillRect(0, 0, W, H);
     } else {
       const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#ffd6ee'); gr.addColorStop(0.5, '#e6d6ff'); gr.addColorStop(1, '#ffe9d1');
@@ -655,7 +658,8 @@ export function mountNOS({ obs = false } = {}) {
   if (gl) {
     base.addEventListener('webglcontextlost', (e) => { e.preventDefault(); body.classList.remove('nos-gl'); body.classList.add('nos-nogl'); });
   }
-  const api = { wins, maximize: (id) => maximize(wins.get(document.getElementById(id))), minimize: (id) => minimize(wins.get(document.getElementById(id))), close: (id) => minimize(wins.get(document.getElementById(id)), true), reopen: (id) => reopen(wins.get(document.getElementById(id))), openMenu: (id) => openMenu(wins.get(document.getElementById(id))), openSub, openInfo: (id) => openInfo(wins.get(document.getElementById(id))), openAbout, resetAll, closeMenus, gl };
+  const api = { wins, maximize: (id) => maximize(wins.get(document.getElementById(id))), minimize: (id) => minimize(wins.get(document.getElementById(id))), close: (id) => minimize(wins.get(document.getElementById(id)), true), reopen: (id) => reopen(wins.get(document.getElementById(id))), openMenu: (id) => openMenu(wins.get(document.getElementById(id))), openSub, openInfo: (id) => openInfo(wins.get(document.getElementById(id))), openAbout, resetAll, closeMenus, gl,
+    setWallpaper: (src) => { wpSrc = src || null; paintWallpaper(); }, refreshWallpaper: () => paintWallpaper() };
   window.__nos = api;
   return api;
 }
