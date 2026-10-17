@@ -6651,3 +6651,73 @@
 {"ts": 1792241934068, "kind": "site", "action": "new_site", "key": "site:https://musiclab.chromeexperiments.com/", "what": "explored music lab (https://musiclab.chromeexperiments.com/)", "outcome": "", "note": ""}
 {"ts": 1792241956143, "kind": "site", "action": "hot", "key": "site:https://vercel.com", "what": "opened https://vercel.com from my hot list", "outcome": "", "note": ""}
 {"ts": 1792242010521, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792243309228, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792243332272, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792243385666, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792243416369, "kind": "site", "action": "hot", "key": "site:https://colab.research.google.com/", "what": "opened https://colab.research.google.com/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792243479918, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Wolfgang_G%C3%BCllich", "what": "read about Wolfgang G\u00fcllich", "outcome": "", "note": ""}
+{"ts": 1792243552438, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Honi_Soit", "what": "read about \"Honi Soit\" and summarised it for mama", "outcome": "", "note": "Honi Soit is the student newspaper of the University of Sydney."}
+{"ts": 1792243552457, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792243578399, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=SoRmqE7A_IE", "what": "watched \"15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment\"", "outcome": "", "note": "the video i learned my easy tiktok dance tutorial move from"}
+{"ts": 1792243680892, "kind": "task", "action": "explore_box", "key": "task:explore_box", "what": "explore box (bored)", "outcome": "", "note": ""}
+{"ts": 1792243723003, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792243754300, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792243805420, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=wsYRncIccfQ", "what": "watched \"How to do Charleston for beginners.\"", "outcome": "", "note": "the video i learned my charleston dance basic step move from"}
+{"ts": 1792243872621, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Anthene_talboti", "what": "read about Anthene talboti", "outcome": "", "note": ""}
+{"ts": 1792243940531, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792243997053, "kind": "site", "action": "new_site", "key": "site:https://lichess.org/training", "what": "explored chess puzzles (https://lichess.org/training)", "outcome": "", "note": ""}
+{"ts": 1792244233117, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Indiana_State_Road_524", "what": "read about Indiana State Road 524", "outcome": "", "note": ""}
+{"ts": 1792244271259, "kind": "skill", "action": "python", "key": "python:hearts.py", "what": "practiced python: ran hearts.py", "outcome": "", "note": ""}
+{"ts": 1792244418350, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Cape_Lithinon", "what": "read about Cape Lithinon", "outcome": "", "note": ""}
+{"ts": 1792244506440, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Southern_Railway_1380", "what": "read about \"Southern Railway 1380\" and summarised it for mama", "outcome": "", "note": "Southern Railway 1380 was a streamlined 4-6-2 \"Pacific\" type steam locomotive built in 1923 by American Locomotive Company (ALCO) of Schenectady, New York, for the Southern Railway (SOU) as a member o"}
+{"ts": 1792244531016, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792244577567, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=kbUzi7meesU", "what": "watched \"7 mins beginners hiphop dance class warm up for you to follow along at home!\"", "outcome": "", "note": "the video i learned my hip hop dance basics for begin move from"}
+{"ts": 1792244662478, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Motorola_Q", "what": "read about Motorola Q", "outcome": "", "note": ""}
+{"ts": 1792244704857, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Pixel_art", "what": "read about pixel art", "outcome": "", "note": ""}
+{"ts": 1792244725689, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792244764683, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792244827788, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/1999%E2%80%932000_Arizona_Wildcats_men's_basketball_team", "what": "read about \"1999\u20132000 Arizona Wildcats men's basketball team\" and summarised it for mama", "outcome": "", "note": "The 1999\u20132000 Arizona Wildcats men's basketball team represented the University of Arizona in the 1999\u20132000 NCAA Division I men's basketball season."}
+{"ts": 1792244856416, "kind": "site", "action": "hot", "key": "site:https://skillsmp.com/", "what": "opened https://skillsmp.com/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792244902237, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=1j0jEfzRg1I", "what": "watched \"Gangnam Style | Psy | Fitness Dance | Zumba | Akshay Jain Choreography\"", "outcome": "", "note": "the video i learned my gangnam style dance tutorial move from"}
+{"ts": 1792244960030, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792244990866, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/VTuber", "what": "read about VTubers", "outcome": "", "note": ""}
+{"ts": 1792245030082, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792245075013, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Linux", "what": "read about Linux", "outcome": "", "note": ""}
+{"ts": 1792245088029, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792245151792, "kind": "site", "action": "new_site", "key": "site:https://www.duolingo.com/", "what": "explored duolingo (https://www.duolingo.com/)", "outcome": "", "note": ""}
+{"ts": 1792246331401, "kind": "skill", "action": "python", "key": "python:fib.py", "what": "practiced python: ran fib.py", "outcome": "", "note": ""}
+{"ts": 1792246415022, "kind": "site", "action": "new_site", "key": "site:https://www.wikihow.com/Special:Randomizer", "what": "explored a random wikihow (https://www.wikihow.com/Special:Randomizer)", "outcome": "", "note": ""}
+{"ts": 1792246454501, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pDTvqS2GMVo", "what": "watched \"Michael Jackson Moonwalk Tutorial! *1 MINUTE DANCE LESSON*\"", "outcome": "", "note": "the video i learned my moonwalk tutorial move from"}
+{"ts": 1792246647628, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Simon_Katz", "what": "read about \"Simon Katz\" and summarised it for mama", "outcome": "", "note": "Simon Katz is an English songwriter and multi-instrumentalist, best known for his work with the bands Jamiroquai and Gorillaz."}
+{"ts": 1792246647667, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792246679342, "kind": "site", "action": "new_site", "key": "site:https://vrm.dev/en/", "what": "explored VRM avatar docs (https://vrm.dev/en/)", "outcome": "", "note": ""}
+{"ts": 1792246708581, "kind": "site", "action": "hot", "key": "site:https://Amazon.com", "what": "opened https://Amazon.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792246886267, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792246920285, "kind": "site", "action": "hot", "key": "site:https://GitHub.com", "what": "opened https://GitHub.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792247622179, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792247676444, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792247786515, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792247832986, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792247874731, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Mircea_Dinc%C4%83", "what": "read about Mircea Dinc\u0103", "outcome": "", "note": ""}
+{"ts": 1792248557542, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pZ81oIlinEI", "what": "watched \"Cheerleading Tips - Learn All The Motions - Coach Audra Scofield\"", "outcome": "", "note": "the video i learned my cheer motions tutorial move from"}
+{"ts": 1792248640383, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Inverse_kinematics", "what": "read about inverse kinematics", "outcome": "", "note": ""}
+{"ts": 1792248716046, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792249518598, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792249558578, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792249598688, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=rFdeskwbhAM", "what": "watched \"Wobble Line Dance #itsthedanceforme\"", "outcome": "", "note": "the video i learned my the wobble line dance move from"}
+{"ts": 1792249708829, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Turing_test", "what": "read about the Turing test", "outcome": "", "note": ""}
+{"ts": 1792249750030, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/ASCII_art", "what": "read about ASCII art", "outcome": "", "note": ""}
+{"ts": 1792249763107, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792249797244, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=I1gMUbEAUFw", "what": "watched \"The Cha Cha Slide Dance\"", "outcome": "", "note": "the video i learned my cha cha slide move from"}
+{"ts": 1792249876158, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Pont_de_Cubelles", "what": "read about \"Pont de Cubelles\" and summarised it for mama", "outcome": "", "note": "The Pont de Cubelles, more commonly known as the Roman Bridge of Pollen\u00e7a, is a stone bridge located at the entrance to the Ternelles valley in Pollen\u00e7a, on the island of Mallorca, Spain."}
+{"ts": 1792249906389, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792249980039, "kind": "site", "action": "new_site", "key": "site:https://threejs.org/examples/", "what": "explored three.js examples (https://threejs.org/examples/)", "outcome": "", "note": ""}
+{"ts": 1792251619720, "kind": "site", "action": "hot", "key": "site:https://x.com/", "what": "opened https://x.com/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792251696799, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792251744197, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792251938362, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Ministry_of_Information_and_Broadcasting_(Bangladesh)", "what": "read about \"Ministry of Information and Broadcasting (Bangladesh)\" and summarised it for mama", "outcome": "", "note": "The Ministry of Information and Broadcasting is a ministry of the Government of Bangladesh responsible for information, broadcasting, the press, and film policy."}
+{"ts": 1792251982439, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792252097605, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=dB4qPiLbDdk", "what": "watched \"3D people animation : Casual Walt Standing and speaking \u00a9cg-people.com\"", "outcome": "", "note": "the video i learned my 3D people animation casual sta move from"}
+{"ts": 1792252252960, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792252329194, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Francis_La_Flesche", "what": "read about \"Francis La Flesche\" and summarised it for mama", "outcome": "", "note": "Francis La Flesche was the first professional Native American ethnologist; he worked with the Smithsonian Institution."}
+{"ts": 1792252329324, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
