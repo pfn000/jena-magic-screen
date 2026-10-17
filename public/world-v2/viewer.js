@@ -10,7 +10,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // Baked lighting: diffuse light comes only from the Cycles lightmap; the panorama gives reflections, not a second diffuse fill.
 // duvet: its quilt creases baked black in blocky patches (lightmap texels inside the puffs). Fill the dark holes from the
-// lit neighbourhood: average the lit samples on 3 rings (4/10/18 texels, dark ones ignored) and never go below 85% of it.
+// lit neighbourhood: average the lit samples on 3 rings (4/10/18 texels, dark ones ignored); the duvet takes mostly that
+// smooth average (80%), so neither the black holes nor the blocky low-res texels show.
 const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', `
   vec2 lmPx = 1.0 / vec2( textureSize( lightMap, 0 ) );
   vec3 lmS[ 24 ]; float lmPeak = dot( lightMapTexel.rgb, vec3( 0.333 ) );
@@ -24,7 +25,7 @@ const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIr
   vec3 lmSum = vec3( 0.0 ); float lmN = 0.0;
   for ( int i = 0; i < 24; i ++ ) { float w = step( lmPeak * 0.35, dot( lmS[ i ], vec3( 0.333 ) ) ); lmSum += lmS[ i ] * w; lmN += w; }
   vec3 lmFill = lmN > 0.0 ? lmSum / lmN : lightMapTexel.rgb;
-  vec3 lightMapIrradiance = max( lightMapTexel.rgb, lmFill * 0.85 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
+  vec3 lightMapIrradiance = mix( lmFill, max( lightMapTexel.rgb, lmFill * 0.85 ), 0.2 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 THREE.ShaderChunk.lights_fragment_maps = THREE.ShaderChunk.lights_fragment_maps.replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 
 const Q = new URLSearchParams(location.search);

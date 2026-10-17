@@ -21,7 +21,8 @@ const log = (...a) => console.info('[room]', ...a);
 // Patched per material (onBeforeCompile), so her avatar's materials are never touched.
 const NO_IBL_DIFFUSE = THREE.ShaderChunk.lights_fragment_maps.replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 // duvet: its quilt creases baked black in blocky patches (lightmap texels inside the puffs). Fill the dark holes from the
-// lit neighbourhood: average the lit samples on 3 rings (4/10/18 texels, dark ones ignored) and never go below 85% of it.
+// lit neighbourhood: average the lit samples on 3 rings (4/10/18 texels, dark ones ignored); the duvet takes mostly that
+// smooth average (80%), so neither the black holes nor the blocky low-res texels show.
 const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', `
   vec2 lmPx = 1.0 / vec2( textureSize( lightMap, 0 ) );
   vec3 lmS[ 24 ]; float lmPeak = dot( lightMapTexel.rgb, vec3( 0.333 ) );
@@ -35,7 +36,7 @@ const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIr
   vec3 lmSum = vec3( 0.0 ); float lmN = 0.0;
   for ( int i = 0; i < 24; i ++ ) { float w = step( lmPeak * 0.35, dot( lmS[ i ], vec3( 0.333 ) ) ); lmSum += lmS[ i ] * w; lmN += w; }
   vec3 lmFill = lmN > 0.0 ? lmSum / lmN : lightMapTexel.rgb;
-  vec3 lightMapIrradiance = max( lightMapTexel.rgb, lmFill * 0.85 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
+  vec3 lightMapIrradiance = mix( lmFill, max( lightMapTexel.rgb, lmFill * 0.85 ), 0.2 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 const LOOKS = {
   night: { lmFile: 'lightmap.webp', envFile: 'env.hdr', ext: 'exterior_night.jpg', lms: 4.0, bg: 0x05040a, emis: 1.0, exp: 1.5, sky: 1.3 },
   day: { lmFile: 'lightmap_day.webp', envFile: 'env_day.hdr', ext: 'exterior_day.jpg', lms: 8.0, bg: 0xbcd3f0, emis: 0.13, exp: 1.1, sky: 1.0 },
