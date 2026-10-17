@@ -905,3 +905,5 @@
 - 2026-10-17 15:11 **Pont de Cubelles**: The Pont de Cubelles, more commonly known as the Roman Bridge of Pollença, is a stone bridge located at the entrance to the Ternelles valley in Pollença, on the island of Mallorca, Spain. (https://en.wikipedia.org/wiki/Pont_de_Cubelles)
 - 2026-10-17 15:45 **Ministry of Information and Broadcasting (Bangladesh)**: The Ministry of Information and Broadcasting is a ministry of the Government of Bangladesh responsible for information, broadcasting, the press, and film policy. (https://en.wikipedia.org/wiki/Ministry_of_Information_and_Broadcasting_(Bangladesh))
 - 2026-10-17 15:52 **Francis La Flesche**: Francis La Flesche was the first professional Native American ethnologist; he worked with the Smithsonian Institution. (https://en.wikipedia.org/wiki/Francis_La_Flesche)
+- 2026-10-17 16:09 **Ohtsuro Dam**: Ohtsuro Dam is a gravity dam located in Fukui Prefecture in Japan. (https://en.wikipedia.org/wiki/Ohtsuro_Dam)
+- 2026-10-17 16:35 **Ministry of Defence of Georgia**: idk, my brain doesn't know live stuff. want me to search it so it's not made up? (https://en.wikipedia.org/wiki/Ministry_of_Defence_of_Georgia)

@@ -6721,3 +6721,40 @@
 {"ts": 1792252252960, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
 {"ts": 1792252329194, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Francis_La_Flesche", "what": "read about \"Francis La Flesche\" and summarised it for mama", "outcome": "", "note": "Francis La Flesche was the first professional Native American ethnologist; he worked with the Smithsonian Institution."}
 {"ts": 1792252329324, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792253223421, "kind": "mama", "action": "mama", "key": "mama_takeover", "what": "mama had my desktop for 15 min. she opened: debian OS terminal command for system upgrade - Google Searc. she closed: Francis La Flesche - Wikipedia \u2014 Mozilla Firefox. files she changed or made: notes", "outcome": "done", "note": "mama took over my desktop"}
+{"ts": 1792253236098, "kind": "site", "action": "new_site", "key": "site:https://github.com/explore", "what": "explored github explore (https://github.com/explore)", "outcome": "", "note": ""}
+{"ts": 1792253270339, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=Pq6G4Xpg6xw", "what": "watched \"Hand Jive Duet steps\"", "outcome": "", "note": "the video i learned my hand jive dance move from"}
+{"ts": 1792253275249, "kind": "learned", "action": "watch_mama", "key": "mama:20261017-155206", "what": "watched mama do something on my desktop and wrote down how (private notes for mama)", "outcome": "steps saved", "note": ""}
+{"ts": 1792253371299, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Ohtsuro_Dam", "what": "read about \"Ohtsuro Dam\" and summarised it for mama", "outcome": "", "note": "Ohtsuro Dam is a gravity dam located in Fukui Prefecture in Japan."}
+{"ts": 1792253371332, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792253404569, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792253440290, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Octopus", "what": "read about octopuses", "outcome": "", "note": ""}
+{"ts": 1792253483621, "kind": "skill", "action": "python", "key": "python:hearts.py", "what": "practiced python: ran hearts.py", "outcome": "", "note": ""}
+{"ts": 1792253540337, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=SoRmqE7A_IE", "what": "watched \"15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment\"", "outcome": "", "note": "the video i learned my easy tiktok dance tutorial move from"}
+{"ts": 1792253607219, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Neural_network_(machine_learning)", "what": "read about neural networks", "outcome": "", "note": ""}
+{"ts": 1792254137019, "kind": "task", "action": "summarise", "key": "task:summarise", "what": "summarise (bored)", "outcome": "", "note": ""}
+{"ts": 1792254191113, "kind": "site", "action": "new_site", "key": "site:https://www.typingclub.com/", "what": "explored typing practice (https://www.typingclub.com/)", "outcome": "", "note": ""}
+{"ts": 1792254226164, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Tetris", "what": "read about Tetris", "outcome": "", "note": ""}
+{"ts": 1792254242955, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792254276018, "kind": "site", "action": "hot", "key": "site:https://google.com", "what": "opened https://google.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792254329622, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792254391682, "kind": "site", "action": "new_site", "key": "site:https://pixeljoint.com/", "what": "explored pixel art gallery (https://pixeljoint.com/)", "outcome": "", "note": ""}
+{"ts": 1792254476647, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792254584592, "kind": "task", "action": "explore_box", "key": "task:explore_box", "what": "explore box (bored)", "outcome": "", "note": ""}
+{"ts": 1792254676083, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792254716962, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=kbUzi7meesU", "what": "watched \"7 mins beginners hiphop dance class warm up for you to follow along at home!\"", "outcome": "", "note": "the video i learned my hip hop dance basics for begin move from"}
+{"ts": 1792254793958, "kind": "site", "action": "new_site", "key": "site:https://www.shadertoy.com/", "what": "explored shadertoy (https://www.shadertoy.com/)", "outcome": "", "note": ""}
+{"ts": 1792254828746, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life", "what": "read about Conway's Game of Life", "outcome": "", "note": ""}
+{"ts": 1792254848955, "kind": "task", "action": "summarise", "key": "task:summarise", "what": "summarise (bored)", "outcome": "", "note": ""}
+{"ts": 1792254956381, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Ministry_of_Defence_of_Georgia", "what": "read about \"Ministry of Defence of Georgia\" and summarised it for mama", "outcome": "", "note": "idk, my brain doesn't know live stuff. want me to search it so it's not made up?"}
+{"ts": 1792254956540, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (bored)", "outcome": "", "note": ""}
+{"ts": 1792255197770, "kind": "site", "action": "new_site", "key": "site:https://xkcd.com/", "what": "explored xkcd (https://xkcd.com/)", "outcome": "", "note": ""}
+{"ts": 1792255220906, "kind": "site", "action": "hot", "key": "site:https://open-design.ai/", "what": "opened https://open-design.ai/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792255272511, "kind": "skill", "action": "python", "key": "python:fib.py", "what": "practiced python: ran fib.py", "outcome": "", "note": ""}
+{"ts": 1792255321803, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=wsYRncIccfQ", "what": "watched \"How to do Charleston for beginners.\"", "outcome": "", "note": "the video i learned my charleston dance basic step move from"}
+{"ts": 1792256524300, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (bored)", "outcome": "", "note": ""}
+{"ts": 1792256604390, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (bored)", "outcome": "", "note": ""}
+{"ts": 1792256857573, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (bored)", "outcome": "", "note": ""}
+{"ts": 1792257098844, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=1j0jEfzRg1I", "what": "watched \"Gangnam Style | Psy | Fitness Dance | Zumba | Akshay Jain Choreography\"", "outcome": "", "note": "the video i learned my gangnam style dance tutorial move from"}
+{"ts": 1792257683519, "kind": "task", "action": "note", "key": "task:note", "what": "note (bored)", "outcome": "", "note": ""}
+{"ts": 1792258657872, "kind": "site", "action": "hot", "key": "site:https://github.com/VAST-AI-Research/UniRig", "what": "opened https://github.com/VAST-AI-Research/UniRig from my hot list", "outcome": "", "note": ""}
