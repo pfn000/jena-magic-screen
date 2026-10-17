@@ -297,40 +297,40 @@ export async function takeoverToken(extra = {}) {
 }
 export const takeoverDone = () => mama({ op: 'end' });
 
-export function openTakeover({ minutes = 0, source = 'takeover', title } = {}) {
+export function openTakeover({ source = 'takeover', title } = {}) {
   css();
   document.getElementById('mama-takeover')?.remove();
   const w = document.createElement('section');
   w.id = 'mama-takeover';
-  w.innerHTML = `<header><b>🖐 ${title || (minutes ? "you have Jena's desk · her hands are paused" : "you're driving Jena's desktop")}</b>
-    <span class="tk-st">connecting…</span>${minutes ? '<button class="tk-more" title="15 more minutes">+15m</button>' : ''}
+  w.innerHTML = `<header><b>🖐 ${title || "you have Jena's desk · it's yours until you press Done"}</b>
+    <span class="tk-st">connecting…</span>
     ${document.fullscreenEnabled ? '<button class="tk-fs" title="fullscreen">⛶</button>' : ''}<button class="tk-done">✓ Done</button></header><div class="tk-body" style="flex:1;min-height:0"></div>`;
   document.body.appendChild(w);
   const st = w.querySelector('.tk-st'), body = w.querySelector('.tk-body');
-  let ctl = null, until = minutes ? Date.now() + minutes * 60000 : 0, closed = false, tries = 0, authTried = false;
+  let ctl = null, closed = false, tries = 0, authTried = false;   // infinite hold: no countdown, only ✓ Done ends it
   const phone = isPhoneView();
   w.dataset.phone = phone ? '1' : '0';
   const tick = () => {
     if (!ctl?.state.connected) return;
-    if (until) { const s = Math.max(0, Math.round((until - Date.now()) / 1000)); st.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`; if (!s) finish(); }
-    else st.textContent = phone ? 'connected · phone mode' : 'connected';
+    st.textContent = phone ? 'connected · phone mode' : 'connected';
   };
   const timer = setInterval(tick, 1000);
+  const retry = () => { if (!closed) setTimeout(connect, Math.min(30000, 1500 * 2 ** Math.min(tries++, 5))); };   // retry forever: 1.5 s, 3, 6, 12, 24, then every 30 s
   const connect = async () => {
     st.textContent = tries ? 'reconnecting…' : 'connecting…';
-    const r = await takeoverToken({ minutes, source });
+    const r = await takeoverToken({ source, infinite: true });
     if (closed) return;
     if (!r.ok && r.auth && !authTried) {   // key missing in this tab: the one trusted check (cookie / Face ID), then straight back in
       authTried = true;
       const k = await window.jenaTrust?.ensureMama?.('Taking over her desktop');
       if (k && !closed) return connect();
     }
-    if (!r.ok) { st.textContent = r.summary || 'could not connect'; if (!r.auth && tries++ < 5) setTimeout(connect, 3000); return; }
+    if (!r.ok) { st.textContent = r.summary || 'could not connect'; if (!r.auth) retry(); return; }
     if (r.phone) w.dataset.portrait = r.phone.join('x');
     ctl?.destroy();
     ctl = mountTakeover(body, { ws: r.ws, protocol: r.protocol, onState: (s) => {
       if (s === 'connected') { tries = 0; tick(); }
-      else if (!closed && s === 'dropped' && (!until || Date.now() < until) && tries++ < 6) setTimeout(connect, 1500);   // phone slept / tunnel blip: back in, same session
+      else if (!closed && s === 'dropped') { st.textContent = 'reconnecting…'; retry(); }   // phone slept / tunnel blip: back in, same session, never gives up
       else if (!closed) st.textContent = 'disconnected';
     } });
     w.ctl = ctl;
@@ -345,7 +345,6 @@ export function openTakeover({ minutes = 0, source = 'takeover', title } = {}) {
     setTimeout(() => w.remove(), 4500);
   };
   w.querySelector('.tk-done').onclick = finish;
-  w.querySelector('.tk-more')?.addEventListener('click', async () => { until = Math.max(until, Date.now()) + 15 * 60000; await mama({ op: 'extend', minutes: 15 }); tick(); });
   w.querySelector('.tk-fs')?.addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else w.requestFullscreen?.().catch(() => {}); });
   connect();
   return w;

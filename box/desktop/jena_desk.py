@@ -208,20 +208,30 @@ def wants_new_tab(text):
 tabs_opened = {'n': 0}   # tabs she opened on top of the first one (hard cap below); the site reuses the current tab otherwise
 MAX_EXTRA_TABS = 2
 
+def workarea():
+    """the usable desktop (x, y, w, h) per the window manager: below the N•OS menu bar, above the dock (_NET_WORKAREA)"""
+    try:
+        v = [int(x) for x in re.findall(r'\d+', sh(['xprop', '-root', '_NET_WORKAREA']).split('=', 1)[1])[:4]]
+        if len(v) == 4 and v[2] > 200 and v[3] > 200: return tuple(v)
+    except Exception: pass
+    W, H = screen_size()
+    return 0, 26, W, H - 26 - 64
+
 def firefox(url, new_tab=False):
     """open url in her Firefox. ALWAYS the current tab (focus, Ctrl+L, type, Enter) unless new_tab=True, which only
     mama's own words ('open X in a new tab' / 'new window') set; and at most MAX_EXTRA_TABS extra tabs ever."""
     if hands_blocked(): return None     # mama is driving, or her Firefox profile is busy in the private sign-in window
     wid = find('firefox')
     W, H = screen_size()
-    fw, fh = min(1180, W - 60), H - 70
+    wx, wy, ww, wh = workarea()
+    fw, fh = min(1180, ww - 40), max(200, wh - 31 - 8)   # 31 = the window frame (30 px glass title bar + 1 px border)
     if not wid:
         spawn(['firefox-esr', '--new-instance', '--profile', os.path.join(HOME, '.ffprofile'), '--width', str(fw), '--height', str(fh), url])
         wid = wait_for('firefox', 40)
         tabs_opened['n'] = 0
         if wid:
             time.sleep(4)
-            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{W - fw - 20},8,{fw},{fh}'])
+            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{wx + ww - fw - 20},{wy + 4},{fw},{fh}'])   # below the N•OS menu bar, above the dock
             try:  # if memory gets tight, the browser goes first, never her brain
                 for pid in sh(['pgrep', '-u', str(os.getuid()), '-f', 'firefox-esr']).split():
                     open(f'/proc/{pid}/oom_score_adj', 'w').write('800')
@@ -245,8 +255,9 @@ def notes():
         wid = wait_for('mousepad', 20)
         if wid:
             time.sleep(1.5)
-            W, H = screen_size()
-            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{W - 620},{H - 400},600,360'])
+            wx, wy, ww, wh = workarea()
+            nh = min(360, wh - 31 - 8)
+            sh(['wmctrl', '-i', '-r', wid, '-e', f'0,{wx + ww - 620},{max(wy + 4, wy + wh - nh - 31 - 6)},600,{nh}'])
     if wid:
         focus(wid)
     return wid
@@ -724,8 +735,9 @@ def tidy_private_pages():
     would cover it anyway, but the page itself should not stay up on her public desktop)"""
     for w in windows():
         if 'firefox' in w['cls'] and PRIVATE_PAGE.search(w['title'] or ''):
-            did('mama left a sign-in page open in my browser, closing it before I go on', 'help')
-            focus(w['id']); key('ctrl+l'); time.sleep(0.2); type_('about:blank\n', delay=20); time.sleep(0.8)
+            # her page stays exactly where mama left it (its own tab): Jena only puts a blank tab on top for the public view
+            did('mama left a sign-in page open in my browser, putting a blank tab over it (her page stays in its tab)', 'help')
+            focus(w['id']); key('ctrl+t'); time.sleep(0.6)
             break
 
 def unstick():
@@ -802,12 +814,23 @@ def act_read(topic=None):
 def notes_reset():
     # her editor and the file disagree (unsaved edits, or the file changed under it): close it without saving
     # and open the file fresh, so what she sees is exactly what's in thoughts.txt
+    tk = globals().get('TK')
+    mp = [x for x in windows() if 'mousepad' in x['cls']]
+    if any('thoughts.txt' not in x['title'] or (tk is not None and tk.protected(x['id'])) for x in mp):
+        did("left my editor alone: mama's edits / another file are open in it", 'hands')   # never throw away her unsaved work
+        return None
     sh(['pkill', '-u', 'jena', '-x', 'mousepad']); time.sleep(1)
     return notes()
 
 def act_note(extra=None):
     w = find('mousepad')
-    if w and any(x['id'] == w and x['title'].startswith('*') for x in windows()): notes_reset()
+    tk = globals().get('TK')
+    if w and any(x['id'] == w and 'thoughts.txt' not in x['title'] for x in windows()): return   # mama's file is up: don't type into it
+    if w and any(x['id'] == w and x['title'].startswith('*') for x in windows()):
+        if tk is not None and tk.protected(w):
+            focus(w); key('ctrl+s'); time.sleep(1.2)       # mama typed here: save her edits, never discard them
+        if any(x['id'] == w and x['title'].startswith('*') for x in windows()):
+            if notes_reset() is None: return
     if not notes(): return
     with lock:
         s = screen.get('summary', '')
@@ -836,7 +859,8 @@ def act_note(extra=None):
 
 def act_tidy():
     # sometimes she closes stuff so it's not always the same three windows
-    ws = [w for w in windows() if 'tint2' not in w['cls']]
+    tk = globals().get('TK')
+    ws = [w for w in windows() if 'tint2' not in w['cls'] and not (tk is not None and tk.protected(w['id']))]   # never mama's windows
     if len(ws) <= 1: return
     w = random.choice(ws)
     if 'mousepad' in w['cls']:

@@ -5,9 +5,14 @@
 #    output off -> --fb Wx704 (and back: --fb 1600x704 -> output on at 1600x704). x11vnc runs with -xrandr.
 #    The public / OBS view holds the last censored frame meanwhile (censor.set_hold), so the stream never glitches.
 #    JenaOS (another builder) adapts through /home/jena/jenaos/mode.sh phone|desktop when that script exists.
-#  * 60-MIN PAUSE: a takeover with minutes=N (double-click on the desktop panel) pauses Jena's own hands until
-#    mama says done or N minutes pass, even across a dropped connection. The flag is ~/.jena/mama_takeover.json
-#    ({"active": true, "until": <epoch s>, ...}); her desk agent's hands_blocked() and autonomy read it.
+#  * INFINITE HOLD (Saidie, Oct 16 2026 9:02 PM: "set desktop takeover to be infinite"): once mama takes over, Jena's own
+#    hands stay paused until MAMA ends it (✓ Done -> POST /box/mama/takeover op:end -> done()). No timer, no minutes cap, a
+#    dropped connection or closed tab does NOT end it, and it survives a jena-desk restart (boot() re-arms it from the flag).
+#    'minutes' from the site is kept only as information; 'extend' is a harmless no-op. A sign-in hand-off (source signin*)
+#    is a tool flow with its own Done and still ends when its window closes. The flag is ~/.jena/mama_takeover.json
+#    ({"active": true, "infinite": true, "until": 0, ...}); her desk agent's hands_blocked() and autonomy read it.
+#  * HER CHANGES STAY: windows mama opened or worked in during a takeover are remembered (~/.jena/mama_windows.json);
+#    Jena's autonomy never closes or retypes into them (protected()). Only phone mode's display size goes back to 1600x704.
 #  * WHAT CHANGED: when the pause ends, Jena gets a plain summary of what mama changed (windows opened/closed,
 #    files touched in her home), in her activity memory + ~/.jena/memory/mama_takeover_last.md. Nothing is reset.
 import json, os, subprocess, threading, time
@@ -20,12 +25,13 @@ FLAG = os.path.join(STATE, 'mama_takeover.json')
 MEMDIR = os.path.join(STATE, 'memory')
 MODE_SH = os.path.join(HOME, 'jenaos', 'mode.sh')
 GRACE_S = 20            # a dropped phone connection keeps portrait this long, so a quick reconnect doesn't flip twice
-PAUSE_GRACE_S = 60      # ...and a dropped timed takeover keeps Jena paused this long; after that the flag clears by itself
+PAUSE_GRACE_S = 60      # (old timed sessions only; unused since the infinite hold — kept so nothing importing it breaks)
+KEEP = os.path.join(STATE, 'mama_windows.json')   # window ids mama opened / worked in: Jena's autonomy leaves them alone
 ENV = {**os.environ, 'DISPLAY': DISPLAY}
 
 _lock = threading.RLock()
 S = {'sessions': 0, 'mode': 'desktop', 'phone': None, 'since': 0, 'until': 0, 'source': None, 'before': None,
-     'drop_at': 0, 'saved_geo': None, 'marker': None, 'log': []}
+     'drop_at': 0, 'saved_geo': None, 'marker': None, 'log': [], 'hold': False, 'minutes': 0, 'touched': set()}
 _hooks = {'censor': None, 'did': None, 'memory': None}
 
 def _log(*a):
@@ -119,6 +125,11 @@ def _restore_display():
     _run('xrandr', '--output', 'screen', '--mode', f'{DESK_W}x{DESK_H}')
     return screen_size() == (DESK_W, DESK_H)
 
+def _wa_top():
+    rc, out = _run('xprop', '-root', '_NET_WORKAREA')
+    try: return int(out.split('=', 1)[1].split(',')[1])
+    except Exception: return 26
+
 def exit_phone(reason=''):
     with _lock:
         ok = _restore_display()
@@ -131,7 +142,7 @@ def exit_phone(reason=''):
             if not o: continue
             if not o.get('max'):
                 _run('wmctrl', '-i', '-r', w['id'], '-b', 'remove,maximized_vert,maximized_horz')
-                _run('wmctrl', '-i', '-r', w['id'], '-e', f"0,{o['x']},{max(0, o['y'] - 28)},{o['w']},{o['h']}")
+                _run('wmctrl', '-i', '-r', w['id'], '-e', f"0,{o['x']},{max(_wa_top(), o['y'] - 28)},{o['w']},{o['h']}")   # never under the N•OS menu bar
         was = S['mode']
         S['mode'], S['phone'], S['saved_geo'] = 'desktop', None, None
         _hold(False)
@@ -142,22 +153,57 @@ def exit_phone(reason=''):
 # ------------------------------------------------------------------ pause flag + what changed
 def _write_flag():
     os.makedirs(STATE, exist_ok=True)
-    d = {'active': paused(), 'since': S['since'], 'until': S['until'], 'source': S['source'], 'phone': S['mode'] == 'phone',
-         'connected': S['sessions'] > 0, 'updated': time.time(),
-         'note': 'mama has the desktop: Jena\'s own hands/autonomy pause until "until" (epoch s) or until active is false'}
+    d = {'active': paused(), 'infinite': bool(S['hold']), 'since': S['since'], 'until': S['until'], 'minutes': S['minutes'],
+         'source': S['source'], 'phone': S['mode'] == 'phone', 'connected': S['sessions'] > 0, 'updated': time.time(),
+         'note': 'mama has the desktop: Jena\'s own hands/autonomy pause until mama presses Done (active goes false); no timer'}
     tmp = FLAG + '.tmp'
     with open(tmp, 'w') as f: json.dump(d, f)
     os.replace(tmp, FLAG)
 
 def paused():
-    return S['sessions'] > 0 or time.time() < S['until']
+    # infinite: a held takeover never times out; only done() (mama's ✓ Done / op:end) clears S['hold']
+    return S['sessions'] > 0 or bool(S['hold'] and S['since'])
+
+# ---- windows mama opened or worked in: kept as she left them (Jena's autonomy must not close / retype into them)
+def _wid(w):
+    try: return int(str(w), 16) if str(w).lower().startswith('0x') else int(w)
+    except Exception: return None
+
+def _load_keep():
+    try: return set(int(x) for x in json.load(open(KEEP)).get('ids', []))
+    except Exception: return set()
+
+def _save_keep(ids):
+    try:
+        os.makedirs(STATE, exist_ok=True)
+        tmp = KEEP + '.tmp'
+        with open(tmp, 'w') as f: json.dump({'ids': sorted(ids), 'updated': time.time()}, f)
+        os.replace(tmp, KEEP)
+    except Exception as e: _log('keep write', e)
+
+def _remember_windows():
+    """windows opened since the takeover began + windows mama focused, added to the keep list (closed ones pruned)"""
+    live = {_wid(w['id']) for w in _windows()}
+    before = set((S.get('before') or {}).get('ids') or [])
+    keep = (_load_keep() | {i for i in live if i not in before} | set(S['touched'])) & live
+    keep.discard(None)
+    _save_keep(keep)
+    return keep
+
+def protected(wid):
+    """True if mama opened or worked in this window during a takeover (or one is on right now): leave it as she left it"""
+    i = _wid(wid)
+    if i is None: return False
+    if paused(): return True
+    return i in _load_keep()
 
 def _snapshot():
     marker = os.path.join(STATE, '.takeover-marker')
     try:
         with open(marker, 'w') as f: f.write(str(time.time()))
     except Exception: marker = None
-    return {'windows': [w['title'] for w in _windows()], 'ts': time.time()}, marker
+    ws = _windows()
+    return {'windows': [w['title'] for w in ws], 'ids': [_wid(w['id']) for w in ws], 'ts': time.time()}, marker
 
 SKIP = ('.cache', '.mozilla', '.ffprofile', '.jena', '.jena-mama', '__pycache__', '.local/share', 'learned', 'library', '.npm', 'Videos', 'jena-repo/.git')
 def _changed_files(marker, limit=25):
@@ -210,8 +256,12 @@ def _summarize():
 def _finish(reason):
     with _lock:
         if S['mode'] == 'phone': exit_phone(reason)
+        if S['since']:
+            try: _remember_windows()
+            except Exception as e: _log('remember windows', e)
         text = _summarize() if S['since'] else ''
-        S.update(since=0, until=0, source=None, before=None, marker=None, drop_at=0)
+        S.update(since=0, until=0, source=None, before=None, marker=None, drop_at=0, hold=False, minutes=0)
+        S['touched'] = set()
         _write_flag()
         return text
 
@@ -219,7 +269,7 @@ def _finish(reason):
 def params(b):
     b = b or {}
     out = {'source': str(b.get('source') or 'takeover')[:30]}
-    try: out['minutes'] = max(1, min(120, int(b.get('minutes') or 0))) if b.get('minutes') else 0
+    try: out['minutes'] = max(0, int(b.get('minutes') or 0))   # information only: the hold has no timer (no 1..120 cap)
     except Exception: out['minutes'] = 0
     ph = b.get('phone')
     if isinstance(ph, dict):
@@ -269,8 +319,10 @@ def begin(p):
             S['since'] = time.time()
             S['before'], S['marker'] = _snapshot()
             S['source'] = p.get('source') or 'takeover'
-        if p.get('minutes'):
-            S['until'] = max(S['until'], time.time() + 60 * p['minutes'])
+        if not str(p.get('source') or 'takeover').startswith('signin'):
+            S['hold'] = True            # infinite: holds until mama's Done, whatever the minutes said
+        if p.get('minutes'): S['minutes'] = int(p['minutes'])
+        S['until'] = 0
         phone = False
         if p.get('phone'):
             phone = enter_phone(p['phone'])
@@ -288,27 +340,29 @@ def end():
         if S['sessions'] == 0:
             S['drop_at'] = time.time()
         _write_flag()
-        _log('end', 'sessions', S['sessions'], 'until', int(S['until'] - time.time()) if S['until'] else 0)
-        if S['sessions'] == 0 and time.time() >= S['until']:
-            pass   # the watchdog finishes it after GRACE_S (a reconnect within the grace keeps phone mode)
+        _log('end', 'sessions', S['sessions'], 'hold', S['hold'])
+        # a dropped connection / closed tab does NOT end a held takeover: only mama's Done does (done()).
+        # The watchdog only flips phone mode back after GRACE_S (and ends an un-held sign-in hand-off).
 
 def done(extra=None):
     """mama pressed Done / Give it back: end the pause now"""
     with _lock:
         S['until'] = 0
+        S['hold'] = False
         if S['sessions'] == 0: return _finish('mama done')
         _write_flag()
         return ''
 
 def extend(minutes):
+    """no timer any more (infinite hold): extending just (re)confirms the hold; returns 0 = no expiry"""
     with _lock:
-        S['until'] = max(S['until'], time.time()) + 60 * max(1, min(60, int(minutes)))
+        if S['since']: S['hold'] = True
         _write_flag()
-        return S['until']
+        return 0
 
 def status():
     return {'paused': paused(), 'sessions': S['sessions'], 'mode': S['mode'], 'phone': S['phone'], 'since': S['since'],
-            'until': S['until'], 'left_s': max(0, int(S['until'] - time.time())) if S['until'] else None, 'source': S['source'],
+            'until': 0, 'left_s': None, 'infinite': bool(S['hold']), 'source': S['source'],
             'screen': screen_size(), 'log': S['log'][-8:]}
 
 def door(b):
@@ -324,15 +378,15 @@ def _watch():
         try:
             with _lock:
                 idle = S['sessions'] == 0
+                if not idle and S['since']:
+                    a = _wid(_run('xdotool', 'getactivewindow', timeout=3)[1].strip() or 'x')
+                    if a: S['touched'].add(a)          # a window mama works in: kept as she leaves it
                 if idle and S['drop_at'] and time.time() - S['drop_at'] > GRACE_S:
-                    if S['mode'] == 'phone': exit_phone('connection closed')
-                    # no mama connected any more: the pause ends too (a test or a closed tab never leaves her paused);
-                    # a timed (double-click) session gets PAUSE_GRACE_S so a phone that slept can reconnect into it
-                    if S['since'] and (time.time() >= S['until'] or time.time() - S['drop_at'] > PAUSE_GRACE_S):
-                        S['until'] = 0; _finish('closed')
-                    if not S['since']: S['drop_at'] = 0
-                elif idle and S['since'] and S['until'] and time.time() >= S['until']:
-                    _finish('time up')
+                    if S['mode'] == 'phone': exit_phone('connection closed')   # only the display size goes back
+                    # INFINITE HOLD: a dropped connection never ends mama's takeover; only an un-held sign-in hand-off ends here
+                    if S['since'] and not S['hold']:
+                        _finish('closed')
+                    S['drop_at'] = 0
                 elif idle and not S['since'] and S['mode'] == 'phone':
                     exit_phone('no session')
         except Exception as e:
@@ -346,6 +400,18 @@ def boot():
         _restore_display()
     try:
         d = json.load(open(FLAG))
-        if d.get('active'): d['active'] = False; d['note'] = 'cleared at desk restart'; json.dump(d, open(FLAG, 'w'))
+        if d.get('active') and d.get('infinite') and d.get('since'):
+            # mama's infinite takeover survives a desk restart: still hers until she presses Done
+            with _lock:
+                S.update(since=float(d['since']), until=0, source=d.get('source') or 'takeover', hold=True,
+                         minutes=int(d.get('minutes') or 0), drop_at=0, sessions=0)
+                S['before'] = {'windows': [], 'ids': [], 'ts': S['since']}
+                _write_flag()
+            _log('boot: mama\'s takeover is still on (infinite) since', int(S['since']))
+        elif d.get('active'):
+            d['active'] = False; d['note'] = 'cleared at desk restart'
+            tmp = FLAG + '.tmp'
+            with open(tmp, 'w') as f: json.dump(d, f)
+            os.replace(tmp, FLAG)
     except Exception: pass
     threading.Thread(target=_watch, daemon=True, name='takeover-watch').start()

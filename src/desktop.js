@@ -94,7 +94,7 @@ export class Desktop {
     if (OBS) return;
     window.addEventListener('jena-trusted', () => { if (this.mode !== 'mama' && this.wantsMama()) { clearTimeout(this.watchRetry); this.startMama(); } });
     const isMama = () => this.mode === 'mama' || !!localStorage.getItem('jena.dmKey');
-    const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ minutes: 60, source: 'double_click' })); };
+    const go = () => { if (!isMama() || document.getElementById('mama-takeover')) return; import('./takeover.js').then((m) => m.openTakeover({ source: 'double_click' })); };
     // capture phase: noVNC's own mouse/touch handlers on the canvas stop these events from bubbling
     // a mouse double-click is detected from two pointerdowns: noVNC captures the pointer on mousedown (its capture
     // div takes the mouseup), so the browser's own dblclick lands on <body>, never on this panel (1600 px bug).
