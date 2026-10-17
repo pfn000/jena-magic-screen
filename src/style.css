@@ -19,8 +19,8 @@ body { background: #f3dcef; overflow: hidden; }
 button, input { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
 
-#bg { position: fixed; inset: 0; background: url('/bg-room.jpg') center / cover no-repeat; }
-#bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255, 240, 250, 0.05), rgba(240, 225, 255, 0.28)); backdrop-filter: blur(1.5px); }
+#bg { position: fixed; inset: 0; background: radial-gradient(120% 90% at 70% 20%, #2a1d36 0%, #150f1d 55%, #07060b 100%); }   /* her 3D room (src/room-bg.js) is the background; no WebGL = this plain dark gradient (the old bg-room.jpg picture is gone) */
+#bg > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 body.bg-none, body.bg-none #bg { background: transparent; }
 body.bg-none #bg { display: none; }
 

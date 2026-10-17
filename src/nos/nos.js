@@ -57,11 +57,8 @@ export function mountNOS({ obs = false } = {}) {
   body.classList.toggle('nos-gl', gl);
   if (!gl) body.classList.add('nos-nogl');
 
-  /* wallpaper: her room, cover-fit to the viewport (same picture #bg showed) */
-  const wpImg = new Image(); let wpReady = false;
-  wpImg.onload = () => { wpReady = true; paintWallpaper(); };
-  wpImg.onerror = () => { wpReady = false; paintWallpaper(); };
-  wpImg.src = '/bg-room.jpg';
+  /* wallpaper: her live 3D room (src/room-bg.js), cover-fit; until it renders (or with no WebGL) a plain dark gradient.
+     The old static bg-room.jpg picture is gone (Saidie, Oct 16 2026). */
   const wp = document.createElement('canvas');
   let wpSrc = null;   // her live 3D room (src/room-bg.js) replaces the picture once it has rendered
   let VW = innerWidth, VH = innerHeight, DPR = Math.min(devicePixelRatio || 1, 2);
@@ -70,7 +67,7 @@ export function mountNOS({ obs = false } = {}) {
     const W = Math.max(2, Math.round(VW * s)), H = Math.max(2, Math.round(VH * s));
     wp.width = W; wp.height = H;
     const g = wp.getContext('2d');
-    const src = wpSrc || (wpReady ? wpImg : null);
+    const src = wpSrc;
     if (src) {
       const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
       const k = Math.max(W / sw, H / sh);
@@ -78,7 +75,7 @@ export function mountNOS({ obs = false } = {}) {
       g.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
       g.fillStyle = 'rgba(240,225,255,0.16)'; g.fillRect(0, 0, W, H);
     } else {
-      const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#ffd6ee'); gr.addColorStop(0.5, '#e6d6ff'); gr.addColorStop(1, '#ffe9d1');
+      const gr = g.createRadialGradient(W * 0.7, H * 0.2, 0, W * 0.7, H * 0.2, Math.hypot(W, H) * 0.9); gr.addColorStop(0, '#2a1d36'); gr.addColorStop(0.55, '#150f1d'); gr.addColorStop(1, '#07060b');
       g.fillStyle = gr; g.fillRect(0, 0, W, H);
     }
     for (const G of [G1, G2]) if (G) G.upload(wp);

@@ -43,6 +43,36 @@ if (SET === 'all' || SET === 'world') {
     await shot(SIZES[1], `/world-v2/?cam=bed&look=${look}&shot=1`, `world-bed-390-${look}.png`, viewerReady, 3000);
   }
 }
+if (SET === 'sitepass') {   // site pass: main page at desktop + phone, the no-GPU fallback, and a WebGPU-enabled Chromium
+  await shot(SIZES[0], '/', 'main-1600.png', roomDone, 5000);
+  await shot(SIZES[2], '/', 'main-402.png', roomDone, 5000);
+  await shot(SIZES[0], '/?room=0', 'fallback-1600-room-off.png', () => document.readyState === 'complete', 5000);
+  const gpuBrowser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPU', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  try {
+    const ctx = await gpuBrowser.newContext({ viewport: { width: 1600, height: 900 }, timezoneId: 'America/New_York' });
+    const page = await ctx.newPage(); const logs = [];
+    page.on('console', (m) => { const t = m.text(); if (/room|webgpu|error|warn/i.test(t)) logs.push(m.type() + ': ' + t.slice(0, 300)); });
+    const t0 = Date.now();
+    await page.goto(base + '/', { waitUntil: 'load', timeout: 90000 });
+    const adapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
+    await page.waitForFunction(roomDone, null, { timeout: 240000, polling: 1000 }).catch((e) => logs.push('wait: ' + String(e).slice(0, 200)));
+    await page.waitForTimeout(5000);
+    const st = await page.evaluate(() => window.__roomBg ? JSON.parse(JSON.stringify(window.__roomBg)) : null).catch(() => null);
+    await page.screenshot({ path: `${out}/main-1600-webgpu-chromium.png`, timeout: 120000 }).catch((e) => logs.push('shot: ' + e));
+    const r = { file: 'main-1600-webgpu-chromium.png', webgpuAdapter: adapter, secs: Math.round((Date.now() - t0) / 1000), room: st, logs };
+    console.log(JSON.stringify(r)); report.push(r);
+    await ctx.close();
+  } catch (e) { report.push({ file: 'main-1600-webgpu-chromium.png', error: String(e).slice(0, 300) }); }
+  await gpuBrowser.close().catch(() => {});
+  // UI check on the phone page: chat input and the takeover script carry no countdown
+  const ctx = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: IPHONE_UA });
+  const page = await ctx.newPage();
+  await page.goto(base + '/', { waitUntil: 'load', timeout: 90000 });
+  await page.waitForTimeout(6000);
+  const ui = await page.evaluate(() => ({ talkInput: !!document.getElementById('talk-input'), chat: !!document.getElementById('chat'), bgImage: getComputedStyle(document.getElementById('bg') || document.body).backgroundImage.slice(0, 160), oldPicLoaded: performance.getEntriesByType('resource').some((e) => /bg-room\.jpg/.test(e.name)) }));
+  report.push({ check: 'ui-402', ui }); console.log(JSON.stringify({ check: 'ui-402', ui }));
+  await ctx.close();
+}
 if (SET === 'chairtry') {   // phone chair framing variants (viewer ?lean= ?rise= ?vmax=)
   for (const [k, q] of [['base90', 'lean=0&rise=0&vmax=90'], ['v104', 'lean=0&rise=0&vmax=104'], ['v112', 'lean=0&rise=0&vmax=112'], ['l12v104', 'lean=0.12&rise=0.04&vmax=104']])
     await shot(SIZES[2], `/world-v2/?cam=chair&shot=1&${q}`, `chairtry-402-${k}.png`, viewerReady, 2500);

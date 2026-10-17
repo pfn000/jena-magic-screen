@@ -4,7 +4,10 @@
 // the N•OS glass wallpaper (window.__nos.setWallpaper) or, without N•OS, to a canvas inside #bg.
 // Phones and weak laptops (iPhone, Intel N200 4 GB) render ONE frame at a capped size, then free the GPU entirely
 // (scene, textures and the WebGL context are disposed); only strong desktops keep a slow drifting camera.
-// No WebGL2, a load error or a slow network leaves /bg-room.jpg exactly as before.
+// Renderer: WebGPU (three/webgpu, loaded only on devices whose browser exposes navigator.gpu and returns an adapter),
+// else WebGL2 (OpenGL ES 3.0 in the browser). A WebGPU start or frame that fails falls back to WebGL2 on the spot.
+// No GPU at all, a load error or a slow network leaves the plain dark gradient (#bg); the old bg-room.jpg is gone.
+// URL: ?gpu=webgl forces WebGL2, ?gpu=webgpu skips the adapter pre-check.
 // URL: ?room=0 off · ?room=still|live force a mode · ?look=day|night (default: her local clock, or night in dark glass).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -92,11 +95,65 @@ function show(frame) {
 }
 function refresh() { if (shownIn === 'nos') window.__nos?.refreshWallpaper?.(); }
 
+async function webgpuOK() {
+  if (Q.get('gpu') === 'webgl' || !navigator.gpu) return false;
+  if (Q.get('gpu') === 'webgpu') return true;
+  try { return !!(await Promise.race([navigator.gpu.requestAdapter(), new Promise((r) => setTimeout(() => r(null), 3000))])); } catch { return false; }
+}
+async function makeRenderer(canvas, mode, kind) {
+  const opts = { canvas, antialias: true, alpha: false, powerPreference: mode === 'live' ? 'high-performance' : 'low-power' };
+  if (kind === 'webgpu') {
+    const WG = await import('three/webgpu');
+    const r = new WG.WebGPURenderer(opts);
+    await r.init();
+    if (!r.backend || !r.backend.isWebGPUBackend) { r.dispose(); throw new Error('WebGPU backend did not start'); }
+    return { r, WG, TSL: await import('three/tsl') };
+  }
+  return { r: new THREE.WebGLRenderer({ ...opts, preserveDrawingBuffer: true }) };
+}
+// The duvet's lightmap fill (DUVET_LM above) as a TSL node graph for the WebGPU renderer (onBeforeCompile is WebGL only).
+function duvetNodeMaterial(m, lm, lms, WG, TSL) {
+  const { texture, uv, vec2, vec3, float, max, dot, step, mix } = TSL;
+  const px = [1 / (lm.image?.width || 2048), 1 / (lm.image?.height || 2048)];
+  const luv = uv(1), lum = (c) => dot(c, vec3(0.333));
+  const base = texture(lm, luv).rgb, S = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i * 0.7853982;
+    for (const [rad, da] of [[4, 0], [10, 0.39], [18, 0.2]]) S.push(texture(lm, luv.add(vec2(Math.cos(a + da) * rad * px[0], Math.sin(a + da) * rad * px[1]))).rgb);
+  }
+  let peak = lum(base); for (const x of S) peak = max(peak, lum(x));
+  let sum = vec3(0), n = float(0);
+  for (const x of S) { const w = step(peak.mul(0.35), lum(x)); sum = sum.add(x.mul(w)); n = n.add(w); }
+  const fill = mix(base, sum.div(max(n, 0.0001)), step(0.5, n));
+  const irr = mix(fill, max(base, fill.mul(0.85)), 0.2).mul(lms);
+  const tint = vec3(m.color.r, m.color.g, m.color.b), albedo = m.map ? texture(m.map, uv()).rgb.mul(tint) : tint;
+  const nm = new WG.MeshBasicNodeMaterial(); nm.name = 'duvet'; nm.colorNode = albedo.mul(irr);
+  return nm;
+}
+// a frame that came out empty (all black / transparent) means the renderer silently failed
+function blankFrame(c) {
+  try {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lit = 0;
+    for (let i = 0, step = Math.max(4, ((d.length / 4 / 400) | 0) * 4); i < d.length; i += step) if (d[i] + d[i + 1] + d[i + 2] > 24) lit++;
+    return lit < 8;
+  } catch { return false; }
+}
+
 async function build(mode, look) {
+  const order = (await webgpuOK()) ? ['webgpu', 'webgl'] : ['webgl'];
+  let err = null;
+  for (const kind of order) {
+    try { const R2 = await buildWith(mode, look, kind); state.renderer = kind; return R2; }
+    catch (e) { err = e; console.warn('[room]', kind, 'failed:', String(e && e.message || e)); state.gpuError = kind === 'webgpu' ? String(e && e.message || e) : state.gpuError; }
+  }
+  throw err;
+}
+async function buildWith(mode, look, kind) {
   const t0 = performance.now();
   const [W, H] = frameSize(mode);
   const gl = document.createElement('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: mode === 'live' ? 'high-performance' : 'low-power' });
+  const { r: renderer, WG, TSL } = await makeRenderer(gl, mode, kind);
+  const gpu = kind === 'webgpu';
   renderer.setPixelRatio(1); renderer.setSize(W, H, false);
   renderer.toneMapping = THREE.AgXToneMapping;
   const L = LOOKS[look];
@@ -116,9 +173,12 @@ async function build(mode, look) {
   draco.dispose();
   lm.flipY = false; lm.colorSpace = THREE.SRGBColorSpace; lm.channel = 1;
   if (ext) { ext.colorSpace = THREE.SRGBColorSpace; ext.flipY = false; }
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  if (env) { env.mapping = THREE.EquirectangularReflectionMapping; scene.environment = pmrem.fromEquirectangular(env).texture; env.dispose(); }
-  pmrem.dispose();
+  if (gpu) { if (env) { env.mapping = THREE.EquirectangularReflectionMapping; scene.environment = env; } }   // WebGPU prefilters it itself
+  else {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    if (env) { env.mapping = THREE.EquirectangularReflectionMapping; scene.environment = pmrem.fromEquirectangular(env).texture; env.dispose(); }
+    pmrem.dispose();
+  }
   const maxAniso = mode === 'live' ? 8 : 4;
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -129,6 +189,7 @@ async function build(mode, look) {
         if (ext) { if (m.emissiveMap) ext.flipY = m.emissiveMap.flipY; m.emissiveMap = ext; m.map = null; m.color.setRGB(0, 0, 0); m.emissive.setRGB(1, 1, 1); }
         m.emissiveIntensity = L.sky; m.needsUpdate = true; continue;
       }
+      if (hasLM && gpu && m.name === 'duvet') { const nm = duvetNodeMaterial(m, lm, L.lms, WG, TSL); if (Array.isArray(o.material)) o.material[o.material.indexOf(m)] = nm; else o.material = nm; m.dispose(); continue; }
       if (hasLM) {
         m.lightMap = lm; m.lightMapIntensity = L.lms * Math.PI;
         const duvet = m.name === 'duvet', chunk = duvet ? DUVET_LM : NO_IBL_DIFFUSE;
@@ -136,7 +197,7 @@ async function build(mode, look) {
         m.customProgramCacheKey = () => (duvet ? 'room-duvet' : 'room-baked');
       }
       if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) m.emissiveIntensity *= L.emis;
-      m.envMapIntensity = hasLM ? 0.9 : 1.0;
+      m.envMapIntensity = hasLM ? (gpu ? 0.3 : 0.9) : 1.0;   // WebGPU can't drop the panorama's diffuse fill per material: keep it faint
       if (m.map) m.map.anisotropy = maxAniso;
       if (/glass/i.test(m.name)) { m.transparent = true; m.opacity = 0.12; m.depthWrite = false; m.roughness = 0.03; m.metalness = 0; m.transmission = 0; m.envMapIntensity = 1.5; }
       m.needsUpdate = true;
@@ -153,7 +214,9 @@ async function build(mode, look) {
   frame.width = W; frame.height = H;
   const g2 = frame.getContext('2d');
   const draw = () => { renderer.render(scene, camera); g2.drawImage(gl, 0, 0, W, H); };
+  if (gpu) await renderer.renderAsync(scene, camera).catch(() => {});   // compiles the WebGPU pipelines before the first copied frame
   draw();
+  if (gpu && blankFrame(frame)) { try { renderer.dispose(); } catch {} throw new Error(kind + ' frame came out blank'); }
   state.ms.firstFrame = Math.round(performance.now() - t0);
   const dispose = () => {
     scene.traverse((o) => {
@@ -164,7 +227,7 @@ async function build(mode, look) {
       }
     });
     lm.dispose(); ext?.dispose(); scene.environment?.dispose();
-    renderer.dispose(); renderer.forceContextLoss();
+    renderer.dispose(); renderer.forceContextLoss?.();
   };
   return { frame, draw, dispose, camera, P, T, W, H };
 }
@@ -206,13 +269,13 @@ async function run(reason) {
   } catch (e) {
     clearTimeout(timer);
     state.state = out ? 'shown' : 'fallback'; state.error = String(e && e.message || e);
-    console.warn('[room] keeping the picture background:', state.error);
+    console.warn('[room] keeping the plain gradient background:', state.error);
   } finally { building = false; }
 }
 
 export function mountRoomBg({ obs = false, waitFor = null } = {}) {
   if (obs || Q.get('room') === '0' || document.body.classList.contains('bg-none') || document.body.classList.contains('stream')) { state.state = 'off'; return state; }
-  if (!webgl2OK()) { state.state = 'fallback'; state.error = 'no WebGL2'; return state; }
+  if (!webgl2OK() && !navigator.gpu) { state.state = 'fallback'; state.error = 'no WebGL2 / WebGPU'; return state; }
   const t0 = performance.now();
   const go = () => {
     // let her avatar load first (up to 12 s) so the two never fight over a weak GPU or a slow phone connection

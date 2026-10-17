@@ -7,7 +7,7 @@ on:
       base: { description: 'site base URL', required: false, default: 'https://jena-magic-screen.vercel.app' }
       expect: { description: 'commit sha prefix /api/config must report first (empty = no wait)', required: false, default: '' }
       tag: { description: 'label for the output folder', required: false, default: 'prod' }
-      set: { description: 'all | main | world | chairtry', required: false, default: 'all' }
+      set: { description: 'all | main | world | chairtry | sitepass', required: false, default: 'all' }
 permissions:
   contents: read
 jobs:
