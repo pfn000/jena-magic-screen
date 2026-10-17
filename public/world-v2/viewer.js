@@ -9,17 +9,22 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // Baked lighting: diffuse light comes only from the Cycles lightmap; the panorama gives reflections, not a second diffuse fill.
-// duvet: its quilt creases baked black in places (lightmap texels inside the puffs); a small max-dilation of the lightmap
-// fills those holes from the lit texels around them (the bake leaves a 10 px margin per island, so nothing bleeds in)
+// duvet: its quilt creases baked black in blocky patches (lightmap texels inside the puffs). Fill the dark holes from the
+// lit neighbourhood: average the lit samples on 3 rings (4/10/18 texels, dark ones ignored) and never go below 85% of it.
 const DUVET_LM = THREE.ShaderChunk.lights_fragment_maps.replace('vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', `
   vec2 lmPx = 1.0 / vec2( textureSize( lightMap, 0 ) );
-  vec3 lmMax = lightMapTexel.rgb;
+  vec3 lmS[ 24 ]; float lmPeak = dot( lightMapTexel.rgb, vec3( 0.333 ) );
   for ( int i = 0; i < 8; i ++ ) {
     float a = float( i ) * 0.7853982;
-    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a ), sin( a ) ) * lmPx * 3.0 ).rgb );
-    lmMax = max( lmMax, texture2D( lightMap, vLightMapUv + vec2( cos( a + 0.39 ), sin( a + 0.39 ) ) * lmPx * 7.0 ).rgb );
+    lmS[ i ] = texture2D( lightMap, vLightMapUv + vec2( cos( a ), sin( a ) ) * lmPx * 4.0 ).rgb;
+    lmS[ i + 8 ] = texture2D( lightMap, vLightMapUv + vec2( cos( a + 0.39 ), sin( a + 0.39 ) ) * lmPx * 10.0 ).rgb;
+    lmS[ i + 16 ] = texture2D( lightMap, vLightMapUv + vec2( cos( a + 0.2 ), sin( a + 0.2 ) ) * lmPx * 18.0 ).rgb;
   }
-  vec3 lightMapIrradiance = mix( lightMapTexel.rgb, lmMax, 0.8 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
+  for ( int i = 0; i < 24; i ++ ) lmPeak = max( lmPeak, dot( lmS[ i ], vec3( 0.333 ) ) );
+  vec3 lmSum = vec3( 0.0 ); float lmN = 0.0;
+  for ( int i = 0; i < 24; i ++ ) { float w = step( lmPeak * 0.35, dot( lmS[ i ], vec3( 0.333 ) ) ); lmSum += lmS[ i ] * w; lmN += w; }
+  vec3 lmFill = lmN > 0.0 ? lmSum / lmN : lightMapTexel.rgb;
+  vec3 lightMapIrradiance = max( lightMapTexel.rgb, lmFill * 0.85 ) * lightMapIntensity;`).replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 THREE.ShaderChunk.lights_fragment_maps = THREE.ShaderChunk.lights_fragment_maps.replace('iblIrradiance += getIBLIrradiance( geometryNormal );', '');
 
 const Q = new URLSearchParams(location.search);
@@ -131,9 +136,9 @@ function goto(name, instant) {
   document.querySelectorAll('#bar button[data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === name));
   const p0 = camera.position.clone(), t0 = controls.target.clone(), f0 = camera.fov;
   const p1 = new THREE.Vector3(...c.position), t1 = new THREE.Vector3(...c.target);
-  if (name === 'chair' && innerWidth < innerHeight) {   // tall phone: sit a touch higher/back in the seat (?lean=metres to try others)
+  if (name === 'chair' && innerWidth < innerHeight) {   // tall phone: sit back in the seat (0.12 m) so both monitors fit (?lean=metres to try others)
     const back = p1.clone().sub(t1).setY(0).normalize();
-    p1.addScaledVector(back, parseFloat(Q.get('lean') ?? '0.06')); p1.y += parseFloat(Q.get('rise') ?? '0.04');
+    p1.addScaledVector(back, parseFloat(Q.get('lean') ?? '0.12')); p1.y += parseFloat(Q.get('rise') ?? '0.04');
   }
   if (name === 'chair') t1.sub(p1).normalize().multiplyScalar(0.02).add(p1);   // seated: orbit around the eyes = look around from the chair
   const dur = instant ? 0 : 900, start = performance.now();
