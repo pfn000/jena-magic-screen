@@ -1,0 +1,52 @@
+name: prod proof shots
+# Headless Chromium (SwiftShader WebGL) screenshots of the LIVE site, taken on a GitHub runner (never on Tab's box).
+# Waits until /api/config reports the expected commit, then shoots the main page (desktop + phones) and /world-v2/.
+on:
+  workflow_dispatch:
+    inputs:
+      base: { description: 'site base URL', required: false, default: 'https://jena-magic-screen.vercel.app' }
+      expect: { description: 'commit sha prefix /api/config must report first (empty = no wait)', required: false, default: '' }
+      tag: { description: 'label for the output folder', required: false, default: 'prod' }
+permissions:
+  contents: read
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: ops/prod-shot }
+      - name: Wait for the deploy
+        env: { BASE: "${{ inputs.base }}", EXPECT: "${{ inputs.expect }}" }
+        run: |
+          [ -z "$EXPECT" ] && exit 0
+          for i in $(seq 1 80); do
+            c=$(curl -s "$BASE/api/config?nc=$RANDOM" | python3 -c 'import sys,json; print((json.load(sys.stdin).get("build") or {}).get("commit") or "")' 2>/dev/null)
+            echo "$(date -u +%H:%M:%S) live commit: $c"
+            case "$c" in "$EXPECT"*) exit 0;; esac
+            sleep 15
+          done
+          echo "deploy never reported $EXPECT"; exit 1
+      - name: Shoot
+        env: { BASE: "${{ inputs.base }}" }
+        run: |
+          mkdir -p /tmp/pw shots && cp ops/prod-shot/shot.mjs /tmp/pw/shot.mjs
+          (cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.48.2 >/dev/null && npx playwright install --with-deps chromium >/dev/null)
+          node /tmp/pw/shot.mjs "$BASE" shots 2>&1 | tee shots/log.txt
+          curl -s "$BASE/api/config" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin).get("build")))' > shots/build.json || true
+          ls -la shots
+      - name: Publish to the private render dataset
+        if: always()
+        env: { HF_TOKEN: "${{ secrets.HF_TOKEN }}", RUN_ID: "${{ github.run_id }}", TAG: "${{ inputs.tag }}" }
+        run: |
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          python3 - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          d = 'runs/shots-%s-%s' % (os.environ['TAG'], os.environ['RUN_ID'])
+          HfApi(token=os.environ['HF_TOKEN']).upload_folder(folder_path='shots', path_in_repo=d, repo_id='Saidie000/tab-render-out', repo_type='dataset', commit_message='prod shots ' + os.environ['RUN_ID'])
+          print('published', d)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: prod-shots, path: shots/, retention-days: 7 }

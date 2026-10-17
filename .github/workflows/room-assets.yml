@@ -1,0 +1,41 @@
+name: room assets to main (world-v2)
+# Pulls a finished Q-WORLD bake (room.glb + lightmaps + env + window photos) from the private render dataset into
+# public/world-v2/ on main, so the main page's room background and /world-v2/ use it. Run by hand (workflow_dispatch).
+on:
+  workflow_dispatch:
+    inputs:
+      source_run: { description: 'qworld render run id on Saidie000/tab-render-out (runs/<id>)', required: true }
+permissions:
+  contents: write
+concurrency: { group: room-assets-main, cancel-in-progress: false }
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - name: Pull the baked room
+        env: { HF_TOKEN: "${{ secrets.HF_TOKEN }}", RUN: "${{ inputs.source_run }}" }
+        run: |
+          echo "$RUN" | grep -Eq '^[0-9]{6,14}$' || { echo "bad run id"; exit 1; }
+          pip install -q huggingface_hub || pip install -q --break-system-packages huggingface_hub
+          python3 - <<'PY'
+          import os, shutil
+          from huggingface_hub import hf_hub_download
+          run = os.environ['RUN']
+          for n in ('room.glb', 'lightmap.webp', 'lightmap_day.webp', 'env.hdr', 'env_day.hdr', 'cameras.json', 'exterior_day.jpg', 'exterior_night.jpg'):
+              p = hf_hub_download('Saidie000/tab-render-out', 'runs/%s/%s' % (run, n), repo_type='dataset', token=os.environ['HF_TOKEN'])
+              shutil.copy(p, os.path.join('public/world-v2', n)); print('got', n, os.path.getsize(p))
+          open('public/world-v2/SOURCE_RUN', 'w').write(run + '\n')
+          PY
+          ls -la public/world-v2
+      - name: Commit to main (rebase on whatever landed meanwhile; never force)
+        env: { RUN: "${{ inputs.source_run }}" }
+        run: |
+          git config user.name "world-v2-bot"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/world-v2
+          if git diff --cached --quiet; then echo "assets unchanged"; exit 0; fi
+          git commit -q -m "world-v2: baked room from qworld run $RUN (fx-bake2: duvet underside removed, wider lightmap margins)"
+          for k in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 6; done
+          git log -1 --format='%H %s'
