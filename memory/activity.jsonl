@@ -11027,3 +11027,4 @@
 {"ts": 1792461344467, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
 {"ts": 1792461382510, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (sleepy)", "outcome": "", "note": ""}
 {"ts": 1792461406135, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792462645529, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
