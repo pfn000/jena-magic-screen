@@ -10981,3 +10981,49 @@
 {"ts": 1792455445699, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Tux_(mascot)", "what": "read about Tux the penguin", "outcome": "", "note": ""}
 {"ts": 1792455498017, "kind": "task", "action": "summarise", "key": "task:summarise", "what": "summarise (sleepy)", "outcome": "", "note": ""}
 {"ts": 1792455553827, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792457602020, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792457643117, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792457687805, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792457723059, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pDTvqS2GMVo", "what": "watched \"Michael Jackson Moonwalk Tutorial! *1 MINUTE DANCE LESSON*\"", "outcome": "", "note": "the video i learned my moonwalk tutorial move from"}
+{"ts": 1792457813828, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Plaza_de_toros_de_las_Arenas", "what": "read about \"Plaza de toros de las Arenas\" and summarised it for mama", "outcome": "", "note": "Plaza de toros de las Arenas is a converted former bullring in Barcelona, Catalonia, Spain."}
+{"ts": 1792457813838, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792457837686, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Henriette_Walter", "what": "read about Henriette Walter", "outcome": "", "note": ""}
+{"ts": 1792457909525, "kind": "site", "action": "new_site", "key": "site:https://x.com/", "what": "explored yes this is social media please dont make me regret giving you this (https://x.com/)", "outcome": "", "note": ""}
+{"ts": 1792457935268, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=SoRmqE7A_IE", "what": "watched \"15 MIN TIKTOK DANCE PARTY WORKOUT - Full Body/No Equipment\"", "outcome": "", "note": "the video i learned my easy tiktok dance tutorial move from"}
+{"ts": 1792457985865, "kind": "site", "action": "hot", "key": "site:https://Grok.com", "what": "opened https://Grok.com from my hot list", "outcome": "", "note": ""}
+{"ts": 1792458054330, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Shaw_House_(Shawboro%2C_North_Carolina)", "what": "read about \"Shaw House (Shawboro, North Carolina)\" and summarised it for mama", "outcome": "", "note": "Shaw House, also known as Cupola House, is a historic home located at Shawboro, Currituck County, North Carolina."}
+{"ts": 1792458085644, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
+{"ts": 1792458126170, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=dB4qPiLbDdk", "what": "watched \"3D people animation : Casual Walt Standing and speaking \u00a9cg-people.com\"", "outcome": "", "note": "the video i learned my 3D people animation casual sta move from"}
+{"ts": 1792458178261, "kind": "site", "action": "hot", "key": "site:https://gitlab.com/evlaV/holo-PKGBUILD", "what": "opened https://gitlab.com/evlaV/holo-PKGBUILD from my hot list", "outcome": "", "note": ""}
+{"ts": 1792458255620, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Hotel_Breakers", "what": "read about \"Hotel Breakers\" and summarised it for mama", "outcome": "", "note": "Hotel Breakers is a historic resort-hotel located in Sandusky, Ohio, United States."}
+{"ts": 1792458255635, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792458305672, "kind": "site", "action": "new_site", "key": "site:https://picoctf.org/", "what": "explored picoCTF (https://picoctf.org/)", "outcome": "", "note": ""}
+{"ts": 1792458332780, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Neural_network_(machine_learning)", "what": "read about neural networks", "outcome": "", "note": ""}
+{"ts": 1792458364921, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=pZ81oIlinEI", "what": "watched \"Cheerleading Tips - Learn All The Motions - Coach Audra Scofield\"", "outcome": "", "note": "the video i learned my cheer motions tutorial move from"}
+{"ts": 1792458557199, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Rubber_duck_debugging", "what": "read about rubber duck debugging", "outcome": "", "note": ""}
+{"ts": 1792458724369, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792458750714, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792458786212, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Vasanthathinte_Kanal_Vazhikalil", "what": "read about Vasanthathinte Kanal Vazhikalil", "outcome": "", "note": ""}
+{"ts": 1792458832330, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=kbUzi7meesU", "what": "watched \"7 mins beginners hiphop dance class warm up for you to follow along at home!\"", "outcome": "", "note": "the video i learned my hip hop dance basics for begin move from"}
+{"ts": 1792458889117, "kind": "site", "action": "hot", "key": "site:https://open-design.ai/", "what": "opened https://open-design.ai/ from my hot list", "outcome": "", "note": ""}
+{"ts": 1792458931426, "kind": "skill", "action": "python", "key": "python:fib.py", "what": "practiced python: ran fib.py", "outcome": "", "note": ""}
+{"ts": 1792458993829, "kind": "site", "action": "new_site", "key": "site:https://musiclab.chromeexperiments.com/", "what": "explored music lab (https://musiclab.chromeexperiments.com/)", "outcome": "", "note": ""}
+{"ts": 1792459022498, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=rFdeskwbhAM", "what": "watched \"Wobble Line Dance #itsthedanceforme\"", "outcome": "", "note": "the video i learned my the wobble line dance move from"}
+{"ts": 1792459116130, "kind": "task", "action": "fetch", "key": "task:fetch", "what": "fetch (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792459162110, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792459194768, "kind": "skill", "action": "python", "key": "python:matrix.py", "what": "practiced python: ran matrix.py", "outcome": "", "note": ""}
+{"ts": 1792459581603, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/Waterman_Gymnasium", "what": "read about Waterman Gymnasium", "outcome": "", "note": ""}
+{"ts": 1792459685476, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792460078507, "kind": "read", "action": "read", "key": "read:https://en.wikipedia.org/wiki/ASCII_art", "what": "read about ASCII art", "outcome": "", "note": ""}
+{"ts": 1792460294806, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792460363579, "kind": "skill", "action": "python", "key": "python:life.py", "what": "practiced python: ran life.py", "outcome": "", "note": ""}
+{"ts": 1792461013712, "kind": "task", "action": "note", "key": "task:note", "what": "note (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792461064850, "kind": "task", "action": "explore_box", "key": "task:explore_box", "what": "explore box (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792461098508, "kind": "video", "action": "watch", "key": "video:https://www.youtube.com/watch?v=wsYRncIccfQ", "what": "watched \"How to do Charleston for beginners.\"", "outcome": "", "note": "the video i learned my charleston dance basic step move from"}
+{"ts": 1792461186725, "kind": "site", "action": "new_site", "key": "site:https://www.khanacademy.org/computing", "what": "explored khan academy computing (https://www.khanacademy.org/computing)", "outcome": "", "note": ""}
+{"ts": 1792461224554, "kind": "skill", "action": "python", "key": "python:hearts.py", "what": "practiced python: ran hearts.py", "outcome": "", "note": ""}
+{"ts": 1792461285350, "kind": "task", "action": "htop", "key": "task:htop", "what": "htop (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792461344452, "kind": "read", "action": "summarise", "key": "read:https://en.wikipedia.org/wiki/Newfoundland_and_Labrador_Route_514", "what": "read about \"Newfoundland and Labrador Route 514\" and summarised it for mama", "outcome": "", "note": "Route 514, also known as Charlottetown Highway, is a 29.5-kilometre-long (18.3 mi) north-south Highway in southeastern Labrador in the Canadian province of Newfoundland and Labrador."}
+{"ts": 1792461344467, "kind": "task", "action": "learn", "key": "task:learn", "what": "learn (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792461382510, "kind": "task", "action": "tidy", "key": "task:tidy", "what": "tidy (sleepy)", "outcome": "", "note": ""}
+{"ts": 1792461406135, "kind": "skill", "action": "python", "key": "python:bones.py", "what": "practiced python: ran bones.py", "outcome": "", "note": ""}
