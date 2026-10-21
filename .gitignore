@@ -8,3 +8,7 @@ __pycache__/
 
 # Local VRChat avatar-specific OSC parameters; use the committed example as a template.
 box/xr/avatar-mapping.json
+
+# local motion telemetry (never committed)
+data/motion-log/
+jena-avatar/animations/live-telemetry/*/

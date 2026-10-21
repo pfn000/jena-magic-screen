@@ -108,7 +108,8 @@ export function mountNOS({ obs = false } = {}) {
     el.addEventListener('pointerdown', () => raise(W), true);
   }
   function scan() {
-    for (const el of document.querySelectorAll('#stage > .panel, #avatar-panel, #nos-about')) attach(el);
+    // Jena herself is never put in a window (Saidie, Oct 20: "not have that box around it"); ?box=1 brings the old glass frame back
+    for (const el of document.querySelectorAll(new URLSearchParams(location.search).get('box') === '1' ? '#stage > .panel, #avatar-panel, #nos-about' : '#stage > .panel, #nos-about')) attach(el);
     for (const [el, W] of wins) if (!el.isConnected) { wins.delete(el); renderDock(); }
   }
   function raise(W) { if (isPhone()) return; if (W.el.id === 'avatar-panel' && !W.max) return; W.el.style.zIndex = String(W.top ? 60 : ++zTop); dirty = true; updateFront(); }

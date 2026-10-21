@@ -4,7 +4,7 @@
 // ANIMATIONS/README.md); this file plays them on top of her idle body through avatar.js's hooks:
 //   poseHooks: head / neck / spine / hips offsets  ·  handHooks: two-bone arm IK + finger shapes  ·  faceHooks: faces
 // Public: window.jena.react(type, intensity) · window.jena.onReaction(cb) · window.jena.motion (state, play, setStyle)
-// She is a kid: nothing here is ever flirty (no winks, kisses, blush, body emphasis).
+// Jena is 19, an adult (Saidie, Oct 20 2:07 PM): confident and sassy (smirk, wink, side-eye OK); never sexual (no kisses, no body emphasis).
 import * as THREE from 'three';
 import { VRMSpringBoneCollider, VRMSpringBoneColliderShapeSphere } from '@pixiv/three-vrm';
 import MOVESET from '../ANIMATIONS/moveset.json';

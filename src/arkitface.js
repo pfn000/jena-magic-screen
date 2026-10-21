@@ -11,6 +11,7 @@
 // - Light per-channel smoothing: blinks close fast and open fast (crisp), everything else a touch softer.
 // - Mirror-correct: 'Left' is HER left. A mirrored playback swaps every Left/Right pair before it gets here.
 import { VRMExpression, VRMExpressionMorphTargetBind } from '@pixiv/three-vrm';
+import { OneEuro } from './motionpolish.js';
 
 export const ARKIT = ['browDownLeft', 'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight',
   'eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookDownLeft', 'eyeLookDownRight', 'eyeLookInLeft', 'eyeLookInRight', 'eyeLookOutLeft', 'eyeLookOutRight', 'eyeLookUpLeft', 'eyeLookUpRight',
@@ -98,13 +99,22 @@ export class ArkitFace {
       for (const [k, v] of Object.entries(s.scores)) { const x = v * s.w; if (x > (tgt[k] || 0)) tgt[k] = x; }
     }
     if (this.held && now < this.held.until) { live++; Object.assign(tgt, this.held.scores); } else this.held = null;
-    // per-channel smoothing (critically damped toward the target): blinks crisp, the rest a little softer
-    const sm = this.sm;
+    // per-channel ONE-EURO filtering (tracker jitter gone when the face is still, no lag when it moves fast):
+    // blinks get a high cutoff + strong speed term so they stay crisp; ?faceeuro=0 restores the old damped smoothing
+    const sm = this.sm, FT = this.avatar.faceTune?.oneEuro || {}, useEuro = this._euroOn ??= new URLSearchParams(location.search).get('faceeuro') !== '0';
+    const fe = (this.euro ||= new Map());
     for (const k of new Set([...Object.keys(tgt), ...Object.keys(sm)])) {
       const g = clamp01(tgt[k] || 0), c = sm[k] || 0;
-      const lam = BLINKS.has(k) ? (g > c ? 55 : 35) : (g > c ? 28 : 18);
-      const v = c + (g - c) * (1 - Math.exp(-lam * dt));
-      if (v < 0.002 && g === 0) delete sm[k]; else sm[k] = v;
+      let v;
+      if (useEuro) {
+        const [mc, be] = BLINKS.has(k) ? (FT.blink || [6.0, 4.0]) : (FT.other || [2.2, 6.0]);
+        let f = fe.get(k); if (!f) { f = new OneEuro(mc, be, 1.2); f.x = c; fe.set(k, f); } f.minCutoff = mc; f.beta = be;
+        v = clamp01(f.filter(g, dt));
+      } else {
+        const lam = BLINKS.has(k) ? (g > c ? 55 : 35) : (g > c ? 28 : 18);
+        v = c + (g - c) * (1 - Math.exp(-lam * dt));
+      }
+      if (v < 0.002 && g === 0) { delete sm[k]; fe.delete(k); } else sm[k] = v;
     }
     this.active = live > 0 || Object.keys(sm).length > 0;
     const S = (k) => (KID_SAFE_OFF.has(k) ? 0 : sm[k] || 0);

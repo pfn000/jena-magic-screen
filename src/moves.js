@@ -61,6 +61,7 @@ export function resampleClip({ fps, frames, tracks, hips }, { outFps = 60, sigma
   return { fps: (n - 1) * fps / (frames - 1), frames: n, tracks: outTracks, hips: hips ? cr(smooth(hips, 3), 3, false) : null, sourceFps: fps, sourceFrames: frames };
 }
 
+const _cv = [new THREE.Vector3(), new THREE.Vector3()];
 const BODY = ['hips', 'spine', 'chest', 'upperChest', 'neck', 'head'];
 const ARMS = ['leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'rightLowerArm', 'rightHand'];
 // how much of each bone the learned motion takes over (the rest stays her own procedural idle)
@@ -158,16 +159,19 @@ export class Moves {
   }
   choose(context = 'idle', mood = 'neutral') {
     const want = {
-      talk: ['talk'], happy: ['happy', 'dance', 'talk'], bored: ['stretch', 'dance', 'idle', 'weight'],
-      stretch: ['stretch'], idle: ['idle', 'weight', 'talk', 'stretch'], dance: ['dance', 'happy'],
+      talk: ['talk'], happy: ['happy', 'dance', 'talk'], bored: ['dance', 'idle', 'weight'],   // r12: no idle arms-up stretch clips
+      stretch: ['stretch'], idle: ['idle', 'weight', 'talk'], dance: ['dance', 'happy'],
     }[context] || ['idle'];
-    const lib = this.library;
+    const T = window.jenaTuning?.get?.().moves || {}, AL = window.jenaTuning?.get?.().antiLoop || {};
+    const banned = new Set(T.banned || []);
+    const lib = this.library.filter((c) => !banned.has(c.id) && (context === 'stretch' || c.kind !== 'stretch'));   // motion-tuning.json can ban a clip without a deploy; r12: stretch clips only when asked for
     if (!lib.length) return null;
     const hist = this.history();
     const lastAt = new Map();
     for (const x of hist) if (!lastAt.has(x.id)) lastAt.set(x.id, x.at);
     // blocked: the clips played in the last ~75% of the library's worth of plays
-    const block = new Set(hist.slice(0, Math.max(1, Math.ceil(lib.length * 0.75) - 1)).map((x) => x.id));
+    // anti-loop memory: up to the last ~20 clips (tuning antiLoop.history), never more than the library allows
+    const block = new Set(hist.slice(0, Math.max(1, Math.min(AL.history || 20, Math.ceil(lib.length * 0.75) - 1))).map((x) => x.id));
     const fresh = lib.filter((c) => !block.has(c.id));
     const fits = (c) => want.includes(c.kind);
     const moodOk = (c) => !mood || mood === 'neutral' || (c.moods || []).includes(mood);
@@ -186,6 +190,9 @@ export class Moves {
     // among the candidates, lean toward the ones done longest ago; whole-body ones (fingers + face) first on ties
     const whole = (c) => (c.has?.fingers ? 1 : 0) + (c.has?.face ? 1 : 0);
     pool = [...pool].sort((a, b) => (lastAt.get(a.id) || 0) - (lastAt.get(b.id) || 0) || whole(b) - whole(a)).slice(0, Math.max(1, Math.ceil(pool.length / 2)));
+    // per-clip weights from motion-tuning.json (0 = never, 2 = twice as likely to stay in the pool)
+    const wt = T.weights || {};
+    if (Object.keys(wt).length) { const kept = pool.filter((c) => (wt[c.id] ?? 1) > 0 && Math.random() < Math.min(1, (wt[c.id] ?? 1))); if (kept.length) pool = kept; }
     const id = CLIPS.pick(pool.map((c) => c.id), { pool: context, prefer: undefined });
     return pool.find((c) => c.id === id) || pool[0];
   }
@@ -216,11 +223,13 @@ export class Moves {
     const dur = c.frames / c.fps;
     const len = Math.min(dur, Math.max(Math.min(6, dur), (meta.minSlice || 6) + Math.random() * 7));
     const start = Math.random() * Math.max(0, dur - len);
-    const rate = 0.86 + Math.random() * 0.24;
+    const T = window.jenaTuning?.get?.().moves || {}, R = T.rate || [0.86, 1.1], AM = T.amplitude || [0.82, 1.0];
+    const rate = R[0] + Math.random() * (R[1] - R[0]);
+    const amp = AM[0] + Math.random() * (AM[1] - AM[0]);   // amplitude varies per play too (no two plays the same size)
     // a clip tracked with true sides (the performer's own left/right) plays left->left on her, never mirrored
-    const mirror = c.sides !== 'performer' && meta.sides !== 'performer' && meta.mirror !== false && Math.random() < 0.4;
+    const mirror = c.sides !== 'performer' && meta.sides !== 'performer' && meta.mirror !== false && Math.random() < (T.mirrorChance ?? 0.4);
     this.guard = { left: 1, right: 1 };
-    this.playing = { c, t: 0, start, len, rate, mirror, w: 0, fadeIn: 0.9, fadeOut: 1.1, began: Date.now() };
+    this.playing = { c, t: 0, start, len, rate, mirror, amp, w: 0, fadeIn: Math.max(T.minFade ?? 0.3, T.fadeIn ?? 0.9), fadeOut: Math.max(T.minFade ?? 0.3, T.fadeOut ?? 1.1), began: Date.now() };
     this.rememberPlay(meta.id);
     try { const L = (window.jenaLog ||= []); L.push({ t: Math.round(performance.now()), kind: 'clip', what: meta.id, why: context }); if (L.length > 400) L.shift(); } catch {}
     this.recent = this.history().slice(0, 8).map((x) => x.id);
@@ -395,6 +404,22 @@ export class Moves {
 
   stop() { if (this.playing) this.playing.stopAt = this.playing.t; }
 
+  // r12 (Saidie's screen must never show a hands-straight-overhead stretch): a clip may lift a hand at most to about
+  // shoulder height. Past that, the clip's upper and lower arm ease back toward her own relaxed pose until the hand is
+  // under the cap (the elbow keeps its bend), so a learned 'stretch' reads as a shoulder-height stretch, not arms up.
+  capOverhead(H, armBusy) {
+    const P = this._proc; if (!P) return;
+    for (const side of ['left', 'right']) {
+      if (armBusy[side]) continue;
+      const up = H.getNormalizedBoneNode(side + 'UpperArm'), lo = H.getNormalizedBoneNode(side + 'LowerArm'), hand = H.getNormalizedBoneNode(side + 'Hand');
+      if (!up || !lo || !hand || !P[side + 'UpperArm']) continue;
+      const over = () => { up.updateMatrixWorld(true); const sy = up.getWorldPosition(_cv[0]).y, hy = hand.getWorldPosition(_cv[1]).y; return hy - (sy + 0.04); };
+      let k = 0;
+      while (over() > 0 && k++ < 10) { up.quaternion.slerp(P[side + 'UpperArm'], 0.22); lo.quaternion.slerp(P[side + 'LowerArm'], 0.12); }
+      if (k) this.capHits = (this.capHits || 0) + 1;
+    }
+  }
+
   // source-frame sampling for the 15 fps finger/face tracks (linear between frames)
   _src(p) {
     const c = p.c, f = Math.max(0, Math.min((c.srcFrames || 1) - 1.001, (p.start + p.t) * (c.srcFps || 15)));
@@ -462,6 +487,7 @@ export class Moves {
       const name = p.mirror ? (SWAPN[name0] || name0) : name0;   // a mirrored playback: her left eye takes the performer's right
       if (!have.has(name)) { (this._unmapped ||= new Set()).has(name) || (this._unmapped.add(name), console.warn('jena face: her model has no expression', name)); return; }
       if (talking && ['aa', 'ih', 'ou', 'ee', 'oh'].includes(name)) return; // her own voice drives her mouth while she talks
+      if ((talking || this.avatar.wave || this.avatar.travelState) && /^look/.test(name)) return;   // r12: her own gaze (on you) wins while she talks / waves / steps
       if (perfect && !/^look/.test(name)) return;
       const at = (jj) => F.w[jj][i] * (1 - a) + (F.w[jj][i + 1] ?? F.w[jj][i]) * a;
       let raw = at(j);
@@ -488,7 +514,7 @@ export class Moves {
     const local = p.t;
     const end = p.stopAt != null ? Math.min(p.len, p.stopAt + p.fadeOut) : p.len;
     if (local >= end) { this.playing = null; return; }
-    const w = smooth(local / p.fadeIn) * smooth((end - local) / p.fadeOut);
+    const w = smooth(local / p.fadeIn) * smooth((end - local) / p.fadeOut) * (p.amp ?? 1);   // crossfade in/out (>= 0.3 s) x per-play amplitude
     p.w = w;
     const c = p.c, f = Math.min(c.frames - 1.001, (p.start + local) * c.fps);
     const i0 = Math.floor(f), a = f - i0, i1 = i0 + 1;
@@ -501,6 +527,9 @@ export class Moves {
     if (A.handOnHip) armBusy[A.handOnHip.side] = true;
     if (A.target?.leftUpperArm && A.target.leftUpperArm[2] > -0.6) armBusy.left = true;
     if (A.target?.rightUpperArm && A.target.rightUpperArm[2] < 0.6) armBusy.right = true;
+    // r12: while she waves or side-steps, the clip's head and neck don't play (the performer's look-down-left at their
+    // own body was overriding her look at the camera mid-wave)
+    const engaged = !!(A.wave || A.travelState);
     for (const b of ARMS) { const n = H.getNormalizedBoneNode(b); if (n) (this._proc ||= {})[b] = (this._proc?.[b] || new THREE.Quaternion()).copy(n.quaternion); }
     for (const bone of [...BODY, ...ARMS]) {
       const src = p.mirror ? MIRROR(bone) : bone;
@@ -508,6 +537,7 @@ export class Moves {
       if (!tr) continue;
       const side = bone.startsWith('left') ? 'left' : bone.startsWith('right') ? 'right' : null;
       if (side && armBusy[side]) continue;
+      if (engaged && (bone === 'neck' || bone === 'head')) continue;   // r12: a wave / side-step keeps her head on you
       let node = H.getNormalizedBoneNode(bone);
       let tq = _qa.set(tr[i0 * 4], tr[i0 * 4 + 1], tr[i0 * 4 + 2], tr[i0 * 4 + 3]);
       _qb.set(tr[i1 * 4], tr[i1 * 4 + 1], tr[i1 * 4 + 2], tr[i1 * 4 + 3]);
@@ -525,6 +555,7 @@ export class Moves {
       node.quaternion.slerp(tq, w * (WEIGHT[bone] ?? 0.8) * (side ? this.guard[side] : 1));
     }
     this.keepClear(H, w, armBusy);
+    this.capOverhead(H, armBusy);
     // hips: travel over her planted feet the way the person's did (scaled to her legs, clamped)
     const hips = H.getNormalizedBoneNode('hips');
     if (c.hips && hips && A.hipsRest) {

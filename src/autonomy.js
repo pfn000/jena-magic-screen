@@ -211,7 +211,7 @@ export class Autonomy {
       return;
     }
     const options = [
-      () => this.raise('both', 1800 + Math.random() * 900, say(['stretching, been standing here a while', 'big stretch', 'ok stretching real quick', 'arms up, reset'], 'stretch')),
+      () => this.raise('both', 1800 + Math.random() * 900, say(['stretching, been standing here a while', 'big stretch', 'ok stretching real quick', 'shoulder stretch'], 'stretch')),
       () => this.tilt(pick(['left', 'right']), 2200 + Math.random() * 1400, say(['thinking about something', 'hmm', 'wait what was I doing', 'pondering'], 'tilt')),
       () => this.shift(pick(['left', 'right']), 7000 + Math.random() * 5000, say(['my legs are tired', 'shifting my weight', 'new stance who dis', 'standing is a sport honestly'], 'shift')),
       () => this.fist(pick(['left', 'right']), 1200 + Math.random() * 900, say(['squeezing my hand, just fidgeting', 'fidgeting', 'little hand squeeze'], 'fist')),

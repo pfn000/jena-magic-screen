@@ -14,6 +14,8 @@ import { ThoughtChain } from './thoughts.js';
 import { think } from './brain.js';
 import { Autonomy } from './autonomy.js';
 import { Moves, rememberMove } from './moves.js';
+import { Tuning } from './tuning.js';
+import { MotionTelemetry } from './telemetry.js';
 import { Motion, setupSprings } from './motion.js';
 import { Dance } from './dance.js';
 import { Seat } from './seat.js';
@@ -230,6 +232,13 @@ if (skillsPub) {
 // ---------------- her own body: autonomy + self-vision ----------------
 const autonomy = new Autonomy(avatar, { log: (text) => chain.self('body', text) });
 // moves she learned by watching videos of real people move (pose-tracked into her own clips, /moves/)
+// motion-tuning.json (live-reloaded constants) + 120 Hz motion telemetry to the LOCAL /motion-log stub
+const tuning = new Tuning('/motion-tuning.json');
+window.jenaTuning = tuning;
+tuning.on((v) => { avatar.polish?.tune?.(v.polish); avatar.camTune = v.camera; avatar.faceTune = v.face; });
+avatar.frameHooks ||= [];
+const telemetry = new MotionTelemetry(avatar, tuning);
+window.jenaTelemetry = telemetry;
 autonomy.moves = new Moves(avatar, { log: (text) => chain.self('body', text), remember: rememberMove, card: (trigger) => chain.start(trigger), boxBase: cfg.apiInfo?.box?.url ? cfg.apiInfo.box.url + '/box/moves/' : null });
 // her talk/react/direct-to-camera move set + smug face + motion styles (src/motion.js, ANIMATIONS/moveset.json)
 const motion = new Motion(avatar, { moves: autonomy.moves });

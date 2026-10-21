@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "_note": "Live-reloaded by the page (src/tuning.js). Any key may be omitted; built-in defaults fill the rest.",
+  "polish": {
+    "core": [
+      1.4,
+      0.5
+    ],
+    "head": [
+      1.6,
+      0.8
+    ],
+    "arms": [
+      2.0,
+      0.9
+    ],
+    "legs": [
+      2.2,
+      0.8
+    ],
+    "fingers": [
+      2.6,
+      0.5
+    ],
+    "wristMaxDeg": 31,
+    "limits": true,
+    "smooth": true
+  },
+  "face": {
+    "oneEuro": {
+      "blink": [
+        6.0,
+        4.0
+      ],
+      "other": [
+        2.2,
+        6.0
+      ]
+    },
+    "coarticulation": 0.35,
+    "lidFollow": 0.6,
+    "liveliness": 1.0,
+    "exprAttack": 14,
+    "exprRelease": 7
+  },
+  "camera": {
+    "omega": 2.6,
+    "modeOmega": 1.4,
+    "leadSec": 0.18,
+    "deadZone": 0.012,
+    "framing": "collar"
+  },
+  "moves": {
+    "fadeIn": 0.9,
+    "fadeOut": 1.1,
+    "minFade": 0.3,
+    "rate": [
+      0.86,
+      1.1
+    ],
+    "amplitude": [
+      0.82,
+      1.0
+    ],
+    "mirrorChance": 0.4,
+    "weights": {},
+    "banned": []
+  },
+  "antiLoop": {
+    "history": 20,
+    "poseWindowSec": 3,
+    "poseSimilarity": 0.012
+  },
+  "telemetry": {
+    "enabled": "local",
+    "hz": 120,
+    "batchSec": 4,
+    "jerkSpike": 2500,
+    "endpoint": "/motion-log"
+  }
+}

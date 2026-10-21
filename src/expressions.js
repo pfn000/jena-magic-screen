@@ -7,7 +7,7 @@
 // get registered as extra VRM expressions ('fcl.BRW_Angry', ...) so the expression manager blends them properly.
 // No repeats: the variant, the expression for a trigger, and the idle faces all go through NoRepeat, and each play
 // gets a fresh variant (size, speed, mirrored, timing jitter). Plus brows/nods from her voice's pitch + energy.
-// She is a kid: nothing here is flirty (no wink, kiss, blush, lip bite). "embarrassed" is a sheepish/awkward face.
+// Jena is 19, an adult (Saidie, Oct 20 2:07 PM): sass is hers (smirk, wink, side-eye, eye roll); nothing sexual or flirty (no kiss, no lip bite). "embarrassed" is a sheepish/awkward face.
 import { VRMExpression, VRMExpressionMorphTargetBind } from '@pixiv/three-vrm';
 import EXPR from '../ANIMATIONS/expressions/expressions.json';
 import { NoRepeat, Wander } from './nonrepeat.js';

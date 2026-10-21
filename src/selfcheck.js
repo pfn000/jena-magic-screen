@@ -120,6 +120,10 @@ export class SelfCheck {
       const up = H.getNormalizedBoneNode('leftUpperArm'); if (up) up.rotateZ(-0.8);
     }
     const tgt = this.target(p);
+    // r12: no self-correction pulls while she waves or side-steps (her head/torso corrections turned her head down and
+    // away from the camera mid-wave); scoring resumes when the gesture is over
+    const AV = this.moves.avatar;
+    if (AV?.wave || AV?.travelState) return;
     if (tgt && Object.values(this.gain).some((g) => g > 0)) {
       const m = this.measure(vrm);
       if (m) for (const side of ['left', 'right']) {

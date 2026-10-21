@@ -383,3 +383,12 @@ body.obs #tip-btn,body.stream #tip-btn{display:none}
   #devpanel .dp-moves { grid-template-columns: 1fr 1fr; }
 }
 #devpanel .dp-body { min-height: 0; }
+
+/* FULL VIEW (avatar-3d-v37, Saidie Oct 20): no box around Jena. Her stage area is just space on the page: no glass
+   window, no frame, no clipping; her canvas is a frameless layer (avatar.js layoutFullView) that fades out softly at her
+   waist and lets her hair and hands go past where the old panel edges were. */
+body.jena-fullview #avatar-panel { background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.jena-fullview #avatar-canvas { pointer-events: none; z-index: 1; filter: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 56px), transparent 100%); mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 56px), transparent 100%); }
+body.jena-fullview #avatar-panel > :not(#avatar-canvas) { z-index: 2; }
+body.jena-fullview #stage > .panel { z-index: 3; }

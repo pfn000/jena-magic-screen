@@ -16,8 +16,11 @@ const STREAM = /^\/stream\/?$/.test(location.pathname) || q.has('layout');
 const DEFAULTS = {
   twitch: null,
   desktopUrl: null,
-  vrmUrl: 'https://cdn.jsdelivr.net/gh/pfn000/JenaAI@main/avatars/sample-vrm1.vrm',
-  vrmFallbackUrl: 'https://raw.githubusercontent.com/pfn000/JenaAI/main/avatars/sample-vrm1.vrm',
+  // her own 3D body (jena-v37r10-final, the debut-video avatar) converted to VRM 1.0: white hair with black streaks,
+  // two short spiky pigtails, the bang over her right eye, grey eyes, the charcoal off-shoulder tee dress, barefoot.
+  vrmUrl: 'https://huggingface.co/Saidie000/JenaAI2026/resolve/main/avatars/jena-v37r10.vrm',
+  // the old sample body stays reachable with ?vrm=old (and is the fallback if her file ever fails to load)
+  vrmFallbackUrl: 'https://cdn.jsdelivr.net/gh/pfn000/JenaAI@main/avatars/sample-vrm1.vrm',
   brainUrl: '/api/think',
 };
 
@@ -59,7 +62,10 @@ export async function loadConfig() {
   };
   cfg.twitch = q.get('twitch') || api?.twitch || null; // never a default channel
   cfg.desktopUrl = normalizeDesktop(pickv('desktop', 'desktopUrl'));
-  cfg.vrmUrl = q.get('vrm') || api?.vrmUrl || file?.vrmUrl || DEFAULTS.vrmUrl;
+  // Her own 3D body wins over an older body URL left in the server env (JENA_VRM_URL); ?vrm=URL still overrides for
+  // tests, ?vrm=old brings back the old sample body, and api.vrmForce lets the server pin another body on purpose.
+  const qv = q.get('vrm');
+  cfg.vrmUrl = qv === 'old' ? DEFAULTS.vrmFallbackUrl : qv || (api?.vrmForce && api?.vrmUrl) || DEFAULTS.vrmUrl;
   cfg.brainUrl = q.get('brain') || (api ? '/api/think' : null);
   return cfg;
 }
