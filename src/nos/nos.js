@@ -608,7 +608,7 @@ export function mountNOS({ obs = false } = {}) {
   let dirty = true, sig = '';
   function panesFor() {
     const A = [], B = [];
-    const phone = isPhone();
+    const phone = isPhone(), lgShell = document.body.classList.contains('lg');
     for (const W of wins.values()) {
       const el = W.el;
       if (el.classList.contains('nos-hidden') || el.classList.contains('nos-under-max') || W.op < 0.01) continue;
@@ -617,12 +617,15 @@ export function mountNOS({ obs = false } = {}) {
       if (!cs) continue;
       const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
       const k = r.width / (el.offsetWidth || r.width);
-      (el.id === 'nos-about' ? B : A).push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: 0, refr: 7, bevel: 18 });
+      const card = lgShell && el.parentElement?.id === 'stage' && el.id !== 'avatar-panel';   // a Liquid Glass card (Chat/Computer/Body/Settings)
+      (el.id === 'nos-about' ? B : A).push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: card ? 0.5 : 0, refr: card ? 14 : 7, bevel: card ? 24 : 18, clear: card ? 1 : 0 });
     }
     // the Liquid Glass shell (src/mobile.js, every screen size): real refracting glass under the tab-bar pill, the round
     // Speak bubble and the two header pills, with their own round ends (the old full-width bars were square slabs)
     if (document.body.classList.contains('lg')) {
-      for (const sel of ['#m-tabs', '#m-speak', '#m-top .m-id', '#m-top .m-actions']) { const el = $(sel); if (!el) continue; const r = el.getBoundingClientRect(); if (r.height > 2 && r.width > 2) A.push({ r, rad: r.height / 2, op: 1, sh: 0.5, lift: 0, menu: 0.6, refr: 6, bevel: 12 }); }
+      // r3 (Saidie, Oct 21 12:55 PM: "actually use liquid glass and not this weird frosted shit ... there needs to be also depth"):
+      // clear lens glass (clear: 1): sharp, magnified middle, strong rim refraction + chromatic edge, light tint, thickness shading
+      for (const sel of ['#m-tabs', '#m-speak', '#m-top .m-id', '#m-top .m-actions', '#tip-btn']) { const el = $(sel); if (!el) continue; const r = el.getBoundingClientRect(); if (r.height > 2 && r.width > 2 && getComputedStyle(el).display !== 'none') A.push({ r, rad: r.height / 2, op: 1, sh: 0.62, lift: 0.2, menu: 0.6, refr: Math.min(16, r.height * 0.26), bevel: Math.min(18, r.height * 0.32), clear: 1 }); }
     } else for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
     if (dock.classList.contains('show')) for (const c of dock.children) { const r = c.getBoundingClientRect(); B.push({ r, rad: r.height / 2, op: 1, sh: 0.6, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
     if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: Math.min(24, bar.offsetHeight / 2 || 20), op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
@@ -719,28 +722,33 @@ void main(){
     if (d > 1.5) continue;
     vec2 e = vec2(1.25, 0.);
     vec2 n = normalize(vec2(sdRB(p+e.xy-Rc.xy,Rc.zw,rad)-sdRB(p-e.xy-Rc.xy,Rc.zw,rad), sdRB(p+e.yx-Rc.xy,Rc.zw,rad)-sdRB(p-e.yx-Rc.xy,Rc.zw,rad)) + 1e-5);
-    float mk = uExt[i].x, bevel = uExt[i].z;
+    float mk = uExt[i].x, bevel = uExt[i].z, clr = uExt[i].w;   // clr: LIQUID GLASS clarity (0 = frosted window, 1 = clear lens)
     float edge = clamp(1. + d/bevel, 0., 1.);
     float prof = edge*edge*edge;
     vec2 off = n * prof * uExt[i].y;
-    vec2 q = p + off;
-    float lod = mix(3.4, 1.6, prof), rr0 = mix(16., 5., prof);
+    // liquid glass is a lens: the middle is magnified a touch and stays sharp, the rim bends what is behind it hardest
+    vec2 q = p + off - (p - Rc.xy) * 0.035 * clr * (1. - prof);
+    float lod = mix(mix(3.4, 1.6, prof), mix(0.55, 0.2, prof), clr), rr0 = mix(mix(16., 5., prof), mix(1.1, 0.5, prof), clr);
     vec3 g = bg(q, lod) * 0.16;
     for (int k = 0; k < 12; k++) {
       float an = float(k) * 0.5236 + 0.26, rr = (k % 2 == 0) ? rr0 : rr0 * 0.5;
       g += bg(q + vec2(cos(an), sin(an)) * rr, lod) * 0.07;
     }
-    if (prof > 0.04) {
-      float cr = bg(p + off*1.10, 1.6).r, cb = bg(p + off*0.88, 1.6).b;
-      g.r = mix(g.r, cr, prof*0.6); g.b = mix(g.b, cb, prof*0.6);
+    if (prof > 0.04) {   // chromatic edge: red and blue bend by different amounts at the rim
+      float cr = bg(q + off*mix(0.10, 0.30, clr), mix(1.6, 0.8, clr)).r, cb = bg(q - off*mix(0.12, 0.26, clr), mix(1.6, 0.8, clr)).b;
+      g.r = mix(g.r, cr, prof*mix(0.6, 0.95, clr)); g.b = mix(g.b, cb, prof*mix(0.6, 0.95, clr));
     }
-    g = tintIt(g, mk * (1. - prof*0.7));
-    g += prof * (uDark > .5 ? vec3(0.10,0.08,0.05) : vec3(0.06));
+    vec3 gt = tintIt(g, mk * (1. - prof*0.7));
+    g = mix(gt, g * (uDark > .5 ? 0.88 : 1.06) + (uDark > .5 ? 0.0 : 0.02), clr * 0.9);   // liquid: mostly clear, a light tint only
+    g += prof * (uDark > .5 ? vec3(0.10,0.08,0.05) : vec3(0.06)) * (1. - 0.6 * clr);
     float rim = smoothstep(1.7, 0.0, abs(d + 0.9));
     float lit = pow(max(dot(n, normalize(vec2(-0.55,-0.85))), 0.), 1.4);
     float bounce = pow(max(dot(n, normalize(vec2(0.55,0.85))), 0.), 2.0);
     g += rim * (0.28 + 0.75*lit + 0.35*bounce) * vec3(1.0, 0.96, 0.9);
     g += smoothstep(9., 0., -d) * lit * 0.10;
+    // thickness: a bright inner arc on the lit (top-left) side, a soft shaded band on the far side
+    g += clr * smoothstep(7., 0., -d) * lit * 0.20 * vec3(1.0, 0.98, 0.95);
+    g *= 1. - clr * 0.12 * smoothstep(16., 0., -d) * (1. - lit) * (0.4 + bounce);
     float a = smoothstep(0.8, -0.8, d) * op;
     col = g * a + col * (1. - a); al = a + al * (1. - a);
   }
@@ -776,7 +784,7 @@ function makeGL(c, overlay) {
       const rect = (p) => [p.r.left + p.r.width / 2, p.r.top + p.r.height / 2, p.r.width / 2, p.r.height / 2];
       g.uniform4fv(U.uRect, pack(panes, rect));
       g.uniform4fv(U.uPar, pack(panes, (p) => [p.rad, p.op, p.sh, p.lift]));
-      g.uniform4fv(U.uExt, pack(panes, (p) => [p.menu, p.refr, p.bevel, p.flat || 0]));
+      g.uniform4fv(U.uExt, pack(panes, (p) => [p.menu, p.refr, p.bevel, p.clear || 0]));
       g.uniform4fv(U.uURect, pack(under, rect));
       g.uniform4fv(U.uUPar, pack(under, (p) => [p.rad, p.op, 0, 0]));
       g.drawArrays(g.TRIANGLES, 0, 3);

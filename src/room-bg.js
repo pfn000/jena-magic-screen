@@ -9,6 +9,12 @@
 // No GPU at all, a load error or a slow network leaves the plain dark gradient (#bg); the old bg-room.jpg is gone.
 // URL: ?gpu=webgl forces WebGL2, ?gpu=webgpu skips the adapter pre-check.
 // URL: ?room=0 off · ?room=still|live force a mode · ?look=day|night (default: her local clock, or night in dark glass).
+// FLOOR LOCK (Saidie, Oct 21 12:50 PM: "the room should be floor level with where she is standing and how she is standing"):
+// the room is no longer shot from its own high 'wide' camera. It is rendered through HER camera (same lens, same height,
+// same tilt, same framing on the screen), with her standing spot on the room's rug, so her soles sit exactly on the
+// room's floor and the room's perspective/horizon is the one her body is drawn with. The near wall (behind the camera)
+// is clipped away. Her camera moves (follow, framing, a card opening) slide the picture with it; a bigger move re-renders.
+// ?roomcam=wide brings back the old high camera.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -79,6 +85,68 @@ function frameSize(mode) {
   return [Math.round(vw * s), Math.round(vh * s)];
 }
 
+// ---- FLOOR LOCK helpers ----
+const MARGIN = [1.6, 1.25];   // the follow picture is rendered this much wider / taller than the screen, so a camera move or a
+                              // card opening (her stage shifts sideways) can slide it without a new render
+let stageFn = null;           // () => her Avatar (camera + canvas), from main.js
+let spot = null;              // her standing spot in the room: { x, y, z } (y = the rug's top surface under her soles)
+let clipZ = null;             // the near wall's inner face: everything nearer the camera than this is not drawn
+function stageView() {
+  if (Q.get('roomcam') === 'wide') return null;
+  const A = stageFn && stageFn();
+  if (!A || !A.vrm || !A.camera || !A.canvas || A.noGL) return null;
+  const r = A.canvas.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return null;
+  const vw = Math.max(1, innerWidth), vh = Math.max(1, innerHeight);
+  A.camera.updateMatrixWorld();
+  // her projection maps the world onto HER canvas rect; the room fills the whole window: remap her NDC to the window's
+  const M = new THREE.Matrix4().set(r.width / vw, 0, 0, (2 * r.left + r.width) / vw - 1, 0, r.height / vh, 0, 1 - (2 * r.top + r.height) / vh, 0, 0, 1, 0, 0, 0, 0, 1);
+  return { pose: A.camera.matrixWorld.clone(), proj: M.multiply(A.camera.projectionMatrix), vw, vh, A };
+}
+function worldVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+// where she stands: on the rug, at its centre depth, slid sideways so the room's back wall fills her view evenly;
+// y = the rug's real top surface (a ray straight down), so her soles (y = 0 in her own scene) land ON it
+function findSpot(root, view) {
+  root.updateMatrixWorld(true);
+  const meshes = []; root.traverse((o) => { if (o.isMesh && worldVisible(o) && !/^sky/i.test(o.name || '')) meshes.push(o); });
+  const ray = new THREE.Raycaster();
+  const hit = (o, d) => { ray.set(o, d.normalize()); ray.far = 30; return ray.intersectObjects(meshes, false)[0] || null; };
+  let rug = null; root.traverse((o) => { if (!rug && /^Rug$/i.test(o.name || '')) rug = o; });
+  const rb = rug ? new THREE.Box3().setFromObject(rug) : null;
+  const rc = rb ? rb.getCenter(new THREE.Vector3()) : new THREE.Vector3(0.15, 0, 0.35), rr = rb ? Math.min(rb.max.x - rb.min.x, rb.max.z - rb.min.z) / 2 : 1;
+  const zS = rc.z, at = new THREE.Vector3(rc.x, 2.2, zS);
+  const wx = (dx, dz, dflt) => { const h = hit(at.clone(), new THREE.Vector3(dx, 0, dz)); return h ? h.point : dflt; };
+  const back = wx(0, -1, null), front = wx(0, 1, null), left = wx(-1, 0, null), right = wx(1, 0, null);
+  const zBack = back ? back.z : -2.2, xMin = left ? left.x : -2.5, xMax = right ? right.x : 2.5;
+  // the near wall's inner face, at several heights (it is thicker low down: a skirting/ledge read as a pale band once)
+  let zf = front ? front.z : 2.1;
+  for (const hy of [0.08, 0.2, 0.4, 0.7, 1.1, 1.6]) for (const dx of [-0.8, 0, 0.8]) {
+    const h = hit(new THREE.Vector3(rc.x + dx, hy, zS), new THREE.Vector3(0, 0, 1));
+    if (h && h.point.z > zS + 1.2 && h.point.z < zf) zf = h.point.z;
+  }
+  clipZ = zf - 0.03;
+  // her view at the back wall if she stood at x = 0: centre that span between the side walls (kept on the rug)
+  let xs = rc.x;
+  if (view) {
+    const pose = new THREE.Matrix4().makeTranslation(0, 0, zS).multiply(view.pose), inv = view.proj.clone().invert();
+    const cam = new THREE.Vector3().setFromMatrixPosition(pose);
+    const xAt = (nx) => { const p = new THREE.Vector3(nx, 0, 0.5).applyMatrix4(inv).applyMatrix4(pose), d = p.sub(cam); const t = (zBack - cam.z) / (d.z || -1e-6); return cam.x + d.x * t; };
+    const want = (xMin + xMax) / 2 - (xAt(-1) + xAt(1)) / 2;
+    xs = THREE.MathUtils.clamp(want, rc.x - rr + 0.42, rc.x + rr - 0.42);
+  }
+  const down = hit(new THREE.Vector3(xs, 1.5, zS), new THREE.Vector3(0, -1, 0));
+  const y = down && down.point.y < 0.25 ? down.point.y : (rb ? rb.max.y : 0);
+  return { x: xs, y, z: zS, walls: { zBack, xMin, xMax, front: clipZ + 0.03 } };
+}
+// affine map (canvas setTransform order a b c d e f) taking 3 source points onto 3 target points
+function affine3(s, t) {
+  const m = new THREE.Matrix3().set(s[0][0], s[0][1], 1, s[1][0], s[1][1], 1, s[2][0], s[2][1], 1);
+  if (Math.abs(m.determinant()) < 1e-9) return null;
+  m.invert();
+  const col = (k) => new THREE.Vector3(t[0][k], t[1][k], t[2][k]).applyMatrix3(m);
+  const X = col(0), Y = col(1);
+  return [X.x, Y.x, X.y, Y.y, X.z, Y.z];   // x' = a x + c y + e ; y' = b x + d y + f
+}
+
 let out = null;          // the 2D frame handed to the wallpaper
 let shownIn = null;      // 'nos' | 'bg'
 function show(frame) {
@@ -146,7 +214,8 @@ function blankFrame(c) {
 }
 
 async function build(mode, look) {
-  const order = (await webgpuOK(mode)) ? ['webgpu', 'webgl'] : ['webgl'];
+  // the floor-locked room needs the near-wall clip plane (WebGL2 path); the old drifting WebGPU room only without it
+  const order = !stageView() && (await webgpuOK(mode)) ? ['webgpu', 'webgl'] : ['webgl'];
   let err = null;
   for (const kind of order) {
     try { const R2 = await buildWith(mode, look, kind); state.renderer = kind; return R2; }
@@ -165,6 +234,7 @@ async function buildWith(mode, look, kind) {
   const L = LOOKS[look];
   renderer.toneMappingExposure = L.exp;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(L.bg);
+  bgCss = '#' + new THREE.Color(L.bg).getHexString();
   const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
   const loader = new GLTFLoader().setDRACOLoader(draco);
   const texL = new THREE.TextureLoader();
@@ -220,9 +290,94 @@ async function buildWith(mode, look, kind) {
   aim(); camera.position.copy(P); camera.lookAt(T);
   // the 2D frame the page shows (the WebGL canvas itself never enters the DOM)
   const frame = out || document.createElement('canvas');
-  frame.width = W; frame.height = H;
   const g2 = frame.getContext('2d');
-  const draw = () => { renderer.render(scene, camera); g2.drawImage(gl, 0, 0, W, H); };
+  // FLOOR LOCK: rendered through her camera into an oversized picture (master), then slid into the frame
+  const view = stageView();
+  let follow = null;
+  if (view && !gpu) {
+    if (!spot) spot = findSpot(gltf.scene, view);
+    // the near wall (between her camera and her) is clipped away: keeps z <= its inner face, room materials only
+    // the floor's raised front lip and the foot of the near wall catch the light as a bright line; when the textured floor
+    // extension takes over, the clip sits just inside that lip (9 cm), so the planks run on without either
+    const ext = makeFloorExt(gltf.scene, spot);
+    const clip = [new THREE.Plane(new THREE.Vector3(0, 0, -1), ext.userData.textured ? Math.min(clipZ, ext.userData.edgeZ - 0.09) : clipZ)];
+    renderer.localClippingEnabled = true;
+    gltf.scene.traverse((o) => { if (o.isMesh) for (const m of Array.isArray(o.material) ? o.material : [o.material]) { m.clippingPlanes = clip; m.needsUpdate = true; } });
+    // ...and the floor carries on past the room's front edge (a phone's tall view looks down past the clipped wall):
+    // the room's own wood texture, laid with the floor's own texture mapping so the planks run on unbroken, tinted to the
+    // lit floor right at the room's front edge (sampled from the first picture), so no seam shows where it takes over
+    ext.visible = false; scene.add(ext);
+    const cap = mode === 'live' ? 2048 * 1.6 : (matchMedia('(pointer: coarse)').matches ? 3600 : 4400);
+    const k = Math.min(1, cap / Math.max(W * MARGIN[0], H * MARGIN[1]));
+    const MW = Math.round(W * MARGIN[0] * k), MH = Math.round(H * MARGIN[1] * k);
+    renderer.setSize(MW, MH, false);
+    const master = document.createElement('canvas'); master.width = MW; master.height = MH;
+    const mg = master.getContext('2d');
+    const camF = new THREE.PerspectiveCamera(); camF.matrixAutoUpdate = false; camF.matrixWorldAutoUpdate = false;
+    const S = new THREE.Matrix4().makeScale(1 / MARGIN[0], 1 / MARGIN[1], 1);
+    follow = { master, MW, MH, ref: null, spot: { ...spot },
+      render(v) {
+        camF.matrixWorld.makeTranslation(spot.x, spot.y, spot.z).multiply(v.pose);
+        camF.matrixWorldInverse.copy(camF.matrixWorld).invert();
+        camF.matrixWorld.decompose(camF.position, camF.quaternion, camF.scale);
+        camF.projectionMatrix.copy(S).multiply(v.proj); camF.projectionMatrixInverse.copy(camF.projectionMatrix).invert();
+        renderer.render(scene, camF);
+        mg.drawImage(gl, 0, 0, MW, MH);
+        // the picture's own top / bottom colours: what shows for a moment where a slid picture no longer reaches
+        try { const t = document.createElement('canvas'); t.width = 1; t.height = 8; const tg = t.getContext('2d'); tg.drawImage(master, 0, 0, MW, MH, 0, 0, 1, 8); const d = tg.getImageData(0, 0, 1, 8).data; this.edge = [`rgb(${d[0]},${d[1]},${d[2]})`, `rgb(${d[28]},${d[29]},${d[30]})`]; } catch { this.edge = null; }
+        this.ref = { view: camF.matrixWorldInverse.clone(), pose: camF.matrixWorld.clone(), proj: camF.projectionMatrix.clone() };
+      } };
+    follow.render(view);
+    try {   // tint the extension to the lit wood right where it takes over: the visible wood patches in the strip just inside
+      // the clip (rug-free spots; on a phone her narrow lens shows only the middle), matched against the texture's own
+      // colour under each patch, so the planks hand over at the same brightness; patches further back only as a fallback
+      const zc = clip[0].constant - 0.15, zf = ext.userData.edgeZ - 0.35, acc = [0, 0, 0], und = [0, 0, 0]; let got = 0, gotU = 0;
+      const tries = [[[0, zc], [0.18, zc], [-0.18, zc], [0.8, zc], [-0.8, zc], [1.5, zc], [-1.5, zc]], [[0, zf], [0.8, zf], [-0.8, zf], [1.5, zf], [-1.5, zf], [1.55, spot.z + 0.6], [-1.55, spot.z + 0.6], [1.55, spot.z], [-1.55, spot.z]]];
+      for (const list of tries) { if (got >= 1) break; acc.fill(0); und.fill(0); got = gotU = 0; for (const [dx, z] of list) {
+        const pw = new THREE.Vector3(spot.x + dx, 0.002, z).applyMatrix4(follow.ref.view).applyMatrix4(follow.ref.proj);
+        const px = Math.round((pw.x + 1) / 2 * MW), py = Math.round((1 - pw.y) / 2 * MH);
+        if (!(pw.z < 1 && px >= 6 && py >= 6 && px < MW - 6 && py < MH - 6)) continue;
+        const d = mg.getImageData(px - 3, py - 3, 7, 7).data; let r = 0, g = 0, b = 0;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+        const n = d.length / 4; acc[0] += r / n; acc[1] += g / n; acc[2] += b / n; got++;
+        const t = ext.userData.texAt(spot.x + dx, z); if (t) { und[0] += t[0]; und[1] += t[1]; und[2] += t[2]; gotU++; }
+      } }
+      if (got) ext.userData.tint(acc[0] / got / 255, acc[1] / got / 255, acc[2] / got / 255, gotU === got ? und.map((q) => q / gotU) : null);
+      state.extTint = got; state.extSample = got ? acc.map((q) => Math.round(q / got)) : null;
+      ext.visible = true; follow.render(view);
+      // one check against the picture as this device actually draws it (texture filtering differs per GPU): the extension just
+      // past the floor's end vs the floor just before it, each over the texture's own colour there; if the planks would step
+      // in brightness, the tint is corrected once and the picture re-rendered
+      if (got && ext.userData.texAt) {
+        const lin = (x) => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+        const patch = (x, z) => {
+          const pw = new THREE.Vector3(x, 0.002, z).applyMatrix4(follow.ref.view).applyMatrix4(follow.ref.proj);
+          const px = Math.round((pw.x + 1) / 2 * MW), py = Math.round((1 - pw.y) / 2 * MH);
+          if (!(pw.z < 1 && px >= 6 && py >= 6 && px < MW - 6 && py < MH - 6)) return null;
+          const d = mg.getImageData(px - 3, py - 3, 7, 7).data, s = [0, 0, 0];
+          for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 3; c++) s[c] += lin(d[i + c]);
+          return s.map((q) => q / (d.length / 4));
+        };
+        const ze = clip[0].constant + 0.08, rat = [0, 0, 0]; let nr = 0;
+        for (const [dx] of tries[0]) {
+          const x = spot.x + dx, F = patch(x, zc), E = patch(x, ze), tF = ext.userData.texAt(x, zc), tE = ext.userData.texAt(x, ze);
+          if (!F || !E || !tF || !tE) continue;
+          for (let c = 0; c < 3; c++) rat[c] += (F[c] / tF[c]) / Math.max(1e-4, E[c] / tE[c]);
+          nr++;
+        }
+        if (nr) {
+          const k = rat.map((q) => THREE.MathUtils.clamp(q / nr, 0.8, 1.25));
+          state.extFix = k.map((q) => +q.toFixed(3));
+          if (k.some((q) => Math.abs(q - 1) > 0.015)) { ext.material.color.setRGB(ext.material.color.r * k[0], ext.material.color.g * k[1], ext.material.color.b * k[2], THREE.LinearSRGBColorSpace); follow.render(view); }
+        }
+      }
+    } catch (e) { ext.visible = true; }
+    frame.width = W; frame.height = H;
+    composite(follow, view, frame, true);
+  } else {
+    frame.width = W; frame.height = H;
+  }
+  const draw = () => { if (follow) return; renderer.render(scene, camera); g2.drawImage(gl, 0, 0, W, H); };
   if (gpu) await renderer.renderAsync(scene, camera).catch(() => {});   // compiles the WebGPU pipelines before the first copied frame
   draw();
   if (gpu && blankFrame(frame)) { try { renderer.dispose(); } catch {} throw new Error(kind + ' frame came out blank'); }
@@ -238,8 +393,89 @@ async function buildWith(mode, look, kind) {
     lm.dispose(); ext?.dispose(); scene.environment?.dispose();
     renderer.dispose(); renderer.forceContextLoss?.();
   };
-  return { frame, draw, dispose, camera, P, T, W, H };
+  return { frame, draw, dispose, camera, P, T, W, H, follow, bg: L.bg };
 }
+
+// FLOOR LOCK compositor: maps the master picture (rendered with camera 'ref') onto the frame for her camera NOW. Three points
+// on the upright plane through her standing spot (her soles, 1 m above them, 1 m to the camera's right) are projected both
+// ways; the affine through them is exact for that plane (so the floor under her feet never slides) and for any change of
+// her framing on the screen (card open/close, resize: same camera, new projection). Returns what still needs a real render.
+const _p = new THREE.Vector3();
+let bgCss = '#05040a';
+function composite(F, v, frame, force) {
+  const ref = F.ref; if (!ref) return { need: true };
+  const pose = new THREE.Matrix4().makeTranslation(F.spot.x, F.spot.y, F.spot.z).multiply(v.pose), viewM = pose.clone().invert();
+  const right = new THREE.Vector3().setFromMatrixColumn(pose, 0).setY(0).normalize();
+  const base = new THREE.Vector3(F.spot.x, F.spot.y, F.spot.z);
+  const pts = [base, base.clone().add(new THREE.Vector3(0, 1, 0)), base.clone().add(right)];
+  const px = (p, V, Pm, w, h) => { _p.copy(p).applyMatrix4(V).applyMatrix4(Pm); return [(_p.x + 1) / 2 * w, (1 - _p.y) / 2 * h]; };
+  const W = frame.width, H = frame.height;
+  const s = pts.map((p) => px(p, ref.view, ref.proj, F.MW, F.MH)), t = pts.map((p) => px(p, viewM, v.proj, W, H));
+  const A = affine3(s, t); if (!A) return { need: true };
+  const g = frame.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (F.edge) { const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, F.edge[0]); gr.addColorStop(1, F.edge[1]); g.fillStyle = gr; } else g.fillStyle = bgCss;
+  g.fillRect(0, 0, W, H);
+  g.setTransform(A[0], A[1], A[2], A[3], A[4], A[5]); g.imageSmoothingQuality = 'high';
+  g.drawImage(F.master, 0, 0);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  // does the master still cover the whole frame? (inverse-map the frame corners)
+  const det = A[0] * A[3] - A[1] * A[2];
+  const inv = (x, y) => { const X = x - A[4], Y = y - A[5]; return [(A[3] * X - A[2] * Y) / det, (-A[1] * X + A[0] * Y) / det]; };
+  let cover = true; for (const [x, y] of [[0, 0], [W, 0], [0, H], [W, H]]) { const [u, w] = inv(x, y); if (u < -2 || w < -2 || u > F.MW + 2 || w > F.MH + 2) cover = false; }
+  // how far her camera moved since the master was rendered (parallax the affine cannot fake)
+  const pRef = new THREE.Vector3().setFromMatrixPosition(ref.pose), pNow = new THREE.Vector3().setFromMatrixPosition(pose);
+  const qa = new THREE.Quaternion().setFromRotationMatrix(ref.pose), qb = new THREE.Quaternion().setFromRotationMatrix(pose);
+  const moved = pRef.distanceTo(pNow), turned = THREE.MathUtils.radToDeg(qa.angleTo(qb));
+  // where the bottom edge of the screen meets the floor (room z): past the room's floor it is the extension plane
+  const ip = v.proj.clone().invert(), cpos = new THREE.Vector3().setFromMatrixPosition(pose);
+  const bp = new THREE.Vector3(0, -1, 0.5).applyMatrix4(ip).applyMatrix4(pose).sub(cpos);
+  const fz = bp.y < 0 ? cpos.z + bp.z * ((F.spot.y - cpos.y) / bp.y) : null;
+  state.follow = { moved: +moved.toFixed(3), turned: +turned.toFixed(2), cover, cam: [+cpos.x.toFixed(2), +cpos.y.toFixed(2), +cpos.z.toFixed(2)], floorAtBottom: fz === null ? null : +fz.toFixed(2) };
+  return { need: !cover || moved > 0.1 || turned > 1.5, moved, turned, cover };   // under ~10 cm the slide is within a few px of a real render
+}
+let followTimer = 0;
+function startFollow() {
+  // live (strong desktops): a real render whenever her camera moved (<= ~12 fps). still (phones, weak laptops): the GPU is
+  // freed after each picture; small moves slide it, a bigger one (or a card opening past the margin) re-renders once
+  // her camera has settled
+  let last = 0, lastKey = '', needSince = 0, needFirst = 0, lastBuild = performance.now() - 3800, slow = 0, anchor = null;   // the first re-render may come ~1.2 s in
+  // "settled" = her camera stayed within ~6 cm (and the framing within ~2 %) for 700 ms: idle breathing/sway (the
+  // camera follows her head) does not count as moving, so a picture that needs a re-render gets one
+  const far = (v) => !anchor || Math.hypot(v.pose.elements[12] - anchor[0], v.pose.elements[13] - anchor[1], v.pose.elements[14] - anchor[2]) > 0.06 || Math.abs(v.proj.elements[0] / anchor[3] - 1) > 0.02 || Math.abs(v.proj.elements[5] / anchor[4] - 1) > 0.02 || Math.abs(v.proj.elements[8] - anchor[5]) > 0.03 || Math.abs(v.proj.elements[9] - anchor[6]) > 0.03;
+  const tick = (now) => {
+    followTimer = requestAnimationFrame(tick);
+    if (document.hidden || now - last < 33 || !R?.follow || building) return;
+    const v = stageView(); if (!v) return;
+    if (v.A.floorRug && v.A.floorRug.visible) v.A.floorRug.visible = false;   // a re-added floor (new body) keeps it off
+    const e = v.pose.elements, p = v.proj.elements;
+    const [fw, fh] = frameSize(state.mode);
+    const key = [e[12], e[13], e[14], e[8], e[9], e[10], p[0], p[5], p[8], p[9]].map((x) => x.toFixed(4)).join(',') + ':' + fw + 'x' + fh;
+    if (key === lastKey && !needSince) return;
+    const live = state.mode === 'live' && R.alive;
+    if (key !== lastKey) {
+      last = now; lastKey = key;
+      if (out.width !== fw || out.height !== fh) { out.width = fw; out.height = fh; anchor = null; }
+      let r = composite(R.follow, v, out);
+      if (live && (r.need || r.moved > 0.002 || r.turned > 0.05)) {
+        const t = performance.now(); R.follow.render(v); r = composite(R.follow, v, out);
+        slow = performance.now() - t > 70 ? slow + 1 : 0;
+        if (slow >= 6) { log('slow frames: still picture'); R.dispose(); R.alive = false; state.mode = 'still'; }
+      }
+      refresh();
+      if (!r.need || live) { needSince = 0; needFirst = 0; anchor = null; return; }
+      if (!needFirst) needFirst = now;
+      if (far(v)) { anchor = [e[12], e[13], e[14], p[0], p[5], p[8], p[9]]; needSince = now; }   // a real move: start the settle clock again
+      else if (!needSince) needSince = now;
+    }
+    state.settle = needSince ? Math.round(now - needSince) : 0;
+    // settled for 700 ms and the picture needs a real render (still mode): re-render, at most every 3 s
+    // (or, if her camera keeps drifting, once the picture has been off for 2.5 s)
+    if (needSince && (now - needSince > 700 || now - needFirst > 2500) && now - lastBuild > 3000) { needSince = 0; needFirst = 0; anchor = null; lastBuild = now; state.rebuilds = (state.rebuilds || 0) + 1; run('follow'); }
+  };
+  followTimer = requestAnimationFrame(tick);
+}
+function stopFollow() { cancelAnimationFrame(followTimer); followTimer = 0; }
 
 let R = null, liveTimer = 0, building = false;
 function startLive() {
@@ -270,9 +506,16 @@ async function run(reason) {
   try {
     const R2 = await Promise.race([build(mode, look), new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('room took over 60 s')), 60000); })]);
     clearTimeout(timer);
-    stopLive(); if (R) { R.dispose(); R = null; }
+    stopLive(); if (R && R.alive) R.dispose(); R = null;
     out = R2.frame; show(out);
-    if (mode === 'live') { R = R2; startLive(); } else R2.dispose();   // still: one picture, then the GPU is freed
+    R = R2; R.alive = true;
+    if (R2.follow) {   // FLOOR LOCK: she stands on the room's own rug now, so her separate lavender floor oval steps aside
+      const A = stageFn && stageFn(); if (A && A.floorRug) A.floorRug.visible = false;
+      state.spot = { x: +spot.x.toFixed(3), y: +spot.y.toFixed(4), z: +spot.z.toFixed(3), clipZ: +clipZ.toFixed(3) };
+      if (mode !== 'live') { R2.dispose(); R2.alive = false; }   // still: the picture stays, the GPU is freed
+      if (!followTimer) startFollow();
+    } else if (mode === 'live') startLive();
+    else { R2.dispose(); R2.alive = false; }   // still: one picture, then the GPU is freed
     state.state = 'shown'; state.shownIn = shownIn; state.size = [R2.W, R2.H]; state.ms.total = Math.round(performance.now() - t0);
     log('shown', mode, look, state.size.join('x'), state.ms);
   } catch (e) {
@@ -282,7 +525,8 @@ async function run(reason) {
   } finally { building = false; }
 }
 
-export function mountRoomBg({ obs = false, waitFor = null } = {}) {
+export function mountRoomBg({ obs = false, waitFor = null, stage = null } = {}) {
+  stageFn = stage;
   if (obs || Q.get('room') === '0' || document.body.classList.contains('bg-none') || document.body.classList.contains('stream')) { state.state = 'off'; return state; }
   if (!webgl2OK() && !navigator.gpu) { state.state = 'fallback'; state.error = 'no WebGL2 / WebGPU'; return state; }
   const t0 = performance.now();
@@ -300,10 +544,92 @@ export function mountRoomBg({ obs = false, waitFor = null } = {}) {
     clearTimeout(rt);
     rt = setTimeout(() => {
       const a = innerWidth / innerHeight;
-      if (state.state === 'shown' && (a > 1) !== (lastAspect > 1)) { lastAspect = a; run('orientation'); }
+      if (state.state === 'shown' && (a > 1) !== (lastAspect > 1)) { lastAspect = a; spot = null; run('orientation'); }
     }, 700);
   });
   // day <-> night follows her clock (checked every 10 min) unless the URL pins a look
   if (!Q.get('look')) setInterval(() => { if (state.state === 'shown' && pickLook() !== state.look) run('look'); }, 600000);
   return state;
+}
+
+// FLOOR EXTENSION: a big plane at the wood's height carrying the floor's own texture with the floor's own UV mapping
+// (fitted from the floor mesh: uv = a*x + b*z + c), so the planks continue past the room's front edge without a seam.
+function makeFloorExt(root, spot) {
+  root.updateMatrixWorld(true);
+  let floor = null;
+  root.traverse((o) => { if (!floor && o.isMesh && (o.material?.name === 'floor' || /floor/i.test(o.material?.name || ''))) floor = o; });
+  const S = 40, x0 = spot.x - S, x1 = spot.x + S, z0 = spot.z - S, z1 = spot.z + S;
+  let y = -0.004, fit = null, edgeZ = 2.0, tex = null, avg = [0.5, 0.4, 0.4], lin128 = null;
+  if (floor) {
+    const p = floor.geometry.attributes.position, uv = floor.geometry.attributes.uv, v = new THREE.Vector3();
+    const pts = []; let ymax = -1e9, zmax = -1e9;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(floor.matrixWorld); if (v.y > ymax) ymax = v.y; pts.push([v.x, v.y, v.z, uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0]); }
+    const top = pts.filter((q) => q[1] > ymax - 0.012);
+    for (const q of top) if (q[2] > zmax) zmax = q[2];
+    if (top.length >= 3) edgeZ = zmax;
+    // the walkable wood's own height (rays straight down onto the floor mesh only, beside and in front of the rug);
+    // the plane sits just under it, so it never covers the rug or the floor and only shows past the room's edge
+    const rc = new THREE.Raycaster(); let hy = Infinity;
+    for (const [dx, dz] of [[1.6, 0], [-1.6, 0], [1.6, 1.2], [-1.6, 1.2], [0, 1.55], [0.9, 1.6], [-0.9, 1.6]]) {
+      rc.set(new THREE.Vector3(spot.x + dx, 3, spot.z + dz), new THREE.Vector3(0, -1, 0));
+      const h = rc.intersectObject(floor, false)[0]; if (h && h.point.y < hy) hy = h.point.y;
+    }
+    y = (Number.isFinite(hy) ? Math.min(hy, spot.y) : spot.y) - 0.012;
+    if (uv && top.length >= 3) {   // least squares, 3x3 normal equations, for u and for v
+      const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], bu = [0, 0, 0], bv = [0, 0, 0];
+      for (const q of top) { const r = [q[0], q[2], 1]; for (let a = 0; a < 3; a++) { bu[a] += r[a] * q[3]; bv[a] += r[a] * q[4]; for (let b = 0; b < 3; b++) M[a][b] += r[a] * r[b]; } }
+      const solve = (A, bb) => { const m = A.map((row, i) => [...row, bb[i]]); for (let c = 0; c < 3; c++) { let piv = c; for (let r = c + 1; r < 3; r++) if (Math.abs(m[r][c]) > Math.abs(m[piv][c])) piv = r; [m[c], m[piv]] = [m[piv], m[c]]; if (Math.abs(m[c][c]) < 1e-12) return null; for (let r = 0; r < 3; r++) if (r !== c) { const f = m[r][c] / m[c][c]; for (let k = c; k < 4; k++) m[r][k] -= f * m[c][k]; } } return [m[0][3] / m[0][0], m[1][3] / m[1][1], m[2][3] / m[2][2]]; };
+      const fu = solve(M, bu), fv = solve(M, bv);
+      if (fu && fv && fu.every(Number.isFinite) && fv.every(Number.isFinite) && (Math.abs(fu[0]) + Math.abs(fu[1])) > 1e-4) fit = [fu, fv];
+    }
+    const map = floor.material?.map;
+    if (fit && map && map.image) {
+      // the floor's own wrap (repeat), so past the room's edge the plank rows carry on exactly as the floor's own would
+      // (a mirrored wrap flipped the planks at v = 2, just inside the room's front: a visible step in tone and pattern)
+      tex = map.clone(); tex.wrapS = map.wrapS; tex.wrapT = map.wrapT; tex.needsUpdate = true;
+      try {   // the texture's mean colour (linear), so the tint can match the lit floor exactly
+        const c = document.createElement('canvas'); c.width = c.height = 16; const cg = c.getContext('2d'); cg.drawImage(map.image, 0, 0, 16, 16);
+        const d = cg.getImageData(0, 0, 16, 16).data; const s = [0, 0, 0];
+        for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) { const x = d[i + k] / 255; s[k] += x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }
+        avg = s.map((x) => Math.max(0.02, x / 256));
+        // ...and a small linear copy, so the tint can be matched to the exact planks under each sampled floor patch
+        const N = 128, c2 = document.createElement('canvas'); c2.width = c2.height = N; const g2 = c2.getContext('2d'); g2.drawImage(map.image, 0, 0, N, N);
+        const d2 = g2.getImageData(0, 0, N, N).data; lin128 = new Float32Array(N * N * 3);
+        for (let i = 0, j = 0; i < d2.length; i += 4, j += 3) for (let k = 0; k < 3; k++) { const x = d2[i + k] / 255; lin128[j + k] = x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }
+      } catch {}
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  const P = [x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1];
+  const U = []; for (let i = 0; i < 4; i++) { const x = P[i * 3], z = P[i * 3 + 2]; U.push(fit ? fit[0][0] * x + fit[0][1] * z + fit[0][2] : 0, fit ? fit[1][0] * x + fit[1][1] * z + fit[1][2] : 0); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setIndex([0, 2, 1, 0, 3, 2]); g.computeVertexNormals();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x8a6f73, map: tex, toneMapped: false, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(g, mat);
+  // textured = the planks carry on: the room is then clipped just inside its raised front lip (see the clip in render).
+  // (r3d: this flag was never set, so the clip stayed at the near wall's face and the foot of that wall (a bevel 2-3 cm
+  // inside the clip) caught the light as the bright line across the phone's whole-body floor)
+  mesh.userData.edgeZ = edgeZ; mesh.userData.y = y; mesh.userData.textured = !!tex;
+  state.ext = { y: +y.toFixed(4), edgeZ: +edgeZ.toFixed(3), textured: !!tex, fit: fit ? fit.map((f) => f.map((x) => +x.toFixed(4))) : null };
+  mesh.userData.tint = (r, gg, b, under) => {   // sRGB sample of the lit floor -> colour multiplier for the texture
+    const lin = (x) => (x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+    const t = under || avg;   // the texture's own colour under the sampled patches (else its overall mean)
+    if (tex) mat.color.setRGB(lin(r) / t[0], lin(gg) / t[1], lin(b) / t[2], THREE.LinearSRGBColorSpace);
+    else mat.color.setRGB(r, gg, b, THREE.SRGBColorSpace);
+  };
+  // the texture's mean (linear) over a world-space square of half-size h at (x, z), with the floor's own mapping and wrap:
+  // what the extension would show there with a white tint
+  mesh.userData.texAt = (x, z, h = 0.05) => {
+    if (!lin128 || !fit) return null;
+    const N = 128, s = [0, 0, 0]; let n = 0;
+    const m = (t) => (tex && tex.wrapS === THREE.MirroredRepeatWrapping ? ((t = ((t % 2) + 2) % 2) > 1 ? 2 - t : t) : t - Math.floor(t));
+    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+      const X = x + h * i / 3, Z = z + h * j / 3;
+      const u = m(fit[0][0] * X + fit[0][1] * Z + fit[0][2]), v = m(fit[1][0] * X + fit[1][1] * Z + fit[1][2]);
+      const k = (Math.min(N - 1, Math.floor(v * N)) * N + Math.min(N - 1, Math.floor(u * N))) * 3;
+      s[0] += lin128[k]; s[1] += lin128[k + 1]; s[2] += lin128[k + 2]; n++;
+    }
+    return s.map((q) => Math.max(0.01, q / n));
+  };
+  return mesh;
 }

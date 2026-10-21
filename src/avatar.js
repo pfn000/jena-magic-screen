@@ -484,7 +484,8 @@ export class Avatar {
       g2.fillStyle = gr; g2.fillRect(0, 0, 256, 256);
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
     })();
-    g.add(disc(1.25, 0.95, rug, 0.0005));
+    this.floorRug = disc(1.25, 0.95, rug, 0.0005);   // hidden by the room (src/room-bg.js) once she stands on its real rug
+    g.add(this.floorRug);
     g.add(disc(0.7, 0.45, tex(0.45, 0, '60,30,85'), 0.001)); // soft shadow under her
     this.footShadows = {};
     for (const s of ['left', 'right']) {

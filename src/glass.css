@@ -238,3 +238,104 @@ body.lg .m-feed { margin: 0 16px 14px; padding-left: 18px; font-size: 13px; colo
 /* N•OS window chrome (dots, resize arc/handles) belongs to its free-floating windows, not to the glass shell's cards */
 body.lg #stage > .panel .nos-dots, body.lg #stage > .panel .nos-arc, body.lg #stage > .panel .nos-rz, body.lg #stage > .panel .nos-chrome, body.lg #stage > .panel .nos-ops,
 body.lg #avatar-panel .nos-dots, body.lg #avatar-panel .nos-arc, body.lg #avatar-panel .nos-rz, body.lg #avatar-panel .nos-chrome, body.lg #avatar-panel .nos-ops { display: none !important; }
+
+
+/* ============ r3: REAL LIQUID GLASS (Saidie, Oct 21 2026, 12:55 PM: "actually use liquid glass and not this weird frosted
+   shit. Now yeah, it can be blurred in the background, but like there needs to be also depth") ============
+   Mostly clear (a light tint, not milky), only a mild blur, the backdrop bent like a lens (N•OS WebGL lens or the SVG
+   displacement filter: src/liquid-glass.js), a bright specular rim on top/left, a chromatic edge, an inner thickness shade and
+   a soft drop shadow so each piece floats. The tab bubble's slide/spring/jelly animation is untouched (only its paint). */
+body.lg {
+  --lg-tint: linear-gradient(180deg, rgba(255, 255, 255, .40), rgba(255, 255, 255, .20) 55%, rgba(255, 255, 255, .28));
+  --lg-tint-card: linear-gradient(180deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .1));
+  --lg-rim:
+    inset 0 1.5px .5px -.5px rgba(255, 255, 255, .98),      /* specular top edge */
+    inset 1.5px 0 .5px -.5px rgba(255, 255, 255, .55),       /* left edge */
+    inset -1px -1.5px 1px -.5px rgba(255, 255, 255, .42),    /* light bouncing off the bottom-right inner edge */
+    inset 0 0 0 .6px rgba(255, 255, 255, .55),                /* the glass edge itself */
+    inset 0 14px 18px -16px rgba(255, 255, 255, .85),         /* top inner glow (thickness) */
+    inset 0 -14px 20px -16px rgba(40, 14, 72, .26),           /* bottom inner shade (thickness) */
+    inset 3px 0 3px -3px rgba(255, 70, 170, .45),            /* chromatic edge: warm left */
+    inset -3px 0 3px -3px rgba(70, 190, 255, .5);            /* chromatic edge: cool right */
+  --lg-depth: 0 12px 30px -8px rgba(40, 16, 74, .34), 0 4px 10px -2px rgba(40, 16, 74, .18), 0 0 0 .5px rgba(30, 10, 60, .10);
+  --lg-clear: blur(4px) saturate(1.9) brightness(1.1) contrast(1.05);
+  --lg-clear-card: blur(3px) saturate(1.8) brightness(1.06);
+  --lg-ring: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .18) 32%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, .14) 70%, rgba(255, 255, 255, .7));
+  --lg-bubble: rgba(255, 255, 255, .36);
+}
+body.lg.lg-dark {
+  --lg-tint: linear-gradient(180deg, rgba(34, 28, 48, .34), rgba(18, 14, 28, .22) 55%, rgba(30, 24, 44, .3));
+  --lg-tint-card: linear-gradient(180deg, rgba(34, 28, 48, .26), rgba(18, 14, 28, .18));
+  --lg-rim:
+    inset 0 1.5px .5px -.5px rgba(255, 255, 255, .55), inset 1.5px 0 .5px -.5px rgba(255, 255, 255, .25),
+    inset -1px -1.5px 1px -.5px rgba(255, 255, 255, .2), inset 0 0 0 .6px rgba(255, 255, 255, .22),
+    inset 0 14px 18px -16px rgba(255, 255, 255, .3), inset 0 -14px 20px -16px rgba(0, 0, 0, .45),
+    inset 3px 0 3px -3px rgba(255, 90, 190, .45), inset -3px 0 3px -3px rgba(90, 200, 255, .45);
+  --lg-depth: 0 12px 30px -8px rgba(0, 0, 0, .6), 0 4px 10px -2px rgba(0, 0, 0, .35), 0 0 0 .5px rgba(0, 0, 0, .3);
+  --lg-clear: blur(4px) saturate(1.7) brightness(.92);
+  --lg-clear-card: blur(3px) saturate(1.6) brightness(.9);
+  --lg-ring: linear-gradient(135deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .1) 32%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, .08) 70%, rgba(255, 255, 255, .38));
+  --lg-bubble: rgba(255, 255, 255, .14);
+}
+/* the pieces: path 3 (CSS only) by default */
+body.lg #m-tabs, body.lg #m-speak, body.lg #m-top .m-id, body.lg #m-top .m-actions, body.lg.m-app #tip-btn, body.lg.m-wide #tip-btn {
+  background: var(--lg-tint) !important; border: 0 !important;
+  backdrop-filter: var(--lg-clear) !important; -webkit-backdrop-filter: var(--lg-clear) !important;
+  box-shadow: var(--lg-rim), var(--lg-depth) !important; }
+body.lg #stage > .panel {
+  background: var(--lg-tint-card) !important; border: 0 !important;
+  backdrop-filter: var(--lg-clear-card) !important; -webkit-backdrop-filter: var(--lg-clear-card) !important;
+  box-shadow: var(--lg-rim), var(--lg-depth) !important; }
+body.lg #m-speak.rec, body.lg.nos-gl #m-speak.rec { background: linear-gradient(135deg, rgba(255, 79, 154, .92), rgba(180, 92, 255, .92)) !important; }
+/* a rim light that runs round the edge, bright top-left, fading, catching again bottom-right (a gradient ring, masked to 1.2 px) */
+body.lg .lg-glass::after, body.lg #tip-btn::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none; z-index: 3;
+  background: var(--lg-ring);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+/* specular sheen across the top of each piece (stronger than the old soft-light wash) */
+body.lg .lg-glass::before, body.lg #stage > .panel::before {
+  background: radial-gradient(140% 60% at 30% -18%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 60%), radial-gradient(70% 40% at 92% 118%, rgba(255, 255, 255, .22), transparent 62%);
+  mix-blend-mode: screen; opacity: .7; }
+body.lg.lg-dark .lg-glass::before, body.lg.lg-dark #stage > .panel::before { opacity: .28; }
+/* legible on clear glass: a soft halo under the ink (like iOS vibrancy) */
+body.lg #m-tabs button, body.lg #m-top .m-name, body.lg #tip-btn { text-shadow: 0 0 5px rgba(255, 255, 255, .6), 0 0 1px rgba(255, 255, 255, .8); }
+body.lg.lg-dark #m-tabs button, body.lg.lg-dark #m-top .m-name, body.lg.lg-dark #tip-btn { text-shadow: 0 0 6px rgba(0, 0, 0, .6), 0 0 1px rgba(0, 0, 0, .7); }
+body.lg #m-tabs button svg, body.lg #m-speak svg { filter: drop-shadow(0 0 3px rgba(255, 255, 255, .6)); }
+body.lg.lg-dark #m-tabs button svg, body.lg.lg-dark #m-speak svg { filter: drop-shadow(0 0 3px rgba(0, 0, 0, .5)); }
+/* the active-tab bubble: a clearer glass lens with its own rim (paint only; transform/transition/animation untouched) */
+body.lg #m-tabs .lg-bubble { background: var(--lg-bubble);
+  box-shadow: inset 0 1px .5px rgba(255, 255, 255, .98), inset 0 -1px 1px rgba(255, 255, 255, .4), inset 0 0 0 .6px rgba(255, 255, 255, .6), inset 0 -8px 12px -10px rgba(40, 14, 72, .2), 0 3px 10px rgba(70, 35, 105, .16); }
+body.lg.lg-dark #m-tabs .lg-bubble { box-shadow: inset 0 1px .5px rgba(255, 255, 255, .4), inset 0 0 0 .6px rgba(255, 255, 255, .22), 0 3px 10px rgba(0, 0, 0, .35); }
+
+/* path 1: N•OS WebGL lens underneath -> the DOM layer keeps only the rim, the light tint and no blur of its own */
+body.lg.nos-gl #m-tabs, body.lg.nos-gl #m-speak, body.lg.nos-gl #m-top .m-id, body.lg.nos-gl #m-top .m-actions, body.lg.nos-gl.m-app #tip-btn, body.lg.nos-gl.m-wide #tip-btn {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04) 55%, rgba(255, 255, 255, .1)) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: var(--lg-rim) !important; border: 0 !important; }
+body.lg.nos-gl.lg-dark #m-tabs, body.lg.nos-gl.lg-dark #m-speak, body.lg.nos-gl.lg-dark #m-top .m-id, body.lg.nos-gl.lg-dark #m-top .m-actions, body.lg.nos-gl.lg-dark.m-app #tip-btn, body.lg.nos-gl.lg-dark.m-wide #tip-btn {
+  background: linear-gradient(180deg, rgba(30, 24, 44, .22), rgba(14, 10, 22, .12)) !important; }
+body.lg.nos-gl #stage > .panel { background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .04)) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: var(--lg-rim) !important; }
+body.lg.nos-gl.lg-dark #stage > .panel { background: linear-gradient(180deg, rgba(30, 24, 44, .16), rgba(14, 10, 22, .1)) !important; }
+
+/* path 2: Chromium without the WebGL lens -> the SVG displacement filter bends the backdrop (src/liquid-glass.js) */
+body.lg.lg-refract #m-tabs[data-lgf], body.lg.lg-refract #m-speak[data-lgf], body.lg.lg-refract #m-top .m-id[data-lgf], body.lg.lg-refract #m-top .m-actions[data-lgf], body.lg.lg-refract #tip-btn[data-lgf] {
+  backdrop-filter: var(--lgf) blur(1px) saturate(1.7) brightness(1.08) !important; -webkit-backdrop-filter: var(--lgf) blur(1px) saturate(1.7) brightness(1.08) !important; }
+body.lg.lg-refract #stage > .panel[data-lgf] { backdrop-filter: var(--lgf) blur(2px) saturate(1.6) brightness(1.05) !important; -webkit-backdrop-filter: var(--lgf) blur(2px) saturate(1.6) brightness(1.05) !important; }
+@media (prefers-reduced-transparency: reduce) {
+  body.lg #m-tabs, body.lg #m-speak, body.lg #m-top .m-id, body.lg #m-top .m-actions, body.lg #stage > .panel { background: var(--lg-fill) !important; }
+}
+body.lg #m-speak, body.lg #m-top .m-id, body.lg #m-top .m-actions { position: relative; }
+body.lg #stage > .panel h2, body.lg #stage > .panel h3, body.lg .m-card-h, body.lg #chat .m-sheet-h { text-shadow: 0 0 8px rgba(255, 255, 255, .7); }
+body.lg.lg-dark #stage > .panel h2, body.lg.lg-dark #stage > .panel h3, body.lg.lg-dark .m-card-h, body.lg.lg-dark #chat .m-sheet-h { text-shadow: 0 0 8px rgba(0, 0, 0, .6); }
+body.lg #stage > .panel p, body.lg #stage > .panel .m-feed, body.lg #stage > .panel small { text-shadow: 0 0 6px rgba(255, 255, 255, .7); }
+body.lg.lg-dark #stage > .panel p, body.lg.lg-dark #stage > .panel .m-feed, body.lg.lg-dark #stage > .panel small { text-shadow: 0 0 6px rgba(0, 0, 0, .6); }
+/* r3b (review): the cards stay clear glass; the contrast lives UNDER the text instead (message bubbles, fields, a soft plate
+   behind headings/captions), so the words read in light and dark over any part of the room */
+body.lg { --lg-msg: rgba(255, 255, 255, .78); --lg-field: rgba(255, 255, 255, .62); --lg-plate: rgba(255, 255, 255, .55); }
+body.lg.lg-dark { --lg-msg: rgba(22, 17, 32, .72); --lg-field: rgba(22, 17, 32, .62); --lg-plate: rgba(22, 17, 32, .55); --lg-ink2: #d9cfe6; }
+body.lg #chat.mode-chat #chat-list .msg { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+body.lg #talk input::placeholder { color: var(--lg-ink2); opacity: 1; }
+body.lg .panel-head h2, body.lg .m-cap, body.lg .m-feed-h, body.lg .m-fine, body.lg #chat-list .m-thought {
+  background: var(--lg-plate); border-radius: 10px; padding: 2px 8px; box-decoration-break: clone; -webkit-box-decoration-break: clone; width: fit-content; max-width: calc(100% - 16px); }
+body.lg #chat-list .m-thought { opacity: 1; }
