@@ -1,0 +1,240 @@
+/* ============ Liquid Glass app shell (src/mobile.js) — every screen size, never OBS/stream ============
+   Jena is the hero (full stage); the chat is a slim glass sheet; Computer/Body/Settings open as glass cards;
+   the dock is a floating glass pill (4 tabs) + a separate round Speak bubble, like the iOS 26 tab bar + search. */
+body.lg {
+  --lg-ink: #2a1f3b; --lg-ink2: #6e6283; --lg-accent: #e8459b;
+  --lg-fill: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .34));
+  --lg-edge: rgba(255, 255, 255, .7); --lg-line: rgba(42, 31, 59, .08);
+  --lg-shadow: 0 10px 34px rgba(70, 35, 105, .18), 0 1px 3px rgba(70, 35, 105, .12);
+  --lg-hi: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(255, 255, 255, .28), inset 0 0 0 .5px rgba(255, 255, 255, .35);
+  --lg-bubble: rgba(255, 255, 255, .72); --lg-field: rgba(255, 255, 255, .55); --lg-msg: rgba(255, 255, 255, .7);
+  --lg-blur: blur(22px) saturate(1.8) brightness(1.04);
+  --dock-h: 62px; --dock-b: calc(12px + env(safe-area-inset-bottom)); --sheet: 28dvh;
+  --top-h: calc(52px + env(safe-area-inset-top));
+  --card-h: 58dvh; --gap: 10px;
+  color: var(--lg-ink); font-family: system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+body.lg.lg-dark {
+  --lg-ink: #f6f0fb; --lg-ink2: #b9aecb; --lg-accent: #ff7ac6;
+  --lg-fill: linear-gradient(180deg, rgba(48, 42, 62, .62), rgba(28, 24, 38, .5));
+  --lg-edge: rgba(255, 255, 255, .16); --lg-line: rgba(255, 255, 255, .1);
+  --lg-shadow: 0 10px 34px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
+  --lg-hi: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(255, 255, 255, .06), inset 0 0 0 .5px rgba(255, 255, 255, .1);
+  --lg-bubble: rgba(255, 255, 255, .16); --lg-field: rgba(255, 255, 255, .1); --lg-msg: rgba(255, 255, 255, .12);
+}
+body.lg .lg-glass, body.lg #stage > .panel {
+  position: relative; background: var(--lg-fill); border: 1px solid var(--lg-edge);
+  backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-hi), var(--lg-shadow);
+}
+/* specular edge: a soft highlight that sits on the top-left rim of every glass piece */
+body.lg .lg-glass::before, body.lg #stage > .panel::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: radial-gradient(120% 70% at 18% -10%, rgba(255, 255, 255, .55), transparent 55%), radial-gradient(80% 50% at 100% 120%, rgba(255, 255, 255, .18), transparent 60%);
+  mix-blend-mode: soft-light;
+}
+body.lg.lg-dark .lg-glass::before, body.lg.lg-dark #stage > .panel::before { opacity: .5; }
+
+/* ---- stage: Jena fills the screen above the sheet/card ---- */
+body.lg #bg { inset: 0 !important; height: auto !important; }
+body.lg:not(.obs) #stage { position: fixed !important; inset: 0 !important; display: block !important; padding: 0 !important; background: transparent; }
+body.lg #avatar-panel { position: fixed !important; left: 0; right: 0; top: 0; height: auto !important; bottom: calc(var(--dock-b) + var(--dock-h) + var(--sheet) - 6px);
+  border-radius: 0 !important; transition: bottom .38s cubic-bezier(.3, 1.2, .5, 1), right .38s ease; z-index: 1; }
+body.lg:not([data-tab="chat"]) #avatar-panel { bottom: calc(var(--dock-b) + var(--dock-h) + var(--card-h) - 6px); }
+body.lg.sheet-drag #avatar-panel, body.lg.sheet-drag #chat { transition: none !important; }
+body.lg #speech { bottom: 34px; }
+body.lg .nametag, body.lg #self-toggle, body.lg .controls, body.lg #thoughts, body.lg #mic-status, body.lg #talk #mic { display: none !important; }
+body.lg #build-stamp { display: none !important; }
+
+/* ---- header: two small glass pills ---- */
+body.lg #m-top { position: fixed; z-index: 40; top: 0; left: 0; right: 0; height: var(--top-h); padding: env(safe-area-inset-top) 10px 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none !important; border: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; pointer-events: none; }
+body.lg #m-top > * { pointer-events: auto; }
+body.lg #m-top .m-id { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px 0 5px; border-radius: 21px; min-width: 0; max-width: 70%; }
+body.lg #m-top .m-disc { position: relative; z-index: 1; width: 32px; height: 32px; font-size: 15px; flex: none; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; background: linear-gradient(135deg, #ff5fae, #a66bff); }
+body.lg #m-top .m-name { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+body.lg #m-top .m-name b { font-size: 15px; font-weight: 650; }
+body.lg #m-top .m-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--lg-ink2); white-space: nowrap; overflow: hidden; }
+body.lg #m-top .m-status span { overflow: hidden; text-overflow: ellipsis; }
+body.lg #m-top .m-status i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #f0b429; }
+body.lg #m-top .m-status.live i { background: #22c38e; }
+body.lg #m-top .m-actions { display: flex; gap: 0; height: 42px; padding: 0 3px; border-radius: 21px; align-items: center; }
+body.lg #m-top #voice-btn, body.lg #m-top #dm-toggle { position: relative !important; z-index: 1; inset: auto !important; transform: none !important; width: 38px !important; height: 38px !important; margin: 0 !important;
+  border: 0 !important; border-radius: 50% !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; font-size: 0 !important; display: grid; place-items: center; cursor: pointer; color: inherit; padding: 0 !important; }
+
+/* ---- the cards: chat sheet + Computer / Body / Settings ---- */
+body.lg #stage > .panel { position: fixed !important; z-index: 20; left: var(--gap); right: var(--gap); bottom: calc(var(--dock-b) + var(--dock-h) + 10px); top: auto !important;
+  height: var(--card-h); margin: 0 !important; border-radius: 26px !important; display: none; flex-direction: column; overflow: hidden; color: var(--lg-ink);
+  animation: lg-in .32s cubic-bezier(.3, 1.3, .5, 1); transition: height .38s cubic-bezier(.3, 1.2, .5, 1); }
+body.lg #stage > .panel > * { position: relative; z-index: 1; }
+body.lg #stage > #chat { height: var(--sheet); }
+body.lg[data-tab="chat"] #chat, body.lg[data-tab="desktop"] #desktop, body.lg[data-tab="body"] #body-panel, body.lg[data-tab="settings"] #settings-panel { display: flex !important; }
+body.lg #desktop, body.lg #body-panel, body.lg #settings-panel { overflow-y: auto !important; }
+@keyframes lg-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+body.lg .panel-head { padding: 12px 16px 6px; }
+body.lg .panel-head h2 { font-size: 16px; font-weight: 650; letter-spacing: -.01em; color: var(--lg-ink); }
+body.lg .panel-head h2 .sub { font-weight: 500; color: var(--lg-ink2); }
+body.lg .chip, body.lg .desk-badge, body.lg .brain-badge { background: var(--lg-field) !important; color: var(--lg-ink2) !important; border: 0 !important; font-size: 11px; padding: 3px 9px; border-radius: 999px; }
+body.lg .brain-badge.is-live { color: #0b8a5f !important; }
+body.lg .m-cap { color: var(--lg-ink2); font-size: 13px; margin: 8px 16px 14px; }
+
+/* chat sheet */
+body.lg #chat .m-grab { flex: none; height: 18px; display: grid; place-items: center; cursor: grab; touch-action: none; }
+body.lg #chat .m-grab::after { content: ''; width: 38px; height: 5px; border-radius: 3px; background: var(--lg-ink2); opacity: .45; }
+body.lg #chat .panel-head { padding: 0 16px 2px; min-height: 0; }
+body.lg #chat .panel-head h2 { font-size: 14px; }
+body.lg #chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 14px 6px; font-size: 14.5px; overscroll-behavior: contain; scrollbar-width: none; }
+body.lg #chat.mode-chat #chat-list .msg { background: var(--lg-msg); box-shadow: none; padding: 6px 11px; margin: 4px 0; max-width: 82%; border-radius: 17px 17px 17px 6px; }
+body.lg #chat.mode-chat #chat-list .from-you { background: linear-gradient(135deg, #ff6bb5, #b06bff); color: #fff; border-radius: 17px 17px 6px 17px; }
+body.lg #chat-list .chat-empty { padding: 4px 0 6px; gap: 6px; }
+body.lg #chat-list .chat-empty b { font-size: 15px; color: var(--lg-ink); }
+body.lg #chat-list .chat-empty b::after { content: none !important; }
+body.lg #chat-list .chat-empty > span { display: none; }
+body.lg .m-chips { display: flex; gap: 6px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; margin: 0; }
+body.lg .m-chips button { flex: none; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--lg-edge); background: var(--lg-field); color: var(--lg-ink); font-size: 13px; cursor: pointer; }
+/* her thoughts, inline: dim italic, no bubble */
+body.lg #chat-list .m-thought { list-style: none; display: flex; gap: 6px; align-items: baseline; margin: 3px 2px; font-size: 12.5px; line-height: 1.35; font-style: italic; color: var(--lg-ink2); opacity: .85; }
+body.lg #chat-list .m-thought .m-th-ic { font-style: normal; font-size: 11px; opacity: .8; }
+body.lg #chat-list .m-thought.k-note { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-style: normal; font-size: 11.5px; }
+/* slim glass input */
+body.lg #talk { flex: none; display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 8px 8px; border: 0 !important; background: none !important; box-shadow: none !important; backdrop-filter: none !important; }
+body.lg #talk .cmp-row { display: contents; }
+body.lg #talk .cmp-gap { display: none; }
+body.lg #talk input { order: 1; flex: 1; min-width: 0; height: 38px; padding: 0 14px; font-size: 16px; color: var(--lg-ink); border-radius: 19px; border: 1px solid var(--lg-edge); background: var(--lg-field); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .06); }
+body.lg #talk input::placeholder { color: var(--lg-ink2); }
+body.lg #talk input:focus { outline: none; border-color: rgba(232, 69, 155, .5); }
+body.lg #talk #gift, body.lg #talk #cmp-attach { display: none !important; }
+body.lg #talk .cmp-btn { order: 0; flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; color: var(--lg-ink2); font-size: 18px; display: grid; place-items: center; padding: 0; cursor: pointer; }
+body.lg #talk .cmp-btn.on { color: var(--lg-accent); background: var(--lg-field); }
+body.lg #talk .cmp-send { order: 2; flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; display: grid; place-items: center; padding: 0; color: #fff; font-size: 17px; background: linear-gradient(135deg, #ff6bb5, #b06bff); cursor: pointer; }
+
+/* settings */
+body.lg .m-set { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px 14px; }
+body.lg .m-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 6px; border-bottom: 1px solid var(--lg-line); font-size: 14.5px; }
+body.lg .m-row.m-col { flex-direction: column; align-items: stretch; }
+body.lg .m-row > span:first-child { font-weight: 600; }
+body.lg .m-fine { margin: 0; font-size: 12px; line-height: 1.4; color: var(--lg-ink2); }
+body.lg .m-seg { display: flex; padding: 2px; border-radius: 10px; background: var(--lg-field); }
+body.lg .m-seg button { border: 0; background: none; color: var(--lg-ink); font-size: 13px; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
+body.lg .m-seg button[aria-checked="true"] { background: var(--lg-bubble); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); font-weight: 600; }
+body.lg #m-voice-mirror { position: static !important; width: 40px; height: 32px; border-radius: 10px; border: 0; background: var(--lg-field); font-size: 17px; cursor: pointer; transform: none !important; box-shadow: none !important; }
+body.lg .m-set .mic-note { display: block !important; margin: 0; padding: 0; background: none; font-size: 12.5px; color: var(--lg-ink2); }
+body.lg .m-set .mic-note button { border: 1px solid var(--lg-edge); background: var(--lg-field); color: var(--lg-ink); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+body.lg .m-set #skills-pub { margin: 0; padding: 0; border: 0; background: none; }
+body.lg .m-set .m-badge { align-self: flex-start; }
+
+/* ---- the dock ---- */
+body.lg #m-tabs:not(#m-dock #m-tabs) { display: none; }
+#m-dock { position: fixed; z-index: 50; left: 12px; right: 12px; bottom: var(--dock-b); height: var(--dock-h); display: flex; gap: 10px; align-items: center; justify-content: center; pointer-events: none; }
+#m-dock > * { pointer-events: auto; }
+body.lg #m-dock #m-tabs { position: relative; flex: 1 1 auto; max-width: 420px; height: var(--dock-h); padding: 5px; border-radius: calc(var(--dock-h) / 2); display: flex; align-items: stretch;
+  touch-action: none; user-select: none; -webkit-user-select: none; transition: flex-basis .4s cubic-bezier(.3, 1.2, .5, 1), max-width .4s cubic-bezier(.3, 1.2, .5, 1);
+  left: auto; right: auto; bottom: auto; border-top: 1px solid var(--lg-edge); }
+body.lg #m-tabs button { position: relative; z-index: 2; flex: 1 1 0; min-width: 0; max-width: 140px; border: 0; background: none; padding: 0; margin: 0; border-radius: 26px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--lg-ink); cursor: pointer; font: inherit;
+  transition: color .25s, max-width .4s cubic-bezier(.3, 1.2, .5, 1), opacity .25s, transform .25s; overflow: hidden; }
+body.lg #m-tabs button span { font-size: 10.5px; font-weight: 600; letter-spacing: .01em; white-space: nowrap; }
+body.lg #m-tabs button svg { flex: none; }
+body.lg #m-tabs button.on { color: var(--lg-accent); }
+body.lg #m-tabs button:active:not(.on) { transform: scale(.92); }
+body.lg #m-tabs button.under { color: var(--lg-accent); }
+body.lg #m-tabs button.has-new::after { content: ''; position: absolute; top: 8px; right: calc(50% - 16px); width: 8px; height: 8px; border-radius: 50%; background: #ff3d7f; box-shadow: 0 0 0 2px rgba(255, 255, 255, .9); }
+body.lg #m-tabs button:focus-visible { outline: 2px solid var(--lg-accent); outline-offset: -3px; }
+/* the active-tab bubble: a lens of brighter glass that slides with a spring and stretches like jelly as it moves */
+body.lg #m-tabs .lg-bubble { position: absolute; z-index: 1; top: 5px; bottom: 5px; left: 0; width: var(--bw, 80px); transform: translateX(var(--bx, 5px)); border-radius: 26px;
+  background: var(--lg-bubble); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -1px 1px rgba(255, 255, 255, .3), 0 2px 10px rgba(70, 35, 105, .12);
+  transition: transform .55s cubic-bezier(.28, 1.55, .5, 1), width .45s cubic-bezier(.3, 1.3, .5, 1), scale .25s cubic-bezier(.3, 1.4, .5, 1), background .2s; }
+body.lg.lg-dark #m-tabs .lg-bubble { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 2px 10px rgba(0, 0, 0, .3); }
+body.lg #m-tabs .lg-bubble.instant { transition: scale .25s cubic-bezier(.3, 1.4, .5, 1), background .2s; }
+body.lg #m-tabs .lg-bubble.morph { animation: lg-jelly .6s cubic-bezier(.3, 1.2, .5, 1); }
+@keyframes lg-jelly { 0% { scale: 1 1; } 25% { scale: 1.22 .84; } 55% { scale: .95 1.06; } 80% { scale: 1.02 .99; } 100% { scale: 1 1; } }
+body.lg #m-tabs.scrub .lg-bubble { scale: 1.14 1.12; background: rgba(255, 255, 255, .38); backdrop-filter: blur(1px) brightness(1.12) saturate(1.4); -webkit-backdrop-filter: blur(1px) brightness(1.12) saturate(1.4);
+  box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px rgba(255, 255, 255, .6), 0 8px 22px rgba(70, 35, 105, .22); }
+/* Speak: the separate round glass bubble */
+body.lg #m-speak { flex: none; width: var(--dock-h); height: var(--dock-h); border-radius: 50%; padding: 0; display: grid; place-items: center; color: var(--lg-ink); cursor: pointer; transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), background .2s; }
+body.lg #m-speak svg { position: relative; z-index: 1; }
+body.lg #m-speak span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+body.lg #m-speak:active { transform: scale(.9); }
+body.lg #m-speak.rec { color: #fff; background: linear-gradient(135deg, #ff4f9a, #b45cff); animation: lg-pulse 1.4s ease-in-out infinite; }
+@keyframes lg-pulse { 50% { box-shadow: var(--lg-hi), 0 0 0 10px rgba(255, 79, 154, .18), var(--lg-shadow); } }
+/* scrolled down: the bar folds to just the active tab, the way iOS minimises it; scroll up and it comes back */
+body.lg.dock-mini #m-dock #m-tabs { flex: 0 0 auto; }
+body.lg.dock-mini #m-tabs button:not(.on) { max-width: 0; opacity: 0; pointer-events: none; }
+body.lg.dock-mini #m-tabs button.on { flex: 0 0 72px; }
+/* mic status: a small toast under the header, never a line in the main view */
+#m-toast { position: fixed; z-index: 60; left: 50%; top: calc(var(--top-h) + 6px); transform: translate(-50%, -8px); max-width: calc(100% - 40px); padding: 7px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: var(--lg-ink); background: var(--lg-fill); border: 1px solid var(--lg-edge); backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-hi), var(--lg-shadow); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.3, 1.4, .5, 1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#m-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- wide screens: same pieces, laid out for a big window ---- */
+body.lg.m-wide { --gap: 24px; --card-h: auto; --sheet: 30dvh; --card-w: min(420px, 32vw); --dock-h: 64px; }
+body.lg.m-wide #avatar-panel { bottom: 0 !important; right: 0; }
+body.lg.m-wide:not([data-tab="chat"]) #avatar-panel { right: calc(var(--card-w) + var(--gap) * 2); }
+body.lg.m-wide[data-tab="desktop"] { --card-w: min(820px, 54vw); }
+body.lg.m-wide #stage > .panel { left: auto; right: var(--gap); width: var(--card-w); top: calc(var(--top-h) + 14px) !important; bottom: calc(var(--dock-b) + var(--dock-h) + 16px); height: auto; }
+body.lg.m-wide #stage > #chat { top: auto !important; height: max(240px, var(--sheet)); }
+body.lg.m-wide #m-top { padding: 10px 16px 0; }
+body.lg.m-wide #m-dock { left: 50%; right: auto; transform: translateX(-50%); width: min(520px, 90vw); }
+body.lg.m-wide[data-tab="chat"] #m-dock, body.lg.m-wide #m-dock { }
+body.lg.m-wide #desktop .desk-body { flex: none; aspect-ratio: var(--desk-ar, 1600 / 704); }
+@media (prefers-reduced-motion: reduce) { body.lg #m-tabs .lg-bubble.morph { animation: none; } }
+
+/* ---- hard overrides: older sheet styles (mobile.css / style.css) must not repaint the glass ---- */
+body.lg #m-tabs, body.lg #m-speak, body.lg #m-top .m-id, body.lg #m-top .m-actions, body.lg #stage > .panel { background: var(--lg-fill) !important; border: 1px solid var(--lg-edge) !important;
+  backdrop-filter: var(--lg-blur) !important; -webkit-backdrop-filter: var(--lg-blur) !important; box-shadow: var(--lg-hi), var(--lg-shadow) !important; }
+body.lg #m-speak.rec { background: linear-gradient(135deg, #ff4f9a, #b45cff) !important; }
+body.lg #m-tabs button.on::before { display: none !important; }
+body.lg #m-tabs { position: relative !important; left: auto !important; right: auto !important; bottom: auto !important; display: flex !important; grid-template-columns: none !important; }
+body.lg #talk { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; border-radius: 0 !important; }
+body.lg #talk-input { height: 38px !important; border: 1px solid var(--lg-edge) !important; background: var(--lg-field) !important; border-radius: 19px !important; padding: 0 14px !important; font-size: 16px !important; color: var(--lg-ink) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .06) !important; }
+body.lg #chat .panel-head .chip { display: none; }
+/* framing toggle (wide screens): whole body or close-up */
+body.lg #m-frame { position: relative; z-index: 1; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; padding: 0; }
+body.lg #m-frame[aria-pressed="true"] { background: var(--lg-bubble); }
+
+/* header icons (same line icons as the phone bar, now on every size) */
+body.lg #m-top #voice-btn::before, body.lg #m-top #dm-toggle::before { width: 21px !important; height: 21px !important;  content: ''; width: 24px; height: 24px; background: currentColor; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+body.lg #m-top #voice-btn { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z'/%3E%3Cpath d='M16 9l5 6M21 9l-5 6'/%3E%3C/svg%3E"); color: var(--m-ink2); }
+body.lg #m-top #voice-btn[data-on="1"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E"); color: var(--m-pink); }
+body.lg #m-top #dm-toggle { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5'/%3E%3Ccircle cx='12' cy='15.5' r='1.3'/%3E%3C/svg%3E"); }
+body.lg #m-tabs { overflow: hidden; isolation: isolate; }
+
+/* Body tab: her self-views sit inside the glass card on every size */
+body.lg .m-body-wrap { padding: 0 16px; }
+body.lg .m-body-wrap #self-eye { display: flex !important; position: static; flex-direction: row; align-items: flex-start; justify-content: center; gap: 12px; max-height: none; }
+body.lg .m-body-wrap #self-eye .sp { width: calc(50% - 6px); gap: 6px; }
+body.lg .m-body-wrap #self-eye canvas { border-radius: 12px; border: 1px solid var(--lg-line); box-shadow: none; background: var(--lg-field); }
+body.lg .m-body-wrap #self-view { max-height: 46dvh; width: auto; margin: 0 auto; }
+body.lg .m-body-wrap #self-eye figcaption { font-size: 12px; font-weight: 600; padding: 3px 8px; background: var(--lg-field); color: var(--lg-ink2); }
+body.lg .m-body-wrap #self-eye pre { font-size: 10.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--lg-field); padding: 6px 8px; border-radius: 10px; }
+body.lg .m-body-wrap #self-eye { overflow: hidden; }
+body.lg .m-body-wrap #self-eye .sp { min-width: 0; overflow: hidden; }
+body.lg .m-body-wrap #self-eye canvas { max-width: 100%; }
+body.lg .m-body-wrap #self-eye { height: auto !important; inset: auto !important; transform: none !important; width: auto !important; }
+body.lg.m-wide .m-body-wrap #self-view { max-height: 52vh; }
+
+/* N•OS draws real refracting glass (WebGL) under the dock pieces; the DOM layer stays clear so it shows through.
+   Without WebGL (nos-nogl / no N•OS) the CSS glass above is what you see. */
+body.lg.nos-gl #m-tabs, body.lg.nos-gl #m-speak, body.lg.nos-gl #m-top .m-id, body.lg.nos-gl #m-top .m-actions {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .06)) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 .5px rgba(255, 255, 255, .4) !important; border-color: rgba(255, 255, 255, .35) !important; }
+body.lg.nos-gl.lg-dark #m-tabs, body.lg.nos-gl.lg-dark #m-speak, body.lg.nos-gl.lg-dark #m-top .m-id, body.lg.nos-gl.lg-dark #m-top .m-actions { background: rgba(20, 16, 30, .42) !important; }
+body.lg.nos-gl #m-speak.rec { background: linear-gradient(135deg, #ff4f9a, #b45cff) !important; }
+
+/* "Tip Jena" sits under the header pills on phones (it used to collide with them) */
+body.lg.m-app #tip-btn { top: calc(var(--top-h) + 8px) !important; right: 12px !important; height: 30px !important; font-size: 12px !important; background: var(--lg-fill) !important; border: 1px solid var(--lg-edge) !important;
+  backdrop-filter: var(--lg-blur) !important; -webkit-backdrop-filter: var(--lg-blur) !important; box-shadow: var(--lg-hi), var(--lg-shadow) !important; color: var(--lg-ink) !important; }
+
+/* wide: her stage ends above the dock so her feet are never under it */
+body.lg.m-wide #avatar-panel { bottom: calc(var(--dock-b) + var(--dock-h) + 10px) !important; }
+/* wide: "Tip Jena" moves off her stage floor (it sat beside her feet) to the top-left, under the Jena pill */
+body.lg.m-wide #tip-btn { position: fixed !important; top: calc(var(--top-h, 52px) + 10px) !important; left: 12px !important; right: auto !important; bottom: auto !important; height: 30px !important; font-size: 12px !important;
+  background: var(--lg-fill) !important; border: 1px solid var(--lg-edge) !important; backdrop-filter: var(--lg-blur) !important; -webkit-backdrop-filter: var(--lg-blur) !important; box-shadow: var(--lg-hi), var(--lg-shadow) !important; color: var(--lg-ink) !important; z-index: 30; }
+body.lg .m-feed-h { margin: 6px 16px 4px; font-size: 14px; font-weight: 650; color: var(--lg-ink); }
+body.lg .m-feed { margin: 0 16px 14px; padding-left: 18px; font-size: 13px; color: var(--lg-ink2); }
+
+/* N•OS window chrome (dots, resize arc/handles) belongs to its free-floating windows, not to the glass shell's cards */
+body.lg #stage > .panel .nos-dots, body.lg #stage > .panel .nos-arc, body.lg #stage > .panel .nos-rz, body.lg #stage > .panel .nos-chrome, body.lg #stage > .panel .nos-ops,
+body.lg #avatar-panel .nos-dots, body.lg #avatar-panel .nos-arc, body.lg #avatar-panel .nos-rz, body.lg #avatar-panel .nos-chrome, body.lg #avatar-panel .nos-ops { display: none !important; }

@@ -71,8 +71,11 @@ function fitFov(f, aspect) {
 // render size: the viewport, capped (pixel ratio <= 1.25 and the long side <= 2048; phones <= 1.0 and 1400)
 function frameSize(mode) {
   const vw = Math.max(320, innerWidth), vh = Math.max(320, innerHeight);
-  const cap = mode === 'live' ? 2048 : (matchMedia('(pointer: coarse)').matches ? 1400 : 1920);
-  const s = Math.min(mode === 'live' ? 1.25 : Math.min(1.25, devicePixelRatio || 1), cap / Math.max(vw, vh));
+  // still mode is ONE frame, so it renders at the screen's real pixel ratio (a 3x iPhone gets ~1170x2532, long side
+  // <= 2600; desktops <= 2x and 3200) instead of the old 1x/1400 px picture that looked soft on phones (Saidie, Oct 21)
+  const dpr = devicePixelRatio || 1;
+  const cap = mode === 'live' ? 2048 : (matchMedia('(pointer: coarse)').matches ? 2600 : 3200);
+  const s = Math.min(mode === 'live' ? Math.min(1.25, dpr) : Math.min(matchMedia('(pointer: coarse)').matches ? 3 : 2, dpr), cap / Math.max(vw, vh));
   return [Math.round(vw * s), Math.round(vh * s)];
 }
 
@@ -182,7 +185,10 @@ async function buildWith(mode, look, kind) {
     if (env) { env.mapping = THREE.EquirectangularReflectionMapping; scene.environment = pmrem.fromEquirectangular(env).texture; env.dispose(); }
     pmrem.dispose();
   }
-  const maxAniso = mode === 'live' ? 8 : 4;
+  const maxAniso = 8;
+  // Saidie, Oct 21 ("no box"): the wooden display shelves (a box/crate behind her head on laptops) are never drawn
+  // ...and the beanbag with its pink cushion (the 'lavender blobs' in her laptop photo; no pink cushion) is never drawn either
+  gltf.scene.traverse((o) => { if (/wooden_display_shelves|^Beanbag/i.test(o.name || '')) o.visible = false; });
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
     const hasLM = !!o.geometry.attributes.uv1;

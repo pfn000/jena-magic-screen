@@ -176,6 +176,8 @@ export class Avatar {
     // cut-out hair/face layers of a glTF body: alpha-to-coverage (MSAA) instead of a hard alpha test, so hair strands
     // read as soft strands instead of a speckled, pixel-stepped edge
     vrm.scene.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m?.isMeshStandardMaterial && m.alphaTest > 0) { m.alphaToCoverage = true; m.needsUpdate = true; } });
+    // crisp textures at grazing angles (her dress, hair cards, shoes): full anisotropic filtering, capped at 8
+    { const an = Math.min(8, this.renderer.capabilities?.getMaxAnisotropy?.() || 1); if (an > 1) vrm.scene.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) for (const k of ['map', 'normalMap', 'emissiveMap', 'shadeMultiplyTexture']) { const t = m?.[k]; if (t?.isTexture && t.anisotropy < an) { t.anisotropy = an; t.needsUpdate = true; } } }); }
     if (new URLSearchParams(location.search).get('outline') !== '1') vrm.scene.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m?.isOutline && m.visible !== false) { m.visible = false; this.outlinesOff++; } });
     if (this.vrm) { this.scene.remove(this.vrm.scene); VRMUtils.deepDispose(this.vrm.scene); }
     this.vrm = vrm;
@@ -673,19 +675,24 @@ export class Avatar {
     Q.ms = Q.ms * 0.95 + ms1 * 0.05;
     Q.fps = +(1000 / Q.ms).toFixed(1);
     if (Q.pinned || now < Q.cool) return;
-    const pr = this.renderer.getPixelRatio(), floor = Q.soft ? 0.6 : Math.min(this.minPixelRatio || 1, 1);
-    if (Q.ms > Q.vsync * 1.12 && Q.ms > 8.6) {
+    // SHARPNESS (Saidie, Oct 21: "step up the resolution"): she renders at the screen's real pixel ratio (3x on an iPhone).
+    // The budget is 60 fps even on 90/120 Hz screens (chasing 120 Hz used to throw away resolution on every phone), the
+    // extra camera panels slow down FIRST, and only a real drop below ~48 fps lowers her pixel ratio, never under 2x on a
+    // GPU (0.6x only on a software renderer like this box's SwiftShader).
+    const pr = this.renderer.getPixelRatio(), floor = Q.soft ? 0.6 : Math.min(this.nativeRatio || 1, 2);
+    const budget = Math.max(Q.vsync, 16.7);
+    if (Q.ms > budget * 1.25) {
       Q.fastSince = 0;
-      if (!this.dprPinned && pr > floor + 0.01) { this.renderer.setPixelRatio(Math.max(floor, Math.round((pr - 0.25) * 4) / 4)); this.resize(); this.pixelSteps = (this.pixelSteps || 0) + 1; Q.failed.pr = now; }
-      else if (Q.level > 0) { Q.failed[Q.level] = now; Q.level--; }
+      if (Q.level > 0) { Q.failed[Q.level] = now; Q.level--; }
+      else if (!this.dprPinned && pr > floor + 0.01) { this.renderer.setPixelRatio(Math.max(floor, Math.round((pr - 0.25) * 4) / 4)); this.resize(); this.pixelSteps = (this.pixelSteps || 0) + 1; Q.failed.pr = now; }
       else return;
-      Q.steps++; Q.cool = now + 2500; Q.ms = Q.vsync;
-    } else if (Q.ms < Q.vsync * 1.05) {
+      Q.steps++; Q.cool = now + 2500; Q.ms = budget;
+    } else if (Q.ms < budget * 1.05) {
       Q.fastSince ||= now;
       if (now - Q.fastSince > 8000) {
         Q.fastSince = 0; Q.cool = now + 3000;
-        if (Q.level < 3 && !(now - (Q.failed[Q.level + 1] || -1e9) < 60000)) Q.level++;
-        else if (!this.dprPinned && pr < Q.prMax - 0.01 && !(now - (Q.failed.pr || -1e9) < 60000)) { this.renderer.setPixelRatio(Math.min(Q.prMax, pr + 0.25)); this.resize(); }
+        if (!this.dprPinned && pr < Q.prMax - 0.01 && !(now - (Q.failed.pr || -1e9) < 60000)) { this.renderer.setPixelRatio(Math.min(Q.prMax, pr + 0.25)); this.resize(); }
+        else if (Q.level < 3 && !(now - (Q.failed[Q.level + 1] || -1e9) < 60000)) Q.level++;
       }
     } else Q.fastSince = 0;
   }
@@ -820,7 +827,7 @@ export class Avatar {
     if (this.cam && document.body.classList.contains('stream')) return;   // stream: panel resizes (dance <-> talk) ease through updateCamera, never snap
     const pin = new URLSearchParams(location.search).get('view');
     this.viewPin = pin === 'full' || pin === 'talk' ? pin : null;
-    const g = this.frameGoal(this.viewPin || 'talk');   // first frame is already her head-to-waist framing
+    const g = this.frameGoal(this.viewPin || (this.vrm ? this.viewMode(performance.now()) : 'talk'));   // snaps to the CURRENT framing (a resize used to snap a whole-body view back to the close-up)
     this.cam = { ...g }; this.camSpring = null;
     this.camera.position.set(g.x, g.y, g.d);
     this.camera.lookAt(g.x, g.y, 0);
@@ -830,8 +837,11 @@ export class Avatar {
     const mv = window.jenaMoves?.playing;
     // stream layout: VTuber head-to-waist; on the phone layout a real dance goes full body (her example TikToks)
     if (document.body.classList.contains('stream')) return mv && mv.c?.kind === 'dance' && document.body.classList.contains('stream-phone') ? 'full' : 'talk';   // wide: always head-to-waist
-    // head-to-waist is her default framing everywhere (Saidie, Oct 20); a real dance is the only full-body shot
+    // head-to-waist is her default framing everywhere (Saidie, Oct 20); a real dance is the only full-body shot.
+    // The glass shell's framing button (body.frame-full, default on laptops/desktops, Saidie Oct 21) shows her whole body
+    // so her feet and stance are seen.
     if (mv && mv.c?.kind === 'dance') return 'full';
+    if (document.body.classList.contains('frame-full')) return 'full';
     return 'talk';
   }
   updateCamera(dt, now) {

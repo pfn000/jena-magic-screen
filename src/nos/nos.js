@@ -619,7 +619,11 @@ export function mountNOS({ obs = false } = {}) {
       const k = r.width / (el.offsetWidth || r.width);
       (el.id === 'nos-about' ? B : A).push({ r, rad: Math.min(R * k, r.height / 2), op: W.op * (el.id === 'avatar-panel' ? 0.55 : 1), sh: W.mode === 'max' ? 0.6 : 1, lift: W.lift, menu: 0, refr: 7, bevel: 18 });
     }
-    for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
+    // the Liquid Glass shell (src/mobile.js, every screen size): real refracting glass under the tab-bar pill, the round
+    // Speak bubble and the two header pills, with their own round ends (the old full-width bars were square slabs)
+    if (document.body.classList.contains('lg')) {
+      for (const sel of ['#m-tabs', '#m-speak', '#m-top .m-id', '#m-top .m-actions']) { const el = $(sel); if (!el) continue; const r = el.getBoundingClientRect(); if (r.height > 2 && r.width > 2) A.push({ r, rad: r.height / 2, op: 1, sh: 0.5, lift: 0, menu: 0.6, refr: 6, bevel: 12 }); }
+    } else for (const sel of ['#m-top', '#m-tabs']) { const el = $(sel); if (el && phone) { const r = el.getBoundingClientRect(); if (r.height) A.push({ r, rad: 0.01, op: 1, sh: 0.4, lift: 0, menu: 0.6, refr: 4, bevel: 10, flat: 1 }); } }
     if (dock.classList.contains('show')) for (const c of dock.children) { const r = c.getBoundingClientRect(); B.push({ r, rad: r.height / 2, op: 1, sh: 0.6, lift: 0, menu: 0.5, refr: 5, bevel: 12 }); }
     if (M.v > 0.01 && bar.style.visibility === 'visible') B.push({ r: bar.getBoundingClientRect(), rad: Math.min(24, bar.offsetHeight / 2 || 20), op: M.v, sh: 0.7, lift: 0, menu: 1, refr: 6, bevel: 12 });
     if (M.sv > 0.01 && M.subKey) B.push({ r: sub.getBoundingClientRect(), rad: 24, op: M.sv, sh: 0.8, lift: 0, menu: 1, refr: 6, bevel: 14 });
