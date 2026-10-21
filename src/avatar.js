@@ -32,6 +32,7 @@ function noise() {
 }
 const _v = Array.from({ length: 12 }, () => new THREE.Vector3());
 const _q = Array.from({ length: 6 }, () => new THREE.Quaternion());
+const TOE_PRESS = 0.08;   // toes curl down this much (rad) on the floor so their pads press, not hover
 const _tgt = new THREE.Vector3(), _hip = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _eW = new THREE.Euler();
 // Raised ("hand up, like in class"): upper arm lifted out to the side and up, forearm turned so the
 // palm faces forward (x twist), elbow softly bent so the hand leans in toward her head (y flex).
@@ -248,6 +249,43 @@ export class Avatar {
     this.ankleH = { left: this.feet.left.y, right: this.feet.right.y };
     const mid = this.feet.left.clone().add(this.feet.right).multiplyScalar(0.5);
     this.feetRest = { left: this.feet.left.clone().sub(mid), right: this.feet.right.clone().sub(mid) };
+    // BALLS OF HER FEET (Saidie, Oct 19 + Oct 21 8:10 AM: "she on the balls of her feet? NOT FLAT"): her avatar has
+    // high-heel toes, so she stands with her heels up and her weight on the balls of her feet. The heel lift pivots the
+    // foot about its toe joint (the ball), so per foot we keep the ankle's offset from the ball at rest: b = how far the
+    // ankle sits behind the ball, h = how high above it, and the ball->toe direction in the rig root's frame.
+    this.ball = {};
+    const rootQi = H.normalizedHumanBonesRoot.getWorldQuaternion(new THREE.Quaternion()).invert();
+    for (const s of ['left', 'right']) {
+      const T = H.getNormalizedBoneNode(s + 'Toes'); if (!T) continue;
+      const tp = T.getWorldPosition(new THREE.Vector3()), ap = this.feet[s];
+      const dir = new THREE.Vector3(tp.x - ap.x, 0, tp.z - ap.z), b = dir.length();
+      if (b < 0.02) continue;
+      this.ball[s] = { b, h: ap.y - tp.y, dir: dir.normalize().applyQuaternion(rootQi), jy: tp.y, dirW: dir.clone(), tp: tp.clone(), toe: 0, bp: 0, dp: tp.y };
+    }
+    // the rendered pads, not the bones: the lowest skinned vertex of each foot's toes, and of its ball (the sole just
+    // behind the toe joint), measured once in the rest pose. Standing on the ball, whichever pad is lower is put
+    // exactly on the floor (a reviewer saw the toes hover ~7 mm when only the toe JOINT was grounded).
+    try {
+      const raw = {}, v = new THREE.Vector3(), rel = new THREE.Vector3();
+      for (const s of Object.keys(this.ball)) raw[s] = { T: H.getRawBoneNode(s + 'Toes'), F: H.getRawBoneNode(s + 'Foot'), toe: Infinity, ball: Infinity };
+      vrm.scene.traverse((o) => {
+        if (!o.isSkinnedMesh || !o.geometry?.attributes?.skinIndex) return;
+        const g = o.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, n = g.attributes.position.count, bones = o.skeleton.bones;
+        const ids = Object.entries(raw).map(([s, r]) => [s, bones.indexOf(r.T), bones.indexOf(r.F)]).filter((x) => x[1] >= 0 || x[2] >= 0);
+        if (!ids.length) return;
+        for (let i = 0; i < n; i++) {
+          let best = -1, bw = 0; for (let c = 0; c < 4; c++) { const w = sw.getComponent(i, c); if (w > bw) { bw = w; best = si.getComponent(i, c); } }
+          const hit = ids.find((x) => x[1] === best || x[2] === best); if (!hit) continue;
+          o.getVertexPosition(i, v); v.applyMatrix4(o.matrixWorld);
+          const s = hit[0], B = this.ball[s], r = raw[s];
+          if (best === hit[1]) r.toe = Math.min(r.toe, v.y);
+          else { const along = rel.subVectors(v, B.tp).dot(B.dirW); if (along > -0.035 && along < 0.006 && v.y < r.ball) { r.ball = v.y; B.bp = Math.max(0, -along); B.dp = B.jy - v.y; } }
+        }
+      });
+      for (const s of Object.keys(raw)) { if (Number.isFinite(raw[s].toe)) this.ball[s].toe = raw[s].toe; }
+      this.padDbg = Object.fromEntries(Object.entries(this.ball).map(([s, B]) => [s, { toe: +B.toe.toFixed(4), ballBack: +B.bp.toFixed(4), ballDown: +B.dp.toFixed(4), joint: +B.jy.toFixed(4) }]));
+    } catch (e) { console.warn('foot pads', e); }
+    this.heel = { left: 0.5, right: 0.5, vl: 0, vr: 0 }; this.heelLift = 0; this.heelOff = { left: new THREE.Vector3(), right: new THREE.Vector3() };
     this.stepState = null; this.hipDrop = 0; this.nextIdleStep = performance.now() + 20000 + Math.random() * 25000;
     this.addFloor();
   }
@@ -411,7 +449,7 @@ export class Avatar {
       const U = H.getNormalizedBoneNode(s + 'UpperLeg'), K = H.getNormalizedBoneNode(s + 'LowerLeg'), F = H.getNormalizedBoneNode(s + 'Foot');
       if (!U || !K || !F) continue;
       const pu = U.getWorldPosition(_v[0]), len = (this.legLen ||= {})[s] ||= pu.distanceTo(K.getWorldPosition(_v[1])) + K.getWorldPosition(_v[1]).distanceTo(F.getWorldPosition(_v[2]));
-      const tgt = this.feet[s], d = pu.distanceTo(tgt);
+      const tgt = _v[3].copy(this.feet[s]).add(this.heelOff?.[s] || _v[4].set(0, 0, 0)), d = pu.distanceTo(tgt);   // the ankle where the raised heel puts it
       if (d > len * 0.985) need = Math.max(need, Math.min(0.12, (d - len * 0.985) * (pu.y - tgt.y) / Math.max(d, 1e-3)));
     }
     this.hipDrop += (need - this.hipDrop) * Math.min(1, dt * 12);
@@ -463,7 +501,20 @@ export class Avatar {
     const U = H.getNormalizedBoneNode(side + 'UpperLeg'), K = H.getNormalizedBoneNode(side + 'LowerLeg'), F = H.getNormalizedBoneNode(side + 'Foot');
     if (!U || !K || !F || !this.feet) return;
     const target = _tgt.copy(this.feet[side]);
-    if (free) { target.y += 0.05 * free; target.z -= 0.015 * free; } // heel up: the ankle rises a little
+    // heel up, pivoting about the ball of the foot: the ankle rises and comes forward over the ball (updateHeels)
+    const th = this.heelNow?.[side] || 0, B = this.ball?.[side], fy0 = (this.footYaw ||= { left: 0, right: 0 })[side] || 0;
+    const off = (this.heelOff ||= { left: new THREE.Vector3(), right: new THREE.Vector3() })[side].set(0, 0, 0);
+    if (B && th > 1e-4) {
+      const c = Math.cos(th), s = Math.sin(th), bb = B.b * c - B.h * s, hh = B.b * s + B.h * c;
+      const rq = H.normalizedHumanBonesRoot.getWorldQuaternion(_q[3]);
+      if (Math.abs(fy0) > 1e-4) rq.premultiply(_q[4].setFromAxisAngle(_v[5].set(0, 1, 0), fy0));
+      const dir = _v[6].copy(B.dir).applyQuaternion(rq); dir.y = 0; dir.normalize();
+      // the lower of the two rendered pads goes on the floor: the ball (rotating up about the toe joint as the heel
+      // rises) or the toes (kept flat, curled down a touch so their pads press into the floor)
+      const ballY = B.jy - B.dp * c + B.bp * s, toeY = B.toe - TOE_PRESS * 0.03 * (1 - (this.heelAir?.[side] || 0));
+      off.set(dir.x * (B.b - bb), hh - B.h - Math.min(ballY, toeY), dir.z * (B.b - bb));
+      target.add(off);
+    } else if (free) { off.set(0, 0.05 * free, -0.015 * free); target.add(off); }   // (no toe bone: the old free-leg lift)
     U.updateMatrixWorld(true);
     const pu = U.getWorldPosition(_v[0]), pk = K.getWorldPosition(_v[1]), pf = F.getWorldPosition(_v[2]);
     const a = pk.distanceTo(pu), b = pf.distanceTo(pk);
@@ -493,8 +544,67 @@ export class Avatar {
     if (Math.abs(fy) > 1e-4) root.premultiply(_q[3].setFromAxisAngle(_v[5].set(0, 1, 0), fy));
     F.quaternion.copy(F.parent.getWorldQuaternion(_q[2]).invert().multiply(root));
     if (lift) F.rotateX(-lift); // toes up (heel stays down) for a foot tap
-    if (free) F.rotateX(0.45 * free); // toes stay on the floor while the heel is up
+    if (B) {
+      if (th > 1e-4) F.rotateX(th);   // heel up about the ball
+      // toes: flat on the floor while she stands on the ball (bent back by the heel angle), with a little life of their
+      // own: they grip a touch as she rises and spread flat as she settles; in the air they follow the foot loosely
+      const T = H.getNormalizedBoneNode(side + 'Toes');
+      if (T) { const air = this.heelAir?.[side] || 0, grip = (this.toeGrip?.[side] || 0); T.rotation.set(-th * (1 - 0.65 * air) + grip + TOE_PRESS * (1 - air), 0, 0); }
+    } else if (free) F.rotateX(0.45 * free); // toes stay on the floor while the heel is up
     F.updateMatrixWorld(true);
+  }
+
+  // BALLS OF HER FEET (Saidie: "she on the balls of her feet? NOT FLAT" / "if you're doing flat feet ... make sure her feet
+  // and movements are SO MUCH natural"). Each heel is a small spring (slightly under-damped, so it settles instead of
+  // snapping) toward a target built from: her high-heel stance (~27-32 deg, drifting slowly on its own noise, never a
+  // cycle), weight (the loaded foot's heel sinks a little, the free foot rises onto its ball), steps (heel peels up
+  // first = toe-off, the foot lands ball first, the heel settles), the odd rise onto her toes or a lower settle at
+  // random intervals, and a foot tap (heel comes down so the toes can lift). Sitting fades it all out.
+  updateHeels(dt, now, t, L, tap) {
+    if (!this.ball || !this.heel) return;
+    this.HN ||= { l: noise(), r: noise(), gl: noise(), gr: noise() };
+    const seat = THREE.MathUtils.clamp(1 - (this.seatW || 0) * 1.5, 0, 1);
+    // occasional weight moments, at random intervals (never periodic): a rise onto the toes, or a lower settle
+    if (!this._heelEv || now > this._heelEv.t0 + this._heelEv.dur) {
+      if (this._heelEv) this._heelNext = now + 9000 + Math.random() * 26000;
+      this._heelEv = null;
+      if (now > (this._heelNext ??= now + 6000 + Math.random() * 12000) && !this.stepState) {
+        const kind = Math.random() < 0.45 ? 'rise' : 'settle';
+        this._heelEv = { kind, t0: now, dur: kind === 'rise' ? 1100 + Math.random() * 900 : 1600 + Math.random() * 1600, amt: kind === 'rise' ? 0.22 + Math.random() * 0.14 : -(0.1 + Math.random() * 0.08), side: Math.random() < 0.5 ? 'both' : (Math.random() < 0.5 ? 'left' : 'right') };
+      }
+    }
+    const ev = this._heelEv, evu = ev ? (now - ev.t0) / ev.dur : 0, evw = ev ? Math.sin(Math.PI * Math.min(1, Math.max(0, evu))) ** 2 : 0;
+    const S = this.stepState, H = this.HN;
+    this.heelNow ||= { left: 0.5, right: 0.5 }; this.heelAir ||= { left: 0, right: 0 }; this.toeGrip ||= { left: 0, right: 0 };
+    let minRise = Infinity;
+    for (const side of ['left', 'right']) {
+      const k = side === 'left' ? 'l' : 'r';
+      const free = side === 'left' ? Math.max(0, -L) : Math.max(0, L), load = side === 'left' ? Math.max(0, L) : Math.max(0, -L);
+      let want = 0.52 + H[k](t * 0.045 + (k === 'l' ? 0 : 17)) * 0.05 - load * 0.07 + free * 0.32;
+      if (ev && (ev.side === 'both' || ev.side === side)) want += ev.amt * evw;
+      let air = 0;
+      if (S && S.side === side) {
+        const u = Math.min(1, (now - S.t0) / S.dur);
+        // toe-off: the heel peels up first; mid-swing the foot relaxes; it reaches for the floor ball first
+        want = u < 0.3 ? want + 0.45 * (u / 0.3) : u < 0.75 ? want + 0.45 - 0.3 * ((u - 0.3) / 0.45) : want + 0.15 * (1 - (u - 0.75) / 0.25);
+        air = Math.sin(Math.PI * u);
+      } else if (S) want += 0.04;   // the standing foot presses a little higher while the other one is in the air
+      if (tap && tap.side === side) want *= 1 - Math.min(1, tap.v * 3);   // a foot tap: heel down so the toes can lift
+      want = THREE.MathUtils.clamp(want * seat, 0, 1.15);
+      // critically-ish damped heel spring (zeta 0.8): a soft settle, no snap
+      const kk = S && S.side === side ? 140 : 55, z = 0.8, vk = side === 'left' ? 'vl' : 'vr';
+      const a = kk * (want - this.heel[side]) - 2 * z * Math.sqrt(kk) * this.heel[vk];
+      this.heel[vk] += a * dt; this.heel[side] += this.heel[vk] * dt;
+      const th = this.heelNow[side] = THREE.MathUtils.clamp(this.heel[side], 0, 1.2);
+      this.heelAir[side] = air;
+      // toes grip slightly as the heel rises fast, and relax as it settles
+      this.toeGrip[side] = damp(this.toeGrip[side], THREE.MathUtils.clamp(this.heel[vk] * 0.06, -0.06, 0.08) + H['g' + k](t * 0.11) * 0.03, 6, dt);
+      const B = this.ball[side];
+      if (B && !(S && S.side === side)) minRise = Math.min(minRise, B.b * Math.sin(th) + B.h * Math.cos(th) - B.h);
+    }
+    // her hips ride up with the heels of the foot carrying her (the lower one), so her knees keep their bend
+    if (!Number.isFinite(minRise)) minRise = this.heelLift || 0;
+    this.heelLift = damp(this.heelLift || 0, minRise * seat, 10, dt);
   }
 
   // her hips' midline for the legs: the point between her hip joints and the horizontal axis toward HER left.
@@ -1262,7 +1372,7 @@ export class Avatar {
       }
       this.travelV = tv;
       if (hips && this.hipsRest) {
-        hips.position.set(this.hipsRest.x + (this.travelX || 0) + L * 0.075 + sway * 0.03, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003 - bob, this.hipsRest.z + N.py(t * 0.11) * 0.012);
+        hips.position.set(this.hipsRest.x + (this.travelX || 0) + L * 0.075 + sway * 0.03, this.hipsRest.y - 0.022 - Math.abs(L) * 0.022 + breathe * 0.003 - bob + (this.heelLift || 0), this.hipsRest.z + N.py(t * 0.11) * 0.012);
       }
       // contrapposto: the standing leg's hip rises (+z lifts her left side), the spine and shoulders answer it
       // a full free turn (spin): eased 360 degrees on the hips; her feet step around to follow (updateFeet)
@@ -1380,6 +1490,7 @@ export class Avatar {
       H.normalizedHumanBonesRoot.updateMatrixWorld(true);
       try { this.updateFeet(dt, now); } catch (e) { console.warn('feet', e); }
       // the free leg (weight on the other one) rests on the ball of its foot: heel up, knee bent
+      this.updateHeels(dt, now, t, L, A.tap?.side ? { side: A.tap.side, v: tap } : null);
       this.plantFoot('left', A.tap?.side === 'left' ? tap : 0, Math.max(0, -L));
       this.plantFoot('right', A.tap?.side === 'right' ? tap : 0, Math.max(0, L));
       // after the leg IK: her chair (src/seat.js) blends her into a seated pose

@@ -437,6 +437,20 @@ export function setupSprings(vrm) {
       const want = /leg/i.test(n) ? byName(/upperleg|spine/i) : /arm/i.test(n) ? byName(/arm|chest/i) : byName(/spine|chest|upperleg/i);
       if (want.length) { j.colliderGroups = want; out.fixedColliders++; }
       j.settings.stiffness = Math.max(j.settings.stiffness ?? 1, 0.8);
+    } else if (/earring/i.test(n)) {
+      // EARRINGS (Saidie, Oct 21 8:16 AM: "loose and wiggly BUT CONNECTED ... I'd set the gravity to 0.001", both ears).
+      // The creator's springs were there but at stiffness 0.6 on 1 cm bones they snapped straight back and looked frozen.
+      // Each chain hangs from the head (its first bone is a child of Head, so the base stays put); the base link is a
+      // little firmer (her "chain_1 locked to the head"), every link below it is loose so the chain swings, lags and
+      // settles. Joints stay connected: the spring solver keeps every bone's length.
+      out.ear = (out.ear || 0) + 1;
+      // (a 2-bone piece has only its base joint to swing on, so only a longer chain gets the firmer base)
+      const base = (/^head$/i.test(j.bone?.parent?.name || '') || j.bone?.parent === vrm.humanoid?.getRawBoneNode?.('head')) && !!j.bone?.children?.some((c) => c.children?.some((cc) => cc.isBone));
+      j.settings.gravityPower = 0.001;
+      j.settings.gravityDir = new THREE.Vector3(0, -1, 0);
+      j.settings.stiffness = base ? 0.35 : 0.06;
+      j.settings.dragForce = base ? 0.3 : 0.12;
+      (out.earJoints ||= []).push(n + (base ? '*' : ''));
     } else out.other++;
   }
   try { M.setInitState(); } catch {}
