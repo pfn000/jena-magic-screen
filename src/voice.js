@@ -24,7 +24,8 @@ export class Voice {
   }
   speak(text, token) {
     if (!this.on || !text || !token) return;
-    this.queue = this.queue.then(() => this.play(text, token)).catch((e) => { this.status = 'error: ' + e.message; });
+    this.pending = (this.pending || 0) + 1;   // the happy-Jena avatar (src/happycam.js) waits for this audio instead of miming ahead of it
+    this.queue = this.queue.then(() => this.play(text, token)).catch((e) => { this.status = 'error: ' + e.message; }).finally(() => { this.pending = Math.max(0, (this.pending || 1) - 1); });
   }
   async play(text, token) {
     this.unlock();
@@ -36,6 +37,7 @@ export class Voice {
     const src = this.ctx.createBufferSource(); src.buffer = buf;
     const an = this.ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.5;   // 1024: ~21 ms window, long enough for her pitch (120-700 Hz)
     src.connect(an); an.connect(this.ctx.destination);
+    if (this.camTap) { try { src.connect(this.camTap(this.ctx)); } catch (e) { /* the avatar tap is optional */ } }   // happy-Jena avatar: her mouth follows this audio
     const td = new Float32Array(an.fftSize), fd = new Uint8Array(an.frequencyBinCount);
     const binHz = this.ctx.sampleRate / an.fftSize;
     let live = true;
@@ -76,6 +78,7 @@ export class Voice {
     this.avatar.talk.until = performance.now() + buf.duration * 1000;
     // the words she's saying, time-aligned to this audio, pick her mouth shapes (avatar.viseme)
     Object.assign(this.avatar.talk, { text: String(text), t0: performance.now(), ms: buf.duration * 1000 });
+    this.camSched = [this.ctx.currentTime]; this.camEnd = this.ctx.currentTime + buf.duration;   // happy-Jena avatar: speech starts now (mouth opens on time)
     await new Promise((res) => { src.onended = res; src.start(); tick(); });
     live = false; this.avatar.voice = null; this.status = 'idle';
     // what the lip-sync actually did (dev panel + tests read this): mouth-open level per frame from the audio

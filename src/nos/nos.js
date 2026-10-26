@@ -75,7 +75,9 @@ export function mountNOS({ obs = false } = {}) {
       g.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
       g.fillStyle = 'rgba(240,225,255,0.16)'; g.fillRect(0, 0, W, H);
     } else {
-      const gr = g.createRadialGradient(W * 0.7, H * 0.2, 0, W * 0.7, H * 0.2, Math.hypot(W, H) * 0.9); gr.addColorStop(0, '#2a1d36'); gr.addColorStop(0.55, '#150f1d'); gr.addColorStop(1, '#07060b');
+      const gr = g.createRadialGradient(W * 0.7, H * 0.2, 0, W * 0.7, H * 0.2, Math.hypot(W, H) * 0.9); const hp = body.classList.contains('avatar-happy');   // happy-Jena look: her lavender wall + warm pink light (src/happycam.css)
+      if (hp) { gr.addColorStop(0, '#a585da'); gr.addColorStop(0.45, '#8f6fc8'); gr.addColorStop(1, '#4b3380'); }
+      else { gr.addColorStop(0, '#2a1d36'); gr.addColorStop(0.55, '#150f1d'); gr.addColorStop(1, '#07060b'); }
       g.fillStyle = gr; g.fillRect(0, 0, W, H);
     }
     for (const G of [G1, G2]) if (G) G.upload(wp);

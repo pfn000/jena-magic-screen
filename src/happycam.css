@@ -1,0 +1,38 @@
+/* Happy-Jena avatar + style (Saidie, Oct 25 2026 8:26 PM: "the new official avatar and style").
+   Her look = the approved happy-Jena camera (camfix20, refs/jena-happy-IMG_3647.png): lavender room wall, warm pink light,
+   grey-blue eyes, big open smile. These rules only apply in happy mode (body.avatar-happy, the default; ?avatar=3d = old 3D body). */
+body.avatar-happy {
+  --pink: #ff86c4;          /* the warm pink light on her */
+  --lav: #a88be4;           /* her lavender wall */
+  --happy-wall: #8f6fc8;    /* wall colour at the frame edges (measured off the rig's rest frame) */
+  --happy-deep: #4b3380;
+  --happy-eye: #9fb4cc;     /* her grey-blue eyes */
+}
+body.avatar-happy #bg {
+  background:
+    radial-gradient(80% 70% at 50% 34%, rgba(255, 170, 214, 0.28) 0%, rgba(255, 170, 214, 0) 60%),
+    radial-gradient(130% 100% at 50% 30%, #9a79d2 0%, var(--happy-wall) 38%, #6a4ea8 70%, var(--happy-deep) 100%);
+}
+body.avatar-happy #avatar-canvas { display: none !important; }      /* the 3D canvas is not used in happy mode */
+body.avatar-happy #self-eye, body.avatar-happy #self-toggle, body.avatar-happy #body-views, body.avatar-happy #m-frame { display: none !important; }
+#happycam {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  object-fit: cover; object-position: 50% 34%;
+  pointer-events: none; z-index: 0;
+  /* soft edges so her room melts into the page background instead of sitting in a box */
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%);
+  opacity: 0; transition: opacity 0.5s ease;
+}
+body.happycam-ready #happycam { opacity: 1; }
+body.avatar-happy #avatar-panel > :not(#happycam) { position: relative; z-index: 1; }
+body.avatar-happy #avatar-panel > #speech, body.avatar-happy #avatar-panel > .nametag, body.avatar-happy #avatar-panel > #avatar-status,
+body.avatar-happy #avatar-panel > .controls, body.avatar-happy #avatar-panel > #voice-btn, body.avatar-happy #avatar-panel > .drop-hint { position: absolute; }
+body.avatar-happy #avatar-status { background: rgba(255, 255, 255, 0.72); color: #4b3380; }
+/* honest 2.5D label on her name tag */
+body.avatar-happy .nametag .model::after { content: ' · 2.5D'; opacity: 0.75; }
+#happy-body-note { margin: 10px 14px; padding: 12px 14px; border-radius: 18px; background: rgba(255, 255, 255, 0.55); color: #3b2a4a; font-size: 14px; line-height: 1.4; }
+#happy-body-note a { color: #7a3fbf; font-weight: 700; }
+/* stream / OBS layouts: her camera as a rounded cam card */
+body.stream.avatar-happy #happycam { -webkit-mask-image: none; mask-image: none; border-radius: 24px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+body.avatar-happy #avatar-still { -webkit-mask-image: none; mask-image: none; object-fit: cover; width: 100%; height: 100%; left: 0; transform: none; }

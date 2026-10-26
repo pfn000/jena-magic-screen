@@ -2,6 +2,7 @@ import './style.css';
 import './mobile.css';
 import './glass.css';
 import './stream.css';
+import './happycam.css';   // happy-Jena avatar look (src/happycam.js)
 import { streamLayout, streamDirector, streamCaptions, streamHooks } from './stream.js';
 import { Soundboard } from './soundboard.js';
 import { ArkitFace } from './arkitface.js';
@@ -50,6 +51,11 @@ document.body.classList.toggle('no-controls', !cfg.controls || cfg.obs);
 streamLayout(cfg);   // /stream?layout=wide|phone: the VTuber layout (src/stream.js, src/stream.css)
 
 // ---------------- avatar ----------------
+// HAPPY JENA (Saidie, Oct 25 8:26 PM: the magic screen "NEEDS to have the new official avatar and style"): her avatar here is
+// the approved happy-Jena camera rig (camfix20, the IMG_3647 look; src/happycam.js). It is 2.5D: pre-rendered frames, no 3D
+// skeleton. ?avatar=3d brings back the old 3D body (and its Body-tab self-views) for testing.
+const HAPPY = new URLSearchParams(location.search).get('avatar') !== '3d';
+document.body.classList.toggle('avatar-happy', HAPPY);
 const status = $('#avatar-status');
 const avatar = new Avatar($('#avatar-canvas'), {
   onStatus: (s, p, bytes) => {
@@ -70,8 +76,8 @@ const avatarStill = (why) => {
   status.hidden = true;
   document.body.classList.add('avatar-still');
 };
-const avatarTimer = setTimeout(() => avatarStill('her 3D body is taking long to load'), 8000);
-(async () => {
+const avatarTimer = HAPPY ? 0 : setTimeout(() => avatarStill('her 3D body is taking long to load'), 8000);
+if (!HAPPY) (async () => {
   try { await avatar.load(cfg.vrmUrl); }
   catch (e) {
     if (avatar.noGL) { clearTimeout(avatarTimer); avatarStill(e.message); return; }
@@ -90,6 +96,16 @@ if (cfg.obs) $('#voice-btn')?.remove();
 mountTip({ obs: cfg.obs });   // optional "Tip Jena" pill (src/tip.js); never in OBS
 const voice = new Voice(avatar, { obs: cfg.obs, button: cfg.obs ? null : $('#voice-btn') });
 const sfx = new Soundboard({ obs: cfg.obs, voice });   // her meme soundboard (src/soundboard.js)
+if (HAPPY) {
+  avatar.renderer.setAnimationLoop(null);   // no 3D body on this page: stop the empty 3D render loop (saves the phone's GPU)
+  voice.camTap = null;
+  import('./happycam.js').then(async (hc) => {
+    voice.camTap = hc.voiceTap;
+    await hc.mountHappyCam($('#avatar-panel'), { avatar, voice });
+    status.hidden = true; status.textContent = '';
+    document.body.classList.add('happycam-ready');
+  }).catch((e) => { console.warn('[happycam] failed', e); avatarStill(`couldn't load her camera (${e.message})`); });
+}
 streamDirector(cfg, avatar);   // stream camera director: push-ins, punch-ins, low angles (src/stream.js)
 streamCaptions(cfg, avatar);   // TikTok-style captions + punchline pops (src/stream.js)
 streamHooks(cfg, avatar);   // retention hooks: hidden key jingles, a rare random scream, out-of-pocket caption pops
@@ -262,8 +278,8 @@ const selfSense = new SelfSense(avatar, {
   readout: params.get('selfview') !== '0' ? $('#self-readout') : null,
   faceReadout: params.get('selfview') !== '0' ? $('#face-readout') : null,
 });
-if (params.get('selfview') !== '0' && !avatar.noGL) new FacePanel(avatar, $('#self-face'));
-if (params.get('selfview') !== '0' && !avatar.noGL) {
+if (params.get('selfview') !== '0' && !avatar.noGL && !HAPPY) new FacePanel(avatar, $('#self-face'));
+if (params.get('selfview') !== '0' && !avatar.noGL && !HAPPY) {
   const view = $('#self-view'), label = $('#self-view-label');
   const startVision = () => (window.__jenaVision = new SelfVision($('#avatar-canvas'), {
     log: (kind, text) => chain.self(kind, text),
@@ -748,10 +764,16 @@ if (cfg.obs) obsGuard();   // stream-safe: no reloads unless mama asks (src/obsg
 else window.__jenaObsReload = requestObsReload;
 
 window.__jenaMobile = mobileShell({ obs: cfg.obs });
+// happy-Jena avatar is 2.5D (no skeleton): say so where her 3D self-views used to be, with the way back to them
+if (HAPPY) {
+  const note = document.createElement('p'); note.id = 'happy-body-note';
+  note.innerHTML = 'Her avatar here is <b>2.5D</b>: pre-rendered frames of happy Jena, not a 3D model, so there is no live skeleton to show. <a href="?avatar=3d">Open her 3D body</a> to see the self-views.';
+  $('#body-panel .m-body-wrap')?.prepend(note);   // only where the Body tab exists (phone / glass shell)
+}
 if (!cfg.obs) import('./liquid-glass.js').then((m) => { window.__liquidGlass = m.mountLiquidGlass(); }).catch((e) => console.warn('[glass] refraction layer failed', e));
 try { mountNOS({ obs: cfg.obs }); } catch (e) { console.warn('[nos] glass UI failed to start', e); }
 // Jena's 3D room as the live background (lazy, after first paint; WebGPU when the device has it, else WebGL2; no GPU = a plain dark gradient): src/room-bg.js
-if (!cfg.obs && !cfg.bgNone) import('./room-bg.js').then((m) => m.mountRoomBg({ obs: cfg.obs, waitFor: () => avatar.ready || document.body.classList.contains('avatar-still'), stage: () => avatar })).catch((e) => console.warn('[room] background failed to start', e));
+if (!cfg.obs && !cfg.bgNone && !HAPPY) import('./room-bg.js').then((m) => m.mountRoomBg({ obs: cfg.obs, waitFor: () => avatar.ready || document.body.classList.contains('avatar-still'), stage: () => avatar })).catch((e) => console.warn('[room] background failed to start', e));
 
 const stamp = document.createElement('div');
 stamp.id = 'build-stamp';
