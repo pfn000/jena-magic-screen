@@ -264,6 +264,9 @@ export async function mountHappyCam(host, { avatar, voice, base = '/jena-cam/' }
   host.prepend(cam.canvas);
   const pause = () => { if (document.hidden) { clearInterval(cam.st.timer); cam.st.timer = 0; } else if (!cam.st.timer) cam.st.timer = setInterval(cam.frameNow, 1000 / 30); };
   document.addEventListener('visibilitychange', pause);
+  // warm the browser cache with every rig frame (8 MB, low priority, 4 at a time) so a reply that starts mid head-turn
+  // opens her mouth from cache, not from the network
+  setTimeout(async () => { const q = Array.from({ length: rig.frames.length }, (_, f) => f); const go = async () => { while (q.length) { const f = q.shift(); try { await fetch(base + 'f' + String(f).padStart(3, '0') + '.jpg', { priority: 'low' }); } catch (e) {} } }; await Promise.all([go(), go(), go(), go()]); cam.st.warmed = true; }, 2500);
   window.__happyCam = cam;   // diagnostics: window.__happyCam.st (blinks, shapes used, mouth latency, misses)
   return cam;
 }
