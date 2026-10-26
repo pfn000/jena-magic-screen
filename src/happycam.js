@@ -2,7 +2,8 @@
 // Ported from her Discord camera player (ops/jena-discord-voice/jcam.js, camfix20) with two site changes: frames load
 // per file on demand, and speech comes from the site's own voice (tap) or the words she is saying.
 // ===== Jena live camera — camfix20 (2026-10-26; camfix19 rig + logic, plus: speech-start hurry capped at 60 ms then a cut, no flow morph while hurrying, blink 250 ms). HONEST LABEL: this is 2.5D, not a 3D model. Every picture is a
-// pre-rendered 2D frame; head turns are real frames of one generated head-turn video (pre-rendered angles), plus a tiny
+// pre-rendered 2D frame; head turns (turnfix1, 2026-10-26) are her approved open-smile rest frame warped in 2D (a smooth head-yaw
+// warp up to ~16 deg plus a small tilt; the old generated turn frames showed a closed-teeth grin and were replaced), plus a tiny
 // whole-picture drift/tilt (a 2D transform) so she is never frozen.
 // camfix19 changes (review CAMFIX-REVIEW6 FAIL):
 //  - rig rebuilt: only frames with both eyes open and a happy look are left. Rest = frames 0-7, the big open happy smile
