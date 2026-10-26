@@ -20,8 +20,10 @@ body.avatar-happy #self-eye, body.avatar-happy #self-toggle, body.avatar-happy #
   object-fit: cover; object-position: 50% 34%;
   pointer-events: none; z-index: 0;
   /* soft edges so her room melts into the page background instead of sitting in a box */
-  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%);
-  mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%), linear-gradient(to bottom, #000 82%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(ellipse 78% 82% at 50% 42%, #000 62%, transparent 100%), linear-gradient(to bottom, #000 82%, transparent 100%);
+  mask-composite: intersect;
   opacity: 0; transition: opacity 0.5s ease;
 }
 body.happycam-ready #happycam { opacity: 1; }
